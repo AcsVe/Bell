@@ -266,3 +266,11 @@ def test_native_header_auth_and_cors(admin, app):
     assert c.get('/api/schedule', headers={'X-Bell-Code': 'WRONG1'}).status_code == 401
     # admin pages never get CORS headers
     assert 'Access-Control-Allow-Origin' not in admin.get('/admin/').headers
+
+
+def test_normalize_db_url():
+    from app import normalize_db_url
+    for raw in ('postgres://u:p@h/db', 'postgresql://u:p@h/db', 'postgresql+psycopg2://u:p@h/db',
+                'postgresql+psycopg://u:p@h/db', '  postgresql://u:p@h/db  '):
+        assert normalize_db_url(raw) == 'postgresql+psycopg://u:p@h/db'
+    assert normalize_db_url('sqlite:///x.db') == 'sqlite:///x.db'

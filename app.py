@@ -7,6 +7,17 @@ from flask import (Flask, Response, abort, redirect, request, send_from_director
 from models import db, MediaFile
 
 
+def normalize_db_url(url):
+    """Whatever form Render/Neon give (postgres://, postgresql://,
+    postgresql+psycopg2://, postgresql+psycopg://), always use the psycopg 3
+    driver, which ships ready-made wheels for current Python versions."""
+    url = (url or '').strip()
+    for prefix in ('postgres://', 'postgresql://', 'postgresql+psycopg2://', 'postgresql+psycopg://'):
+        if url.startswith(prefix):
+            return 'postgresql+psycopg://' + url[len(prefix):]
+    return url
+
+
 def create_app(test_config=None):
     app = Flask(__name__)
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-change-me')
@@ -20,9 +31,7 @@ def create_app(test_config=None):
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 60 * 60 * 24 * 7
 
     db_path = os.path.join(os.path.dirname(__file__), 'bell.db')
-    database_url = os.environ.get('DATABASE_URL', f'sqlite:///{db_path}')
-    if database_url.startswith('postgres://'):
-        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    database_url = normalize_db_url(os.environ.get('DATABASE_URL', f'sqlite:///{db_path}'))
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     # Managed Postgres (Neon/Render) drops idle connections; ping before reuse.
