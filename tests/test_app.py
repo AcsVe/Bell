@@ -274,3 +274,117 @@ def test_normalize_db_url():
                 'postgresql+psycopg://u:p@h/db', '  postgresql://u:p@h/db  '):
         assert normalize_db_url(raw) == 'postgresql+psycopg://u:p@h/db'
     assert normalize_db_url('sqlite:///x.db') == 'sqlite:///x.db'
+
+
+def _fill(xlsx_bytes, rows):
+    """rows: list of (name_ar, name_en, [section header names to mark])"""
+    import openpyxl
+    wb = openpyxl.load_workbook(io.BytesIO(xlsx_bytes))
+    ws = wb['المعلمون']
+    headers = [c.value for c in ws[2]]
+    for r in range(3, ws.max_row + 1):          # clear pre-filled rows
+        for c in range(1, len(headers) + 1):
+            ws.cell(row=r, column=c).value = None
+    for i, (ar, en, marks) in enumerate(rows):
+        ws.cell(row=3 + i, column=1).value = ar
+        ws.cell(row=3 + i, column=2).value = en
+        for m in marks:
+            ws.cell(row=3 + i, column=headers.index(m) + 1).value = '✓'
+    out = io.BytesIO()
+    wb.save(out)
+    return out.getvalue()
+
+
+def _upload(admin, sid, data, sync=True):
+    form = {'stage_id': sid, 'file': (io.BytesIO(data), 't.xlsx')}
+    if sync:
+        form['sync'] = '1'
+    return admin.post('/admin/teachers/import', data=form, content_type='multipart/form-data',
+                      follow_redirects=True).get_data(as_text=True)
+
+
+def test_teacher_template_import_by_stage(admin, app):
+    import openpyxl
+    sid, gid = _setup_school(admin, app)
+    # second stage for a shared teacher
+    admin.post('/admin/stages/add', data={'name_ar': 'المرحلة الثانوية'})
+    with app.app_context():
+        sid2 = Stage.query.filter_by(name_ar='المرحلة الثانوية').one().id
+    admin.post(f'/admin/stages/{sid2}/grades/add', data={'names': 'الصف العاشر'})
+    with app.app_context():
+        g10 = db.session.get(Stage, sid2).grades[0].id
+    admin.post(f'/admin/grades/{g10}/sections/add', data={'names': 'أ'})
+
+    r = admin.get(f'/admin/teachers/template/{sid}')
+    assert r.status_code == 200 and r.mimetype.endswith('sheet')
+    ws = openpyxl.load_workbook(io.BytesIO(r.data))['المعلمون']
+    assert ws['A1'].value == f'stage:{sid}' and ws.row_dimensions[1].hidden
+    assert [c.value for c in ws[2]][3:] == ['الصف الأول - أ', 'الصف الأول - ب']
+
+    data = _fill(r.data, [('منى  الخطيب', 'Muna', ['الصف الأول - أ', 'الصف الأول - ب']),
+                          ('رامي عودة', '', ['الصف الأول - ب']),
+                          ('أحمد', '', [])])   # existing teacher from _setup_school, no links
+    html = _upload(admin, sid, data)
+    assert 'جديد 2' in html and 'ربط 3' in html
+    with app.app_context():
+        muna = Teacher.query.filter_by(name_ar='منى الخطيب').one()   # whitespace normalized
+        assert muna.name_en == 'Muna' and len(muna.code) == 6
+        assert sorted(s.name_ar for s in muna.sections) == ['أ', 'ب']
+        assert Teacher.query.filter_by(name_ar='أحمد').count() == 1  # matched, not duplicated
+        muna_code = muna.code
+
+    # re-download is pre-filled with current links and codes
+    ws = openpyxl.load_workbook(io.BytesIO(admin.get(f'/admin/teachers/template/{sid}').data))['المعلمون']
+    rows = {ws.cell(row=r, column=1).value: [ws.cell(row=r, column=c).value for c in range(3, 6)]
+            for r in range(3, ws.max_row + 1) if ws.cell(row=r, column=1).value}
+    assert rows['منى الخطيب'] == [muna_code, '✓', '✓'] and rows['رامي عودة'][1:] == [None, '✓']
+
+    # same teacher in the other stage's template keeps one code
+    t2 = admin.get(f'/admin/teachers/template/{sid2}').data
+    _upload(admin, sid2, _fill(t2, [('منى الخطيب', '', ['الصف العاشر - أ'])]))
+    with app.app_context():
+        muna = Teacher.query.filter_by(name_ar='منى الخطيب').one()
+        assert muna.code == muna_code and len(muna.sections) == 3
+
+    # sync: unmarking ب in stage 1 removes only that link (stage-2 link untouched)
+    t1 = admin.get(f'/admin/teachers/template/{sid}').data
+    _upload(admin, sid, _fill(t1, [('منى الخطيب', 'Muna', ['الصف الأول - أ'])]))
+    with app.app_context():
+        muna = Teacher.query.filter_by(name_ar='منى الخطيب').one()
+        assert sorted(s.full_name('ar') for s in muna.sections) == ['الصف الأول - أ', 'الصف العاشر - أ']
+        # رامي not in the file → untouched
+        assert len(Teacher.query.filter_by(name_ar='رامي عودة').one().sections) == 1
+
+    # without sync nothing is removed
+    _upload(admin, sid, _fill(t1, [('منى الخطيب', '', [])]), sync=False)
+    with app.app_context():
+        assert len(Teacher.query.filter_by(name_ar='منى الخطيب').one().sections) == 2
+
+    # wrong stage is refused, nothing changes
+    html = _upload(admin, sid2, _fill(t1, [('جديد', '', ['الصف الأول - أ'])]))
+    assert 'مرحلة أخرى' in html
+    with app.app_context():
+        assert Teacher.query.filter_by(name_ar='جديد').count() == 0
+
+    # a hand-made sheet without the hidden key row still works via header names
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(['الاسم', 'English', 'الكود', 'الصف الأول - ب', 'عمود غريب'])
+    ws.append(['ليلى', '', '', 'x', 'x'])
+    buf = io.BytesIO()
+    wb.save(buf)
+    html = _upload(admin, sid, buf.getvalue())
+    assert 'عمود غريب' in html
+    with app.app_context():
+        assert [s.name_ar for s in Teacher.query.filter_by(name_ar='ليلى').one().sections] == ['ب']
+
+    # not an Excel file
+    html = _upload(admin, sid, b'not excel')
+    assert 'ليس ملف Excel' in html
+
+    # codes export and page render
+    r = admin.get(f'/admin/teachers/codes/{sid}')
+    assert r.status_code == 200
+    ws = openpyxl.load_workbook(io.BytesIO(r.data))['أكواد المعلمين']
+    assert any(row[1] == muna_code for row in ws.iter_rows(values_only=True))
+    assert 'تحميل القالب' in admin.get('/admin/teachers').get_data(as_text=True)

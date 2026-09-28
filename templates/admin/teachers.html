@@ -20,6 +20,38 @@
   </table>
   {% else %}<p class="muted">{{ L('لا يوجد معلمون بعد.', 'No teachers yet.') }}</p>{% endif %}
 </div>
+<div class="card" id="import">
+  <h2>{{ L('استيراد المعلمين حسب المرحلة (Excel)', 'Import teachers by stage (Excel)') }}</h2>
+  <p class="hint">{{ L('نزّل قالب المرحلة، اكتب أسماء المعلمين وضع ✓ تحت شعب كل معلم، ثم ارفعه. يُنشأ المعلم الجديد بكوده تلقائياً، والمعلم المشترك بين مراحل يُكتب بنفس الاسم في قالب كل مرحلة فيبقى له كود واحد. القالب يُنزَّل معبأً بالمعلمين الحاليين لتعدّله وتعيد رفعه.',
+    'Download the stage template, enter teacher names and put ✓ under each teacher’s sections, then upload it. New teachers get a code automatically; a teacher shared across stages is written with the same name in each stage template and keeps one code. The template comes pre-filled with current teachers so you can edit and re-upload it.') }}</p>
+  {% if stages %}
+  <table class="resp">
+    <thead><tr><th>{{ L('المرحلة', 'Stage') }}</th><th>{{ L('القالب', 'Template') }}</th><th>{{ L('رفع القالب المعبأ', 'Upload filled template') }}</th></tr></thead>
+    <tbody>
+    {% for st in stages %}
+    <tr>
+      <td><b>{{ L(st.name_ar, st.name_en or st.name_ar) }}</b>
+        <div class="muted small">{{ st.grades|map(attribute='sections')|map('length')|sum }} {{ L('شعبة', 'sections') }}</div></td>
+      <td>
+        <a class="btn ghost sm" href="{{ url_for('admin.teachers_template', stage_id=st.id) }}">⬇ {{ L('تحميل القالب', 'Download template') }}</a>
+        <a class="btn ghost sm" href="{{ url_for('admin.teachers_codes_export', stage_id=st.id) }}">⬇ {{ L('الأكواد', 'Codes') }}</a>
+      </td>
+      <td>
+        <form method="post" action="{{ url_for('admin.teachers_import') }}" enctype="multipart/form-data" class="row" style="align-items:center">
+          <input type="hidden" name="stage_id" value="{{ st.id }}">
+          <div><input type="file" name="file" accept=".xlsx" required></div>
+          <label class="shrink" style="display:inline-flex;gap:6px;align-items:center;margin:0;color:var(--ink);min-width:0;flex:0 0 auto" title="{{ L('الشعب غير المعلَّمة في هذه المرحلة تُزال من المعلمين الموجودين في الملف', 'Unmarked sections of this stage are unlinked for teachers in the file') }}">
+            <input type="checkbox" name="sync" value="1" checked> {{ L('مزامنة', 'Sync') }}</label>
+          <div class="shrink"><button class="sm">{{ L('رفع', 'Upload') }}</button></div>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">{{ L('أضف المراحل والشعب أولاً.', 'Add stages and sections first.') }}</p>{% endif %}
+</div>
+
 <div class="card">
   <h2>{{ L('إضافة معلمين', 'Add teachers') }}</h2>
   <form method="post" action="{{ url_for('admin.teacher_add') }}">

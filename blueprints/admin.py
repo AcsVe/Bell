@@ -1,7 +1,7 @@
 from functools import wraps
 
 from flask import (Blueprint, current_app, flash, redirect, render_template, request,
-                   session, url_for)
+                   send_file, session, url_for)
 
 from models import (db, AppSetting, Device, Grade, GradePeriodTime, MediaFile, Period,
                     Section, Stage, StageDayPeriodTime, StageWeekday, Teacher, TeacherSection)
@@ -441,7 +441,59 @@ def link_delete(link_id):
 @login_required
 def teachers():
     rows = Teacher.query.order_by(Teacher.name_ar).all()
-    return render_template('admin/teachers.html', teachers=rows)
+    stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
+    return render_template('admin/teachers.html', teachers=rows, stages=stages)
+
+
+XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+
+@admin_bp.route('/teachers/template/<int:stage_id>')
+@login_required
+def teachers_template(stage_id):
+    from teacher_io import build_template
+    st = db.get_or_404(Stage, stage_id)
+    return send_file(build_template(st), mimetype=XLSX, as_attachment=True,
+                     download_name=f'قالب معلمي {st.name_ar}.xlsx')
+
+
+@admin_bp.route('/teachers/codes/<int:stage_id>')
+@login_required
+def teachers_codes_export(stage_id):
+    from teacher_io import build_codes_export
+    st = db.get_or_404(Stage, stage_id)
+    return send_file(build_codes_export(st), mimetype=XLSX, as_attachment=True,
+                     download_name=f'أكواد {st.name_ar}.xlsx')
+
+
+@admin_bp.route('/teachers/import', methods=['POST'])
+@login_required
+def teachers_import():
+    from teacher_io import import_template
+    st = db.get_or_404(Stage, request.form.get('stage_id', type=int))
+    f = request.files.get('file')
+    if not f or not f.filename:
+        flash(_msg('اختر ملف القالب أولاً', 'Choose the template file first'), 'error')
+        return redirect(url_for('admin.teachers') + '#import')
+    try:
+        r = import_template(st, f.stream, sync=bool(request.form.get('sync')))
+    except ValueError as e:
+        db.session.rollback()
+        flash(str(e), 'error')
+        return redirect(url_for('admin.teachers') + '#import')
+    parts = [_msg(f'{st.name_ar}: {len(r["teachers"])} معلم في الملف',
+                  f'{st.name_en or st.name_ar}: {len(r["teachers"])} teachers in file'),
+             _msg(f'جديد {r["created"]}', f'{r["created"]} new'),
+             _msg(f'ربط {r["linked"]}', f'{r["linked"]} links added')]
+    if r['unlinked']:
+        parts.append(_msg(f'إزالة ربط {r["unlinked"]}', f'{r["unlinked"]} links removed'))
+    if r['skipped']:
+        parts.append(_msg(f'تجاهل {r["skipped"]} صف (بلا اسم أو مكرر)', f'{r["skipped"]} rows skipped (no name / duplicate)'))
+    flash(' · '.join(parts), 'ok')
+    if r['unknown_columns']:
+        flash(_msg('أعمدة لم تُعرف كشعب في هذه المرحلة وتم تجاهلها: ', 'Columns not matching a section, ignored: ')
+              + '، '.join(r['unknown_columns']), 'error')
+    return redirect(url_for('admin.teachers') + '#import')
 
 
 @admin_bp.route('/teachers/add', methods=['POST'])
