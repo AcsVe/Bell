@@ -1,0 +1,15 @@
+{
+  "appId": "jo.edu.ras.schoolbell",
+  "appName": "جرس الحصص",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_bell",
+      "iconColor": "#12305e",
+      "sound": "chime.wav"
+    }
+  }
+}

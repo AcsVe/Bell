@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}{{ L('لوحة الإدارة', 'Admin') }}{% endblock %} · {{ L('جرس الحصص', 'School Bell') }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+<link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+</head>
+<body>
+<header class="top">
+  <span class="brand">🔔 {{ L('جرس الحصص', 'School Bell') }}</span>
+  {% if session.admin_logged_in %}
+  <nav>
+    {% set ep = request.endpoint or '' %}
+    <a href="{{ url_for('admin.dashboard') }}" class="{{ 'on' if ep in ['admin.dashboard','admin.stage_view','admin.grade_view','admin.section_view'] }}">{{ L('المراحل والصفوف', 'Stages & grades') }}</a>
+    <a href="{{ url_for('admin.teachers') }}" class="{{ 'on' if ep in ['admin.teachers','admin.teacher_view'] }}">{{ L('المعلمون', 'Teachers') }}</a>
+    <a href="{{ url_for('admin.codes') }}" class="{{ 'on' if ep == 'admin.codes' }}">{{ L('الأكواد', 'Codes') }}</a>
+    <a href="{{ url_for('admin.settings') }}" class="{{ 'on' if ep == 'admin.settings' }}">{{ L('النغمة والأجهزة', 'Tone & devices') }}</a>
+  </nav>
+  {% endif %}
+  <div class="side">
+    <a href="{{ url_for('set_lang', code='en' if lang == 'ar' else 'ar', next=request.full_path) }}">{{ 'English' if lang == 'ar' else 'العربية' }}</a>
+    {% if session.admin_logged_in %}<a href="{{ url_for('admin.logout') }}">{{ L('خروج', 'Log out') }}</a>{% endif %}
+  </div>
+</header>
+<main>
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+<script>
+// Copy-to-clipboard for any element with data-copy.
+document.addEventListener('click', async (e) => {
+  const el = e.target.closest('[data-copy]');
+  if (!el) return;
+  const text = el.dataset.copy;
+  try { await navigator.clipboard.writeText(text); }
+  catch (_) { const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); }
+  const old = el.textContent; el.textContent = '{{ L("تم النسخ ✓", "Copied ✓") }}';
+  setTimeout(() => el.textContent = old, 1200);
+});
+// Confirm destructive actions.
+document.addEventListener('submit', (e) => {
+  const msg = e.target.dataset.confirm;
+  if (msg && !confirm(msg)) e.preventDefault();
+});
+</script>
+</body>
+</html>

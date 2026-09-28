@@ -1,0 +1,36 @@
+name: Desktop installers
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['desktop/**', 'native/**', 'static/js/**', 'static/css/**', 'templates/display.html', '.github/workflows/desktop.yml']
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist:win
+            artifact: desktop/dist/*.exe
+          - os: macos-latest
+            script: dist:mac
+            artifact: desktop/dist/*.dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Build installer
+        working-directory: desktop
+        env:
+          BELL_SERVER: ${{ vars.BELL_SERVER }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # unsigned build
+        run: |
+          npm ci
+          npm run ${{ matrix.script }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: school-bell-${{ matrix.os }}
+          path: ${{ matrix.artifact }}

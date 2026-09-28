@@ -1,0 +1,43 @@
+{% extends 'admin/base.html' %}
+{% block content %}
+<h1>{{ L('المراحل والصفوف', 'Stages & grades') }}</h1>
+
+<div class="grid" style="margin-bottom:18px">
+  <div class="card"><div class="muted small">{{ L('الشعب', 'Sections') }}</div><div class="stat">{{ stats.sections }}</div></div>
+  <div class="card"><div class="muted small">{{ L('المعلمون', 'Teachers') }}</div><div class="stat">{{ stats.teachers }}</div></div>
+  <div class="card"><div class="muted small">{{ L('الأجهزة المسجلة', 'Registered devices') }}</div><div class="stat">{{ stats.devices }}</div></div>
+</div>
+
+<div class="grid">
+{% for st in stages %}
+  <div class="card">
+    <div class="row" style="align-items:center">
+      {% if st.logo %}<img class="thumb shrink" style="height:44px" src="{{ st.logo.url }}" alt="">{% endif %}
+      <div>
+        <h2 style="margin:0"><a href="{{ url_for('admin.stage_view', stage_id=st.id) }}">{{ L(st.name_ar, st.name_en or st.name_ar) }}</a></h2>
+        {% if not st.active %}<span class="chip">{{ L('غير فعّالة', 'Inactive') }}</span>{% endif %}
+      </div>
+    </div>
+    <p class="muted small" style="margin:10px 0 6px">
+      {{ st.periods|length }} {{ L('حصة/فترة', 'periods') }} ·
+      {{ st.grades|length }} {{ L('صف', 'grades') }} ·
+      {{ st.grades|map(attribute='sections')|map('length')|sum }} {{ L('شعبة', 'sections') }}
+    </p>
+    <div>
+      {% for g in st.grades %}<a class="chip" href="{{ url_for('admin.grade_view', grade_id=g.id) }}">{{ L(g.name_ar, g.name_en or g.name_ar) }}</a>{% endfor %}
+    </div>
+  </div>
+{% else %}
+  <div class="card muted">{{ L('لا توجد مراحل بعد — أضف أول مرحلة.', 'No stages yet — add the first one.') }}</div>
+{% endfor %}
+</div>
+
+<div class="card">
+  <h2>{{ L('إضافة مرحلة', 'Add a stage') }}</h2>
+  <form method="post" action="{{ url_for('admin.stage_add') }}" class="row">
+    <div><label>{{ L('الاسم بالعربية', 'Arabic name') }}</label><input type="text" name="name_ar" placeholder="المرحلة الأساسية 1-3" required></div>
+    <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input type="text" name="name_en" placeholder="Primary 1-3"></div>
+    <div class="shrink"><button>{{ L('إضافة', 'Add') }}</button></div>
+  </form>
+</div>
+{% endblock %}

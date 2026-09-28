@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: school-bell
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --workers 2 --threads 4 --timeout 60
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        sync: false          # Postgres connection string (Render Postgres or Neon)
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_USER
+        sync: false
+      - key: ADMIN_PASS
+        sync: false

@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.db
+.pytest_cache/
+.env
+node_modules/
+mobile/www/
+desktop/www/
+desktop/dist/

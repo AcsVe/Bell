@@ -1,0 +1,146 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ L(st.name_ar, st.name_en or st.name_ar) }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">{{ L('المراحل', 'Stages') }}</a></div>
+<h1>{{ L(st.name_ar, st.name_en or st.name_ar) }}</h1>
+
+<div class="card">
+  <h2>{{ L('بيانات المرحلة وأيام الدوام', 'Stage details & school days') }}</h2>
+  <form method="post" action="{{ url_for('admin.stage_update', stage_id=st.id) }}">
+    <div class="row">
+      <div><label>{{ L('الاسم بالعربية', 'Arabic name') }}</label><input type="text" name="name_ar" value="{{ st.name_ar }}" required></div>
+      <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input type="text" name="name_en" value="{{ st.name_en or '' }}"></div>
+      <div class="shrink" style="width:110px"><label>{{ L('الترتيب', 'Order') }}</label><input type="number" name="sort_order" value="{{ st.sort_order }}"></div>
+    </div>
+    <label style="margin-top:12px">{{ L('أيام الدوام', 'School days') }}</label>
+    <div class="days">
+      {% for wd in week_order %}
+      <label><input type="checkbox" name="weekdays" value="{{ wd }}" {{ 'checked' if wd in st.weekday_list }}> {{ wd_names[wd] }}</label>
+      {% endfor %}
+    </div>
+    <div class="row" style="margin-top:12px;align-items:center">
+      <label class="shrink" style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" name="active" {{ 'checked' if st.active }}> {{ L('المرحلة فعّالة', 'Stage active') }}</label>
+      <div class="shrink"><button>{{ L('حفظ', 'Save') }}</button></div>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>{{ L('الشعار والخلفية', 'Logo & background') }}</h2>
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('admin.stage_media', stage_id=st.id) }}">
+    <div class="row">
+      <div>
+        <label>{{ L('الشعار', 'Logo') }}</label>
+        {% if st.logo %}<img class="thumb" src="{{ st.logo.url }}" alt=""><br>
+          <label style="display:inline-flex;gap:6px;color:var(--err)"><input type="checkbox" name="remove_logo" value="1"> {{ L('حذف', 'Remove') }}</label>{% endif %}
+        <input type="file" name="logo" accept="image/*">
+      </div>
+      <div>
+        <label>{{ L('الخلفية', 'Background') }}</label>
+        {% if st.background %}<img class="thumb" src="{{ st.background.url }}" alt=""><br>
+          <label style="display:inline-flex;gap:6px;color:var(--err)"><input type="checkbox" name="remove_background" value="1"> {{ L('حذف', 'Remove') }}</label>{% endif %}
+        <input type="file" name="background" accept="image/*">
+      </div>
+      <div class="shrink"><button>{{ L('رفع', 'Upload') }}</button></div>
+    </div>
+  </form>
+</div>
+
+<div class="card" id="periods">
+  <h2>{{ L('الحصص اليومية (الافتراضي لكل الأيام)', 'Daily periods (default, every day)') }}</h2>
+  <p class="hint">{{ L('الحصص متتالية بلا فراغ: كل حصة تبدأ لحظة انتهاء التي قبلها، فيكفي تحديد بداية الدوام ومدة كل حصة. نص التنبيه يُبنى من التسميات: «انتهت الحصة الأولى - بداية الحصة الثانية».',
+    'Periods run back-to-back: each starts when the previous one ends, so you only set the day start and each duration. Alert text comes from the labels: “End of Period 1 — Start of Period 2”.') }}</p>
+  <form method="post" action="{{ url_for('admin.periods_save', stage_id=st.id) }}">
+    <div class="row" style="max-width:320px;margin-bottom:10px">
+      <div><label>{{ L('بداية الدوام', 'Day starts at') }}</label><input type="time" name="day_start" value="{{ st.day_start }}" required></div>
+    </div>
+    {% if st.periods %}
+    <table class="resp">
+      <thead><tr><th>#</th><th>{{ L('النوع', 'Type') }}</th><th>{{ L('التسمية بالعربية', 'Arabic label') }}</th><th>{{ L('التسمية بالإنجليزية', 'English label') }}</th><th>{{ L('المدة (دقيقة)', 'Minutes') }}</th><th>{{ L('التوقيت', 'Time') }}</th><th></th></tr></thead>
+      <tbody>
+      {% for p in st.periods %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td><select name="p{{ p.id }}_kind"><option value="class" {{ 'selected' if p.kind=='class' }}>{{ L('حصة', 'Class') }}</option><option value="break" {{ 'selected' if p.kind=='break' }}>{{ L('استراحة', 'Break') }}</option></select></td>
+        <td><input type="text" name="p{{ p.id }}_label_ar" value="{{ p.label_ar }}"></td>
+        <td><input type="text" name="p{{ p.id }}_label_en" value="{{ p.label_en or '' }}"></td>
+        <td style="width:110px"><input type="number" min="1" max="240" name="p{{ p.id }}_duration" value="{{ p.duration }}"></td>
+        <td class="small" dir="ltr">{{ p.start_time }} – {{ p.end_time }}</td>
+        <td><button class="danger sm" form="del-p{{ p.id }}">✕</button></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted small">{{ L('نهاية الدوام:', 'Day ends at:') }} <b dir="ltr">{{ st.periods[-1].end_time }}</b></p>
+    {% endif %}
+    <button>{{ L('حفظ', 'Save') }}</button>
+  </form>
+  {% for p in st.periods %}
+  <form id="del-p{{ p.id }}" method="post" action="{{ url_for('admin.period_delete', period_id=p.id) }}" data-confirm="{{ L('حذف هذه الحصة؟ الحصص التالية ستتقدم تلقائياً.', 'Delete this period? Later periods move up automatically.') }}"></form>
+  {% endfor %}
+
+  <h2 style="margin-top:18px">{{ L('إضافة حصة / استراحة في آخر اليوم', 'Add a period / break at the end of the day') }}</h2>
+  <form method="post" action="{{ url_for('admin.period_add', stage_id=st.id) }}" class="row">
+    <div class="shrink" style="width:130px"><label>{{ L('النوع', 'Type') }}</label><select name="kind"><option value="class">{{ L('حصة', 'Class') }}</option><option value="break">{{ L('استراحة', 'Break') }}</option></select></div>
+    <div><label>{{ L('التسمية (اختياري)', 'Label (optional)') }}</label><input type="text" name="label_ar" placeholder="{{ L('تُولَّد تلقائياً', 'Auto-generated') }}"></div>
+    <div class="shrink" style="width:130px"><label>{{ L('المدة (دقيقة)', 'Minutes') }}</label><input type="number" min="1" max="240" name="duration" value="{{ st.periods[-1].duration if st.periods else 45 }}" required></div>
+    <div class="shrink"><button>{{ L('إضافة', 'Add') }}</button></div>
+  </form>
+</div>
+
+<div class="card" id="daytimes">
+  <h2>{{ L('يوم بتوقيت مختلف لكل المرحلة', 'A day with different timing for the whole stage') }}</h2>
+  <p class="hint">{{ L('مثال: الخميس بحصص أقصر لكل صفوف المرحلة. عدّل المدد واحفظ، أو «رجوع للافتراضي». الصفوف الجديدة ترث هذا تلقائياً.',
+    'E.g. shorter periods every Thursday for the whole stage. Edit durations and save, or “Reset to default”. New grades inherit this automatically.') }}</p>
+  <div class="tabs">
+    {% for wd in week_order if wd in st.weekday_list %}
+    <a href="{{ url_for('admin.stage_view', stage_id=st.id, day=wd) }}#daytimes" class="{{ 'on' if wd == day }}">{{ wd_names[wd] }}</a>
+    {% endfor %}
+  </div>
+  {% if day is not none and st.periods %}
+  <p>{% if overrides %}<span class="chip break">{{ L('توقيت مخصص لهذا اليوم', 'Custom timing for this day') }}</span>
+     {% else %}<span class="chip">{{ L('يستخدم الافتراضي', 'Using default') }}</span>{% endif %}</p>
+  <form method="post" action="{{ url_for('admin.stage_day_times', stage_id=st.id) }}">
+    <input type="hidden" name="weekday" value="{{ day }}">
+    <div class="row" style="max-width:320px;margin-bottom:10px">
+      <div><label>{{ L('بداية الدوام', 'Day starts at') }}</label><input type="time" name="day_start" value="{{ eff[0].start }}" required></div>
+    </div>
+    <table class="resp">
+      <thead><tr><th>{{ L('الحصة', 'Period') }}</th><th>{{ L('المدة (دقيقة)', 'Minutes') }}</th><th>{{ L('التوقيت', 'Time') }}</th></tr></thead>
+      <tbody>
+      {% for r in eff %}
+      <tr>
+        <td><span class="chip {{ 'break' if r.p.kind=='break' }}">{{ L(r.p.label_ar, r.p.label_en or r.p.label_ar) }}</span></td>
+        <td style="width:110px"><input type="number" min="1" max="240" name="n{{ r.p.number }}_dur" value="{{ r.dur }}" required></td>
+        <td class="small" dir="ltr">{{ r.start }} – {{ r.end }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="row" style="margin-top:12px">
+      <div class="shrink"><button>{{ L('حفظ توقيت ', 'Save timing for ') }}{{ wd_names[day] }}</button></div>
+      {% if overrides %}<div class="shrink"><button class="ghost" name="reset" value="1" formnovalidate>{{ L('رجوع للافتراضي', 'Reset to default') }}</button></div>{% endif %}
+    </div>
+  </form>
+  {% elif not st.weekday_list %}<p class="muted">{{ L('اختر أيام الدوام أولاً.', 'Choose school days first.') }}</p>{% endif %}
+</div>
+
+<div class="card" id="grades">
+  <h2>{{ L('الصفوف', 'Grades') }}</h2>
+  <div class="list-links">
+    {% for g in st.grades %}
+    <a href="{{ url_for('admin.grade_view', grade_id=g.id) }}">{{ L(g.name_ar, g.name_en or g.name_ar) }}
+      <span class="muted small">· {{ g.sections|length }} {{ L('شعبة', 'sections') }}</span></a>
+    {% else %}<p class="muted">{{ L('لا توجد صفوف بعد.', 'No grades yet.') }}</p>{% endfor %}
+  </div>
+  <form method="post" action="{{ url_for('admin.grade_add', stage_id=st.id) }}" class="row" style="margin-top:12px">
+    <div><label>{{ L('أسماء الصفوف (افصل بفاصلة لإضافة عدة صفوف)', 'Grade names (comma-separate to add several)') }}</label>
+      <input type="text" name="names" placeholder="الصف الأول، الصف الثاني، الصف الثالث" required></div>
+    <div class="shrink"><button>{{ L('إضافة', 'Add') }}</button></div>
+  </form>
+</div>
+
+<form method="post" action="{{ url_for('admin.stage_delete', stage_id=st.id) }}" data-confirm="{{ L('حذف المرحلة بكل صفوفها وشعبها وأكوادها؟ لا يمكن التراجع.', 'Delete this stage with all grades, sections and codes? This cannot be undone.') }}">
+  <button class="danger">{{ L('حذف المرحلة', 'Delete stage') }}</button>
+</form>
+{% endblock %}

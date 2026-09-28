@@ -1,0 +1,562 @@
+from functools import wraps
+
+from flask import (Blueprint, current_app, flash, redirect, render_template, request,
+                   session, url_for)
+
+from models import (db, AppSetting, Device, Grade, GradePeriodTime, MediaFile, Period,
+                    Section, Stage, StageDayPeriodTime, StageWeekday, Teacher, TeacherSection)
+from services import (WEEK_ORDER, bump_schedule_version, chain_times, default_period_labels,
+                      generate_code, minutes_between, parse_duration, rechain_stage,
+                      resolve_grade_day, valid_time, weekday_names)
+
+admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('admin_logged_in'):
+            return redirect(url_for('admin.login', next=request.path))
+        return f(*args, **kwargs)
+    return decorated
+
+
+def _msg(ar, en):
+    return en if session.get('lang') == 'en' else ar
+
+
+@admin_bp.after_request
+def _bump_on_change(resp):
+    """Every successful admin write bumps the schedule version so devices
+    pick up the change on their next silent sync."""
+    if request.method == 'POST' and session.get('admin_logged_in') \
+            and request.endpoint not in ('admin.login',) and resp.status_code < 400:
+        bump_schedule_version()
+        db.session.commit()
+    return resp
+
+
+def _form_text(name):
+    return (request.form.get(name) or '').strip()
+
+
+def _save_upload(field, kind, allowed_prefix, existing=None):
+    f = request.files.get(field)
+    if not f or not f.filename:
+        return existing, False
+    mime = f.mimetype or ''
+    if not mime.startswith(allowed_prefix):
+        flash(_msg('نوع الملف غير مدعوم', 'Unsupported file type'), 'error')
+        return existing, False
+    data = f.read()
+    if existing:
+        existing.data, existing.mime, existing.filename = data, mime, f.filename
+        return existing, True
+    m = MediaFile(kind=kind, filename=f.filename, mime=mime, data=data)
+    db.session.add(m)
+    db.session.flush()
+    return m, True
+
+
+# ── Auth ──────────────────────────────────────────────────────────────────
+@admin_bp.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        if (request.form.get('username', '') == current_app.config['ADMIN_USER'] and
+                request.form.get('password', '') == current_app.config['ADMIN_PASS']):
+            session.permanent = True
+            session['admin_logged_in'] = True
+            nxt = request.args.get('next') or ''
+            return redirect(nxt if nxt.startswith('/admin') else url_for('admin.dashboard'))
+        error = _msg('بيانات الدخول غير صحيحة', 'Invalid credentials')
+    return render_template('admin/login.html', error=error)
+
+
+@admin_bp.route('/logout')
+def logout():
+    session.pop('admin_logged_in', None)
+    return redirect(url_for('admin.login'))
+
+
+# ── Dashboard / stages ────────────────────────────────────────────────────
+@admin_bp.route('/')
+@login_required
+def dashboard():
+    stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
+    stats = {
+        'sections': Section.query.count(),
+        'teachers': Teacher.query.count(),
+        'devices': Device.query.count(),
+    }
+    return render_template('admin/dashboard.html', stages=stages, stats=stats)
+
+
+@admin_bp.route('/stages/add', methods=['POST'])
+@login_required
+def stage_add():
+    name_ar = _form_text('name_ar')
+    if not name_ar:
+        flash(_msg('اسم المرحلة مطلوب', 'Stage name is required'), 'error')
+        return redirect(url_for('admin.dashboard'))
+    st = Stage(name_ar=name_ar, name_en=_form_text('name_en') or None,
+               sort_order=Stage.query.count())
+    db.session.add(st)
+    db.session.flush()
+    for wd in (6, 0, 1, 2, 3):   # default week: Sunday → Thursday
+        db.session.add(StageWeekday(stage_id=st.id, weekday=wd))
+    db.session.commit()
+    return redirect(url_for('admin.stage_view', stage_id=st.id))
+
+
+@admin_bp.route('/stages/<int:stage_id>')
+@login_required
+def stage_view(stage_id):
+    st = db.get_or_404(Stage, stage_id)
+    day = request.args.get('day', type=int)
+    if day is None and st.weekday_list:
+        day = st.weekday_list[0] if 6 not in st.weekday_list else 6
+    overrides = {o.period_number: o for o in StageDayPeriodTime.query.filter_by(
+        stage_id=st.id, weekday=day)} if day is not None else {}
+    eff = []
+    for p in st.periods:
+        o = overrides.get(p.number)
+        s, e = (o.start_time, o.end_time) if o else (p.start_time, p.end_time)
+        eff.append({'p': p, 'start': s, 'end': e, 'dur': minutes_between(s, e)})
+    return render_template('admin/stage.html', st=st, day=day, overrides=overrides, eff=eff,
+                           week_order=WEEK_ORDER, wd_names=weekday_names(session.get('lang', 'ar')))
+
+
+@admin_bp.route('/stages/<int:stage_id>/update', methods=['POST'])
+@login_required
+def stage_update(stage_id):
+    st = db.get_or_404(Stage, stage_id)
+    st.name_ar = _form_text('name_ar') or st.name_ar
+    st.name_en = _form_text('name_en') or None
+    st.sort_order = request.form.get('sort_order', type=int) or 0
+    st.active = bool(request.form.get('active'))
+    chosen = {int(x) for x in request.form.getlist('weekdays')}
+    for w in list(st.weekdays):
+        if w.weekday not in chosen:
+            db.session.delete(w)
+    have = set(st.weekday_list)
+    for wd in chosen - have:
+        db.session.add(StageWeekday(stage_id=st.id, weekday=wd))
+    db.session.commit()
+    flash(_msg('تم الحفظ', 'Saved'), 'ok')
+    return redirect(url_for('admin.stage_view', stage_id=st.id))
+
+
+@admin_bp.route('/stages/<int:stage_id>/media', methods=['POST'])
+@login_required
+def stage_media(stage_id):
+    st = db.get_or_404(Stage, stage_id)
+    for field in ('logo', 'background'):
+        if request.form.get(f'remove_{field}'):
+            old = getattr(st, field)
+            setattr(st, field, None)
+            if old:
+                db.session.delete(old)
+            continue
+        m, changed = _save_upload(field, field, 'image/', getattr(st, field))
+        if changed and m is not getattr(st, field):
+            setattr(st, field, m)
+    db.session.commit()
+    flash(_msg('تم تحديث الصور', 'Images updated'), 'ok')
+    return redirect(url_for('admin.stage_view', stage_id=st.id))
+
+
+@admin_bp.route('/stages/<int:stage_id>/delete', methods=['POST'])
+@login_required
+def stage_delete(stage_id):
+    st = db.get_or_404(Stage, stage_id)
+    for m in (st.logo, st.background):
+        if m:
+            db.session.delete(m)
+    for g in st.grades:
+        _delete_grade_children(g)
+    db.session.delete(st)
+    db.session.commit()
+    flash(_msg('تم حذف المرحلة', 'Stage deleted'), 'ok')
+    return redirect(url_for('admin.dashboard'))
+
+
+# ── Periods (back-to-back: day start + durations) ─────────────────────────
+@admin_bp.route('/stages/<int:stage_id>/periods/add', methods=['POST'])
+@login_required
+def period_add(stage_id):
+    st = db.get_or_404(Stage, stage_id)
+    kind = 'break' if request.form.get('kind') == 'break' else 'class'
+    dur = parse_duration(request.form.get('duration'))
+    start = st.periods[-1].end_time if st.periods else st.day_start
+    times = chain_times(start, [dur]) if dur else None
+    if not times:
+        flash(_msg('أدخل مدة صحيحة بالدقائق (1-240) لا تتجاوز منتصف الليل',
+                   'Enter a valid duration in minutes (1-240) that ends before midnight'), 'error')
+        return redirect(url_for('admin.stage_view', stage_id=st.id) + '#periods')
+    number = max([p.number for p in st.periods] or [0]) + 1
+    class_index = sum(1 for p in st.periods if p.kind == 'class') + 1
+    d_ar, d_en = default_period_labels(kind, class_index)
+    db.session.add(Period(stage_id=st.id, number=number, kind=kind,
+                          label_ar=_form_text('label_ar') or d_ar,
+                          label_en=_form_text('label_en') or d_en,
+                          start_time=times[0][0], end_time=times[0][1]))
+    db.session.flush()
+    db.session.expire(st, ['periods'])
+    rechain_stage(st)
+    db.session.commit()
+    return redirect(url_for('admin.stage_view', stage_id=st.id) + '#periods')
+
+
+@admin_bp.route('/stages/<int:stage_id>/periods/save', methods=['POST'])
+@login_required
+def periods_save(stage_id):
+    """Bulk-save day start + every period's label/type/duration in one submit;
+    start/end times are recomputed as one gap-free chain."""
+    st = db.get_or_404(Stage, stage_id)
+    day_start = _form_text('day_start') or st.day_start
+    if not valid_time(day_start):
+        flash(_msg('وقت بداية الدوام غير صالح', 'Invalid day start time'), 'error')
+        return redirect(url_for('admin.stage_view', stage_id=st.id) + '#periods')
+    durs = []
+    for p in st.periods:
+        pre = f'p{p.id}_'
+        durs.append(parse_duration(request.form.get(pre + 'duration')) or p.duration)
+        p.label_ar = _form_text(pre + 'label_ar') or p.label_ar
+        p.label_en = _form_text(pre + 'label_en') or None
+        p.kind = 'break' if request.form.get(pre + 'kind') == 'break' else 'class'
+    times = chain_times(day_start, durs)
+    if times is None:
+        db.session.rollback()
+        flash(_msg('مجموع المدد يتجاوز منتصف الليل', 'Total duration runs past midnight'), 'error')
+        return redirect(url_for('admin.stage_view', stage_id=st.id) + '#periods')
+    st.day_start = day_start
+    for p, (s, e) in zip(st.periods, times):
+        p.start_time, p.end_time = s, e
+    rechain_stage(st)
+    db.session.commit()
+    flash(_msg('تم حفظ الحصص', 'Periods saved'), 'ok')
+    return redirect(url_for('admin.stage_view', stage_id=st.id) + '#periods')
+
+
+@admin_bp.route('/periods/<int:period_id>/delete', methods=['POST'])
+@login_required
+def period_delete(period_id):
+    p = db.get_or_404(Period, period_id)
+    st = p.stage
+    db.session.delete(p)
+    db.session.flush()
+    db.session.expire(st, ['periods'])
+    rechain_stage(st)   # later periods move up; overrides drop this period
+    db.session.commit()
+    return redirect(url_for('admin.stage_view', stage_id=st.id) + '#periods')
+
+
+def _save_day_override(model, owner_field, owner_id, weekdays, stage):
+    """Whole-day override: a day start + a duration per period, stored as a
+    complete gap-free set of rows. 'reset' removes the set (inherit again).
+    Returns an error message or None."""
+    q = lambda wd: model.query.filter_by(**{owner_field: owner_id}, weekday=wd)
+    if request.form.get('reset'):
+        for wd in weekdays:
+            q(wd).delete()
+        return None
+    day_start = _form_text('day_start')
+    durs = [parse_duration(request.form.get(f'n{p.number}_dur')) for p in stage.periods]
+    if not valid_time(day_start) or None in durs:
+        return _msg('أدخل وقت بداية ومدة صحيحة لكل حصة', 'Enter a start time and a valid duration for every period')
+    times = chain_times(day_start, durs)
+    if times is None:
+        return _msg('مجموع المدد يتجاوز منتصف الليل', 'Total duration runs past midnight')
+    for wd in weekdays:
+        q(wd).delete()
+        for p, (s, e) in zip(stage.periods, times):
+            db.session.add(model(**{owner_field: owner_id}, weekday=wd, period_number=p.number,
+                                 start_time=s, end_time=e))
+    return None
+
+
+@admin_bp.route('/stages/<int:stage_id>/day-times', methods=['POST'])
+@login_required
+def stage_day_times(stage_id):
+    st = db.get_or_404(Stage, stage_id)
+    day = request.form.get('weekday', type=int)
+    err = _save_day_override(StageDayPeriodTime, 'stage_id', st.id, [day], st)
+    db.session.commit()
+    flash(err or _msg('تم الحفظ', 'Saved'), 'error' if err else 'ok')
+    return redirect(url_for('admin.stage_view', stage_id=st.id, day=day) + '#daytimes')
+
+
+# ── Grades ────────────────────────────────────────────────────────────────
+@admin_bp.route('/stages/<int:stage_id>/grades/add', methods=['POST'])
+@login_required
+def grade_add(stage_id):
+    st = db.get_or_404(Stage, stage_id)
+    names = [n.strip() for n in _form_text('names').replace('،', ',').split(',') if n.strip()]
+    for i, n in enumerate(names):
+        db.session.add(Grade(stage_id=st.id, name_ar=n, sort_order=len(st.grades) + i))
+    db.session.commit()
+    return redirect(url_for('admin.stage_view', stage_id=st.id) + '#grades')
+
+
+@admin_bp.route('/grades/<int:grade_id>')
+@login_required
+def grade_view(grade_id):
+    g = db.get_or_404(Grade, grade_id)
+    st = g.stage
+    day = request.args.get('day', type=int)
+    if day is None and st.weekday_list:
+        day = 6 if 6 in st.weekday_list else st.weekday_list[0]
+    overrides = {o.period_number: o for o in GradePeriodTime.query.filter_by(
+        grade_id=g.id, weekday=day)} if day is not None else {}
+    resolved = resolve_grade_day(g, day) if day is not None else []
+    return render_template('admin/grade.html', g=g, st=st, day=day, overrides=overrides,
+                           resolved=resolved, week_order=WEEK_ORDER,
+                           wd_names=weekday_names(session.get('lang', 'ar')))
+
+
+@admin_bp.route('/grades/<int:grade_id>/update', methods=['POST'])
+@login_required
+def grade_update(grade_id):
+    g = db.get_or_404(Grade, grade_id)
+    g.name_ar = _form_text('name_ar') or g.name_ar
+    g.name_en = _form_text('name_en') or None
+    g.sort_order = request.form.get('sort_order', type=int) or 0
+    db.session.commit()
+    flash(_msg('تم الحفظ', 'Saved'), 'ok')
+    return redirect(url_for('admin.grade_view', grade_id=g.id))
+
+
+def _delete_grade_children(g):
+    for s in g.sections:
+        Device.query.filter_by(code_type='section', owner_id=s.id).delete()
+
+
+@admin_bp.route('/grades/<int:grade_id>/delete', methods=['POST'])
+@login_required
+def grade_delete(grade_id):
+    g = db.get_or_404(Grade, grade_id)
+    stage_id = g.stage_id
+    _delete_grade_children(g)
+    db.session.delete(g)
+    db.session.commit()
+    return redirect(url_for('admin.stage_view', stage_id=stage_id) + '#grades')
+
+
+@admin_bp.route('/grades/<int:grade_id>/times', methods=['POST'])
+@login_required
+def grade_times(grade_id):
+    g = db.get_or_404(Grade, grade_id)
+    day = request.form.get('weekday', type=int)
+    days = g.stage.weekday_list if request.form.get('all_days') else [day]
+    err = _save_day_override(GradePeriodTime, 'grade_id', g.id, days, g.stage)
+    db.session.commit()
+    flash(err or _msg('تم الحفظ', 'Saved'), 'error' if err else 'ok')
+    return redirect(url_for('admin.grade_view', grade_id=g.id, day=day) + '#times')
+
+
+# ── Sections ──────────────────────────────────────────────────────────────
+@admin_bp.route('/grades/<int:grade_id>/sections/add', methods=['POST'])
+@login_required
+def section_add(grade_id):
+    g = db.get_or_404(Grade, grade_id)
+    names = [n.strip() for n in _form_text('names').replace('،', ',').split(',') if n.strip()]
+    for i, n in enumerate(names):
+        db.session.add(Section(grade_id=g.id, name_ar=n, sort_order=len(g.sections) + i,
+                               code=generate_code()))
+        db.session.flush()   # keeps generate_code() unique within the batch
+    db.session.commit()
+    return redirect(url_for('admin.grade_view', grade_id=g.id) + '#sections')
+
+
+@admin_bp.route('/sections/<int:section_id>')
+@login_required
+def section_view(section_id):
+    s = db.get_or_404(Section, section_id)
+    linked_ids = {l.teacher_id for l in s.teacher_links}
+    teachers = Teacher.query.order_by(Teacher.name_ar).all()
+    devices = Device.query.filter_by(code_type='section', owner_id=s.id).all()
+    return render_template('admin/section.html', s=s, teachers=teachers,
+                           linked_ids=linked_ids, devices=devices)
+
+
+@admin_bp.route('/sections/<int:section_id>/update', methods=['POST'])
+@login_required
+def section_update(section_id):
+    s = db.get_or_404(Section, section_id)
+    s.name_ar = _form_text('name_ar') or s.name_ar
+    s.name_en = _form_text('name_en') or None
+    s.sort_order = request.form.get('sort_order', type=int) or 0
+    db.session.commit()
+    flash(_msg('تم الحفظ', 'Saved'), 'ok')
+    return redirect(url_for('admin.section_view', section_id=s.id))
+
+
+@admin_bp.route('/sections/<int:section_id>/regen', methods=['POST'])
+@login_required
+def section_regen(section_id):
+    s = db.get_or_404(Section, section_id)
+    s.code = generate_code()
+    Device.query.filter_by(code_type='section', owner_id=s.id).delete()
+    db.session.commit()
+    flash(_msg('تم توليد كود جديد — الأجهزة القديمة ستحتاج الكود الجديد',
+               'New code generated — old devices will need the new code'), 'ok')
+    return redirect(request.referrer or url_for('admin.section_view', section_id=s.id))
+
+
+@admin_bp.route('/sections/<int:section_id>/delete', methods=['POST'])
+@login_required
+def section_delete(section_id):
+    s = db.get_or_404(Section, section_id)
+    grade_id = s.grade_id
+    Device.query.filter_by(code_type='section', owner_id=s.id).delete()
+    db.session.delete(s)
+    db.session.commit()
+    return redirect(url_for('admin.grade_view', grade_id=grade_id) + '#sections')
+
+
+@admin_bp.route('/sections/<int:section_id>/teachers/add', methods=['POST'])
+@login_required
+def section_teacher_add(section_id):
+    s = db.get_or_404(Section, section_id)
+    tid = request.form.get('teacher_id', type=int)
+    if tid and db.session.get(Teacher, tid) and not TeacherSection.query.filter_by(
+            teacher_id=tid, section_id=s.id).first():
+        db.session.add(TeacherSection(teacher_id=tid, section_id=s.id))
+        db.session.commit()
+    return redirect(url_for('admin.section_view', section_id=s.id))
+
+
+@admin_bp.route('/links/<int:link_id>/delete', methods=['POST'])
+@login_required
+def link_delete(link_id):
+    l = db.get_or_404(TeacherSection, link_id)
+    db.session.delete(l)
+    db.session.commit()
+    return redirect(request.referrer or url_for('admin.dashboard'))
+
+
+# ── Teachers ──────────────────────────────────────────────────────────────
+@admin_bp.route('/teachers')
+@login_required
+def teachers():
+    rows = Teacher.query.order_by(Teacher.name_ar).all()
+    return render_template('admin/teachers.html', teachers=rows)
+
+
+@admin_bp.route('/teachers/add', methods=['POST'])
+@login_required
+def teacher_add():
+    """One teacher per line — paste a whole staff list at once."""
+    names = [n.strip() for n in (request.form.get('names') or '').splitlines() if n.strip()]
+    for n in names:
+        db.session.add(Teacher(name_ar=n, code=generate_code()))
+        db.session.flush()
+    db.session.commit()
+    flash(_msg(f'تمت إضافة {len(names)} معلم', f'Added {len(names)} teacher(s)'), 'ok')
+    return redirect(url_for('admin.teachers'))
+
+
+@admin_bp.route('/teachers/<int:teacher_id>')
+@login_required
+def teacher_view(teacher_id):
+    t = db.get_or_404(Teacher, teacher_id)
+    linked = {l.section_id: l for l in t.section_links}
+    stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
+    devices = Device.query.filter_by(code_type='teacher', owner_id=t.id).all()
+    return render_template('admin/teacher.html', t=t, linked=linked, stages=stages,
+                           devices=devices)
+
+
+@admin_bp.route('/teachers/<int:teacher_id>/update', methods=['POST'])
+@login_required
+def teacher_update(teacher_id):
+    t = db.get_or_404(Teacher, teacher_id)
+    t.name_ar = _form_text('name_ar') or t.name_ar
+    t.name_en = _form_text('name_en') or None
+    t.active = bool(request.form.get('active'))
+    db.session.commit()
+    flash(_msg('تم الحفظ', 'Saved'), 'ok')
+    return redirect(url_for('admin.teacher_view', teacher_id=t.id))
+
+
+@admin_bp.route('/teachers/<int:teacher_id>/sections/add', methods=['POST'])
+@login_required
+def teacher_section_add(teacher_id):
+    t = db.get_or_404(Teacher, teacher_id)
+    sid = request.form.get('section_id', type=int)
+    if sid and db.session.get(Section, sid) and not TeacherSection.query.filter_by(
+            teacher_id=t.id, section_id=sid).first():
+        db.session.add(TeacherSection(teacher_id=t.id, section_id=sid))
+        db.session.commit()
+    return redirect(url_for('admin.teacher_view', teacher_id=t.id))
+
+
+@admin_bp.route('/teachers/<int:teacher_id>/regen', methods=['POST'])
+@login_required
+def teacher_regen(teacher_id):
+    t = db.get_or_404(Teacher, teacher_id)
+    t.code = generate_code()
+    Device.query.filter_by(code_type='teacher', owner_id=t.id).delete()
+    db.session.commit()
+    flash(_msg('تم توليد كود جديد', 'New code generated'), 'ok')
+    return redirect(request.referrer or url_for('admin.teacher_view', teacher_id=t.id))
+
+
+@admin_bp.route('/teachers/<int:teacher_id>/delete', methods=['POST'])
+@login_required
+def teacher_delete(teacher_id):
+    t = db.get_or_404(Teacher, teacher_id)
+    Device.query.filter_by(code_type='teacher', owner_id=t.id).delete()
+    db.session.delete(t)
+    db.session.commit()
+    return redirect(url_for('admin.teachers'))
+
+
+# ── Codes overview ────────────────────────────────────────────────────────
+@admin_bp.route('/codes')
+@login_required
+def codes():
+    stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
+    teachers_ = Teacher.query.order_by(Teacher.name_ar).all()
+    return render_template('admin/codes.html', stages=stages, teachers=teachers_)
+
+
+# ── Settings: tone + devices ──────────────────────────────────────────────
+@admin_bp.route('/settings', methods=['GET', 'POST'])
+@login_required
+def settings():
+    tone_id = AppSetting.get('tone_id')
+    tone = db.session.get(MediaFile, int(tone_id)) if tone_id else None
+    if request.method == 'POST':
+        if request.form.get('reset_tone'):
+            if tone:
+                db.session.delete(tone)
+            AppSetting.set('tone_id', '')
+            flash(_msg('تمت العودة للنغمة الافتراضية', 'Default tone restored'), 'ok')
+        else:
+            m, changed = _save_upload('tone', 'tone', 'audio/', tone)
+            if changed:
+                AppSetting.set('tone_id', m.id)
+                flash(_msg('تم رفع النغمة', 'Tone uploaded'), 'ok')
+        db.session.commit()
+        return redirect(url_for('admin.settings'))
+    devices = Device.query.order_by(Device.last_sync.desc()).all()
+    owners = {}
+    for d in devices:
+        if d.code_type == 'section':
+            s = db.session.get(Section, d.owner_id)
+            owners[d.id] = s.full_name(session.get('lang', 'ar')) if s else '—'
+        else:
+            t = db.session.get(Teacher, d.owner_id)
+            owners[d.id] = t.name_ar if t else '—'
+    return render_template('admin/settings.html', tone=tone, devices=devices, owners=owners)
+
+
+@admin_bp.route('/devices/<int:device_id>/delete', methods=['POST'])
+@login_required
+def device_delete(device_id):
+    d = db.get_or_404(Device, device_id)
+    db.session.delete(d)
+    db.session.commit()
+    return redirect(url_for('admin.settings'))

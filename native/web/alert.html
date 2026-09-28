@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>جرس الحصص</title>
+<link rel="stylesheet" href="css/display.css">
+<style>body{cursor:pointer}</style>
+</head>
+<body>
+<div class="alert" id="alert">
+  <div class="alert-inner">
+    <img id="alertLogo" alt="" hidden>
+    <div id="alertTime" class="alert-time"></div>
+    <div id="alertText" class="alert-text"></div>
+    <div id="alertTargets" class="alert-targets"></div>
+    <div class="alert-hint" id="hint"></div>
+  </div>
+</div>
+<audio id="tone" src="sounds/chime.wav"></audio>
+<script>
+(async function () {
+  const $ = (id) => document.getElementById(id);
+  const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const p = await window.electronBell.alertPayload();
+  if (!p) return;
+  document.documentElement.lang = p.lang; document.documentElement.dir = p.lang === 'en' ? 'ltr' : 'rtl';
+  $('alertTime').textContent = p.time;
+  $('alertText').innerHTML = p.lines.map((l) => {
+    const parts = esc(l).split(/ [-—] /);
+    return parts.length === 2 ? `<span>${parts[0]}</span><span class="l2">${parts[1]}</span>` : `<span>${parts[0]}</span>`;
+  }).join('<span class="sep"></span>');
+  $('alertTargets').textContent = p.test ? (p.lang === 'en' ? 'This is a test alert' : 'هذا تنبيه تجريبي') : p.targets;
+  $('hint').textContent = p.lang === 'en' ? 'Click or press Esc to dismiss' : 'اضغط أو Esc للإغلاق';
+  if (p.background) { $('alert').style.backgroundImage = `url("${p.background}")`; $('alert').classList.add('has-img'); }
+  if (p.logo) { $('alertLogo').src = p.logo; $('alertLogo').hidden = false; }
+  if (new URLSearchParams(location.search).get('sound') === '1') {
+    const a = $('tone');
+    if (p.tone) a.src = p.tone;
+    a.play().catch(() => { a.src = 'sounds/chime.wav'; a.play().catch(() => {}); });
+  }
+  const close = () => window.electronBell.closeAlert();
+  document.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+})();
+</script>
+</body>
+</html>

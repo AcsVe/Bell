@@ -1,0 +1,31 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ L('المعلمون', 'Teachers') }}{% endblock %}
+{% block content %}
+<h1>{{ L('المعلمون', 'Teachers') }}</h1>
+<div class="card">
+  {% if teachers %}
+  <table class="resp">
+    <thead><tr><th>{{ L('المعلم', 'Teacher') }}</th><th>{{ L('كود المعلم', 'Teacher code') }}</th><th>{{ L('الشعب', 'Sections') }}</th><th></th></tr></thead>
+    <tbody>
+    {% for t in teachers %}
+    <tr>
+      <td><a href="{{ url_for('admin.teacher_view', teacher_id=t.id) }}">{{ L(t.name_ar, t.name_en or t.name_ar) }}</a>
+        {% if not t.active %}<span class="chip">{{ L('موقوف', 'Disabled') }}</span>{% endif %}</td>
+      <td><span class="code copy" data-copy="{{ t.code }}">{{ t.code }}</span></td>
+      <td class="small">{% for s in t.sections %}<span class="chip">{{ s.full_name(lang) }}</span>{% else %}<span class="muted">—</span>{% endfor %}</td>
+      <td><a class="btn ghost sm" href="{{ url_for('admin.teacher_view', teacher_id=t.id) }}">{{ L('إدارة', 'Manage') }}</a></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">{{ L('لا يوجد معلمون بعد.', 'No teachers yet.') }}</p>{% endif %}
+</div>
+<div class="card">
+  <h2>{{ L('إضافة معلمين', 'Add teachers') }}</h2>
+  <form method="post" action="{{ url_for('admin.teacher_add') }}">
+    <label>{{ L('اسم واحد في كل سطر — يمكنك لصق قائمة الكادر كاملة', 'One name per line — you can paste the whole staff list') }}</label>
+    <textarea name="names" required></textarea>
+    <button style="margin-top:10px">{{ L('إضافة', 'Add') }}</button>
+  </form>
+</div>
+{% endblock %}

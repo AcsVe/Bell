@@ -1,0 +1,44 @@
+{
+  "name": "school-bell-desktop",
+  "productName": "جرس الحصص",
+  "version": "1.0.0",
+  "description": "جرس الحصص — تنبيه نهاية وبداية الحصص، يعمل بدون إنترنت",
+  "author": "RAS IT",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "web": "node ../native/build-web.js desktop",
+    "start": "npm run web && electron .",
+    "dist:win": "npm run web && electron-builder --win nsis --x64",
+    "dist:mac": "npm run web && electron-builder --mac dmg"
+  },
+  "devDependencies": {
+    "electron": "^38.8.6",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "jo.edu.ras.schoolbell",
+    "productName": "School Bell",
+    "files": [
+      "main.js",
+      "preload.js",
+      "scheduler.js",
+      "www/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "www/icons/icon-512.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "shortcutName": "جرس الحصص"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "www/icons/icon-512.png",
+      "category": "public.app-category.education"
+    }
+  }
+}

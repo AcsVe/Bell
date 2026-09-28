@@ -1,0 +1,58 @@
+:root{
+  --bg:#f4f6f9; --card:#fff; --ink:#1c2533; --muted:#667085; --line:#e3e7ee;
+  --brand:#1d5fbf; --brand-ink:#fff; --ok:#1a7f4b; --ok-bg:#e6f5ed; --err:#b42318; --err-bg:#fdecea;
+  --chip:#eef3fb;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Tajawal',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;line-height:1.55}
+a{color:var(--brand);text-decoration:none} a:hover{text-decoration:underline}
+header.top{background:#12305e;color:#fff;padding:0 16px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;min-height:56px}
+header.top .brand{font-weight:700;font-size:17px}
+header.top nav{display:flex;gap:4px;flex-wrap:wrap;flex:1}
+header.top nav a{color:#dbe6f7;padding:8px 12px;border-radius:8px}
+header.top nav a.on,header.top nav a:hover{background:rgba(255,255,255,.12);color:#fff;text-decoration:none}
+header.top .side{display:flex;gap:10px;align-items:center}
+header.top .side a{color:#dbe6f7}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:22px;margin:4px 0 16px} h2{font-size:17px;margin:0 0 12px}
+.crumbs{color:var(--muted);font-size:13px;margin-bottom:6px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:18px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+.stat{font-size:28px;font-weight:700} .muted{color:var(--muted)} .small{font-size:13px}
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+input[type=text],input[type=password],input[type=number],input[type=time],select,textarea{
+  width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff;color:var(--ink)}
+textarea{min-height:110px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.row>*{flex:1;min-width:140px}
+.row>.shrink{flex:0 0 auto;min-width:0}
+button,.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:8px;border:1px solid var(--brand);
+  background:var(--brand);color:var(--brand-ink);font:inherit;font-weight:600;cursor:pointer;text-decoration:none}
+.btn:hover{text-decoration:none}
+button.ghost,.btn.ghost{background:#fff;color:var(--brand)}
+button.danger{background:#fff;color:var(--err);border-color:#f1b8b2}
+button.sm,.btn.sm{padding:5px 10px;font-size:13px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:start;vertical-align:middle}
+th{font-size:13px;color:var(--muted);font-weight:600}
+td input{min-width:80px}
+.flash{padding:10px 14px;border-radius:8px;margin-bottom:12px}
+.flash.ok{background:var(--ok-bg);color:var(--ok)} .flash.error{background:var(--err-bg);color:var(--err)}
+.chip{display:inline-block;padding:2px 10px;border-radius:999px;background:var(--chip);font-size:13px;margin:2px}
+.chip.break{background:#fff4e0;color:#8a5a00}
+.code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:17px;letter-spacing:2px;font-weight:700;
+  background:#f1f5fb;border:1px dashed #b9c8e4;padding:3px 10px;border-radius:6px;direction:ltr;display:inline-block}
+.copy{cursor:pointer}
+.days{display:flex;gap:8px;flex-wrap:wrap}
+.days label{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--ink);margin:0}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tabs a{padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:#fff}
+.tabs a.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.src-grade{color:#8a2be2;font-weight:600} .src-stage{color:#b35c00;font-weight:600} .src-default{color:var(--muted)}
+.thumb{height:64px;border-radius:8px;border:1px solid var(--line);background:#fafafa;object-fit:contain}
+.inline{display:inline}
+.list-links a{display:block;padding:8px 0;border-bottom:1px solid var(--line)}
+.hint{background:#f7f9fc;border-inline-start:3px solid var(--brand);padding:8px 12px;border-radius:6px;font-size:13px;color:#445}
+@media (max-width:640px){ table.resp thead{display:none} table.resp tr{display:block;border-bottom:1px solid var(--line);padding:6px 0}
+  table.resp td{display:block;border:0;padding:4px 0} }
+@media print{ header.top,.noprint{display:none} .card{break-inside:avoid;border:1px solid #999} }

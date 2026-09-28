@@ -1,0 +1,32 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ L('الأكواد', 'Codes') }}{% endblock %}
+{% block content %}
+<div class="row noprint" style="align-items:center;margin-bottom:10px">
+  <h1 style="margin:0">{{ L('كل الأكواد', 'All codes') }}</h1>
+  <div class="shrink"><button class="ghost" onclick="window.print()">{{ L('طباعة', 'Print') }}</button></div>
+</div>
+<p class="muted small noprint">{{ L('اضغط أي كود لنسخه. رابط الدخول:', 'Tap any code to copy it. Sign-in link:') }}
+  <span class="code copy" style="font-size:13px;letter-spacing:0" data-copy="{{ request.host_url }}login">{{ request.host_url }}login</span></p>
+
+<h2>{{ L('أكواد الصفوف (للشاشات الثابتة)', 'Section codes (fixed screens)') }}</h2>
+{% for st in stages %}
+<div class="card">
+  <h2>{{ L(st.name_ar, st.name_en or st.name_ar) }}</h2>
+  <table>
+    {% for g in st.grades %}{% for s in g.sections %}
+    <tr><td>{{ s.full_name(lang) }}</td><td style="text-align:end"><span class="code copy" data-copy="{{ s.code }}">{{ s.code }}</span></td></tr>
+    {% endfor %}{% endfor %}
+  </table>
+</div>
+{% endfor %}
+
+<h2>{{ L('أكواد المعلمين', 'Teacher codes') }}</h2>
+<div class="card">
+  <table>
+    {% for t in teachers %}
+    <tr><td>{{ L(t.name_ar, t.name_en or t.name_ar) }} <span class="muted small">· {{ t.section_links|length }} {{ L('شعبة', 'sections') }}</span></td>
+      <td style="text-align:end"><span class="code copy" data-copy="{{ t.code }}">{{ t.code }}</span></td></tr>
+    {% else %}<tr><td class="muted">{{ L('لا يوجد معلمون.', 'No teachers.') }}</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

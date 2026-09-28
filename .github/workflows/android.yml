@@ -1,0 +1,34 @@
+name: Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['mobile/**', 'native/**', 'static/js/**', 'static/css/**', 'templates/display.html', '.github/workflows/android.yml']
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - name: Build web bundle and sync Capacitor
+        working-directory: mobile
+        env:
+          BELL_SERVER: ${{ vars.BELL_SERVER }}   # repo variable, e.g. https://school-bell.onrender.com
+        run: |
+          npm ci
+          npm run web
+          npx cap sync android
+      - name: Build APK
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: school-bell-android
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk

@@ -1,0 +1,28 @@
+name: iOS build check
+
+# Compiles the iOS app for the simulator (no signing). Installing on real
+# iPhones/iPads needs an Apple Developer account — see README.
+on:
+  workflow_dispatch:
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Build web bundle and sync Capacitor
+        working-directory: mobile
+        env:
+          BELL_SERVER: ${{ vars.BELL_SERVER }}
+        run: |
+          npm ci
+          npm run web
+          npx cap sync ios
+      - name: Build for simulator
+        working-directory: mobile/ios/App
+        run: |
+          xcodebuild -project App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build | tail -20

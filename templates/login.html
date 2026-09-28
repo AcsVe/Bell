@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#12305e">
+<title>{{ L('جرس الحصص — دخول', 'School Bell — Sign in') }}</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/static/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/display.css">
+<style>
+  body{overflow:auto;align-items:center;justify-content:center;padding:20px}
+  .card{background:#fff;color:#1c2533;border-radius:22px;padding:28px 24px;max-width:430px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+  .card img{width:76px;height:76px;border-radius:18px}
+  h1{font-size:24px;margin:12px 0 4px} p{color:#556;margin:0 0 18px}
+  .code-input{width:100%;font-size:32px;font-weight:800;letter-spacing:8px;text-align:center;direction:ltr;text-transform:uppercase;
+    border:2px solid #d0d8e6;border-radius:14px;padding:14px 8px;margin-bottom:14px;font-family:ui-monospace,Menlo,Consolas,monospace}
+  .code-input:focus{outline:none;border-color:#1d5fbf}
+  .err{background:#fdecea;color:#b42318;padding:10px;border-radius:10px;margin-bottom:12px}
+  .note{background:#fff7e0;color:#7a5200;padding:10px;border-radius:10px;margin-bottom:12px;font-size:14px}
+  .links{display:flex;justify-content:space-between;margin-top:16px;font-size:14px}
+  .links a{color:#1d5fbf}
+  .install{margin-top:12px;background:#fff;color:#1d5fbf;border:2px solid #1d5fbf}
+  .hint{font-size:13px;color:#667;margin-top:12px}
+</style>
+</head>
+<body>
+<div id="bg"></div>
+<div class="card" {% if error %}data-error="{{ error }}"{% endif %}>
+  <img src="/static/icons/icon-192.png" alt="">
+  <h1>{{ L('جرس الحصص', 'School Bell') }}</h1>
+  <p>{{ L('أدخل كود الصف أو كود المعلم', 'Enter the section code or teacher code') }}</p>
+  {% if error %}<div class="err">{{ L('الكود غير صحيح. تأكد منه وأعد المحاولة.', 'Invalid code. Check it and try again.') }}</div>{% endif %}
+  <div id="offline" class="note" hidden>{{ L('لا يوجد اتصال بالإنترنت. تسجيل الدخول لأول مرة يحتاج اتصالاً؛ التنبيهات على الأجهزة المسجلة تستمر بدونه.',
+    'No internet connection. First sign-in needs a connection; already registered devices keep alerting without it.') }}</div>
+  <form method="post" id="f">
+    <input class="code-input" name="code" id="code" maxlength="9" autocomplete="off" autocapitalize="characters"
+           spellcheck="false" inputmode="text" placeholder="XXXXXX" required autofocus>
+    <button class="big">{{ L('دخول', 'Sign in') }}</button>
+  </form>
+  <button id="install" class="big install" hidden>{{ L('تثبيت التطبيق', 'Install app') }}</button>
+  <div id="iosHint" class="hint" hidden>{{ L('للتثبيت على iPhone/iPad: زر المشاركة ⬆︎ ثم «إضافة إلى الشاشة الرئيسية».', 'To install on iPhone/iPad: Share ⬆︎ then “Add to Home Screen”.') }}</div>
+  <div class="links">
+    <a href="/app" id="back" hidden>{{ L('العودة لشاشة التنبيه', 'Back to the alert screen') }}</a>
+    <a href="{{ url_for('set_lang', code='en' if lang == 'ar' else 'ar', next='/login') }}">{{ 'English' if lang == 'ar' else 'العربية' }}</a>
+  </div>
+</div>
+<script src="/static/js/store.js"></script>
+<script>
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+  const off = document.getElementById('offline');
+  const upd = () => { off.hidden = navigator.onLine; };
+  window.addEventListener('online', upd); window.addEventListener('offline', upd); upd();
+  document.getElementById('f').addEventListener('submit', (e) => {
+    if (!navigator.onLine) { e.preventDefault(); off.hidden = false; }
+  });
+  let prompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); prompt = e; document.getElementById('install').hidden = false; });
+  document.getElementById('install').onclick = () => { if (prompt) { prompt.prompt(); prompt = null; } document.getElementById('install').hidden = true; };
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent) && !standalone) document.getElementById('iosHint').hidden = false;
+  // A device that already has a schedule can go back to alerting.
+  BellStore.get('schedule').then((s) => { if (s) document.getElementById('back').hidden = false; });
+  // Keep the chosen language for the display screen too.
+  localStorage.setItem('bell:lang', '{{ lang }}');
+</script>
+</body>
+</html>

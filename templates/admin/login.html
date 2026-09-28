@@ -1,0 +1,15 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ L('تسجيل الدخول', 'Sign in') }}{% endblock %}
+{% block content %}
+<div class="card" style="max-width:380px;margin:40px auto">
+  <h1>{{ L('دخول المسؤول', 'Admin sign in') }}</h1>
+  {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+  <form method="post">
+    <label>{{ L('اسم المستخدم', 'Username') }}</label>
+    <input type="text" name="username" autocomplete="username" required>
+    <label style="margin-top:10px">{{ L('كلمة المرور', 'Password') }}</label>
+    <input type="password" name="password" autocomplete="current-password" required>
+    <button style="margin-top:14px;width:100%;justify-content:center">{{ L('دخول', 'Sign in') }}</button>
+  </form>
+</div>
+{% endblock %}

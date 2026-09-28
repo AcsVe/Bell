@@ -1,0 +1,82 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ L(g.name_ar, g.name_en or g.name_ar) }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">{{ L('المراحل', 'Stages') }}</a> ›
+  <a href="{{ url_for('admin.stage_view', stage_id=st.id) }}">{{ L(st.name_ar, st.name_en or st.name_ar) }}</a></div>
+<h1>{{ L(g.name_ar, g.name_en or g.name_ar) }}</h1>
+
+<div class="card">
+  <form method="post" action="{{ url_for('admin.grade_update', grade_id=g.id) }}" class="row">
+    <div><label>{{ L('الاسم بالعربية', 'Arabic name') }}</label><input type="text" name="name_ar" value="{{ g.name_ar }}" required></div>
+    <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input type="text" name="name_en" value="{{ g.name_en or '' }}"></div>
+    <div class="shrink" style="width:110px"><label>{{ L('الترتيب', 'Order') }}</label><input type="number" name="sort_order" value="{{ g.sort_order }}"></div>
+    <div class="shrink"><button>{{ L('حفظ', 'Save') }}</button></div>
+  </form>
+</div>
+
+<div class="card" id="sections">
+  <h2>{{ L('الشعب وأكوادها', 'Sections & codes') }}</h2>
+  {% if g.sections %}
+  <table class="resp">
+    <thead><tr><th>{{ L('الشعبة', 'Section') }}</th><th>{{ L('كود الصف', 'Section code') }}</th><th>{{ L('المعلمون', 'Teachers') }}</th><th></th></tr></thead>
+    <tbody>
+    {% for s in g.sections %}
+    <tr>
+      <td><a href="{{ url_for('admin.section_view', section_id=s.id) }}">{{ L(s.name_ar, s.name_en or s.name_ar) }}</a></td>
+      <td><span class="code copy" data-copy="{{ s.code }}" title="{{ L('انسخ', 'Copy') }}">{{ s.code }}</span></td>
+      <td class="small">{{ s.teacher_links|length }}</td>
+      <td><a class="btn ghost sm" href="{{ url_for('admin.section_view', section_id=s.id) }}">{{ L('إدارة المعلمين', 'Manage teachers') }}</a></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">{{ L('لا توجد شعب بعد.', 'No sections yet.') }}</p>{% endif %}
+  <form method="post" action="{{ url_for('admin.section_add', grade_id=g.id) }}" class="row" style="margin-top:12px">
+    <div><label>{{ L('أسماء الشعب (افصل بفاصلة) — يُولَّد لكل شعبة كود تلقائياً', 'Section names (comma-separated) — each gets a code automatically') }}</label>
+      <input type="text" name="names" placeholder="أ، ب، ج" required></div>
+    <div class="shrink"><button>{{ L('إضافة', 'Add') }}</button></div>
+  </form>
+</div>
+
+<div class="card" id="times">
+  <h2>{{ L('توقيت مختلف لهذا الصف', 'Different timing for this grade') }}</h2>
+  <p class="hint">{{ L('عدّل بداية الدوام أو مدد الحصص لهذا الصف في يوم معيّن (أو كل الأيام). الترتيب: تخصيص الصف ← يوم المرحلة ← الافتراضي.',
+    'Change the day start or period durations for this grade on one day (or all days). Priority: grade → stage day → default.') }}</p>
+  <div class="tabs">
+    {% for wd in week_order if wd in st.weekday_list %}
+    <a href="{{ url_for('admin.grade_view', grade_id=g.id, day=wd) }}#times" class="{{ 'on' if wd == day }}">{{ wd_names[wd] }}</a>
+    {% endfor %}
+  </div>
+  {% if day is not none and st.periods %}
+  {% set src = resolved[0].source %}
+  <p><span class="chip {{ 'break' if src != 'default' }}">{{ {'grade': L('توقيت مخصص لهذا الصف','Custom timing for this grade'), 'stage': L('يرث توقيت يوم المرحلة','Inherits the stage day timing'), 'default': L('يستخدم الافتراضي','Using default')}[src] }}</span></p>
+  <form method="post" action="{{ url_for('admin.grade_times', grade_id=g.id) }}">
+    <input type="hidden" name="weekday" value="{{ day }}">
+    <div class="row" style="max-width:320px;margin-bottom:10px">
+      <div><label>{{ L('بداية الدوام', 'Day starts at') }}</label><input type="time" name="day_start" value="{{ resolved[0].start }}" required></div>
+    </div>
+    <table class="resp">
+      <thead><tr><th>{{ L('الحصة', 'Period') }}</th><th>{{ L('المدة (دقيقة)', 'Minutes') }}</th><th>{{ L('التوقيت', 'Time') }}</th></tr></thead>
+      <tbody>
+      {% for r in resolved %}
+      <tr>
+        <td><span class="chip {{ 'break' if r.kind=='break' }}">{{ L(r.ar, r.en) }}</span></td>
+        <td style="width:110px"><input type="number" min="1" max="240" name="n{{ r.n }}_dur" value="{{ r.dur }}" required></td>
+        <td class="small src-{{ r.source }}" dir="ltr">{{ r.start }} – {{ r.end }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="row" style="margin-top:12px;align-items:center">
+      <label class="shrink" style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" name="all_days" value="1"> {{ L('طبّق على كل أيام الدوام', 'Apply to all school days') }}</label>
+      <div class="shrink"><button>{{ L('حفظ', 'Save') }}</button></div>
+      {% if overrides %}<div class="shrink"><button class="ghost" name="reset" value="1" formnovalidate>{{ L('رجوع لتوقيت المرحلة', 'Reset to stage timing') }}</button></div>{% endif %}
+    </div>
+  </form>
+  {% elif not st.periods %}<p class="muted">{{ L('أضف حصص المرحلة أولاً.', 'Add the stage periods first.') }}</p>{% endif %}
+</div>
+
+<form method="post" action="{{ url_for('admin.grade_delete', grade_id=g.id) }}" data-confirm="{{ L('حذف الصف بكل شعبه وأكوادها؟', 'Delete this grade with all its sections and codes?') }}">
+  <button class="danger">{{ L('حذف الصف', 'Delete grade') }}</button>
+</form>
+{% endblock %}

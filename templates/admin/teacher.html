@@ -1,0 +1,62 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ L(t.name_ar, t.name_en or t.name_ar) }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('admin.teachers') }}">{{ L('المعلمون', 'Teachers') }}</a></div>
+<h1>{{ L(t.name_ar, t.name_en or t.name_ar) }}</h1>
+
+<div class="card">
+  <h2>{{ L('كود المعلم', 'Teacher code') }}</h2>
+  <p><span class="code copy" data-copy="{{ t.code }}">{{ t.code }}</span>
+    <button class="ghost sm" data-copy="{{ t.code }}">{{ L('نسخ', 'Copy') }}</button></p>
+  <p class="muted small">{{ L('كود واحد يغطي كل الشعب أدناه، يُدخله المعلم من موبايله أو لابتوبه.', 'One code covering all sections below; the teacher enters it on their phone or laptop.') }}
+    {% if devices %}· {{ L('أجهزة مسجلة:', 'Registered devices:') }} {{ devices|length }}{% endif %}</p>
+  <form method="post" action="{{ url_for('admin.teacher_regen', teacher_id=t.id) }}" class="inline"
+        data-confirm="{{ L('سيتوقف الكود الحالي عن العمل. متابعة؟', 'The current code will stop working. Continue?') }}">
+    <button class="ghost sm">{{ L('توليد كود جديد', 'Regenerate code') }}</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>{{ L('الشعب المرتبطة', 'Linked sections') }}</h2>
+  <form method="post" action="{{ url_for('admin.teacher_section_add', teacher_id=t.id) }}" class="row">
+    <div>
+      <select name="section_id" required>
+        <option value="">{{ L('— اختر شعبة —', '— choose a section —') }}</option>
+        {% for st in stages %}{% for g in st.grades %}
+        <optgroup label="{{ L(st.name_ar, st.name_en or st.name_ar) }} · {{ L(g.name_ar, g.name_en or g.name_ar) }}">
+          {% for s in g.sections %}
+          <option value="{{ s.id }}" {{ 'disabled' if s.id in linked }}>{{ s.full_name(lang) }}{{ L(' (مضاف)', ' (added)') if s.id in linked }}</option>
+          {% endfor %}
+        </optgroup>
+        {% endfor %}{% endfor %}
+      </select>
+    </div>
+    <div class="shrink"><button>{{ L('ربط', 'Link') }}</button></div>
+  </form>
+  <table style="margin-top:12px">
+    {% for s in t.sections %}
+    <tr>
+      <td>{{ s.full_name(lang) }} <span class="muted small">· {{ L(s.grade.stage.name_ar, s.grade.stage.name_en or s.grade.stage.name_ar) }}</span></td>
+      <td style="text-align:end"><form method="post" action="{{ url_for('admin.link_delete', link_id=linked[s.id].id) }}" class="inline"><button class="danger sm">{{ L('إزالة', 'Remove') }}</button></form></td>
+    </tr>
+    {% else %}<tr><td class="muted">{{ L('لم يُربط بأي شعبة بعد.', 'Not linked to any section yet.') }}</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h2>{{ L('تعديل البيانات', 'Edit details') }}</h2>
+  <form method="post" action="{{ url_for('admin.teacher_update', teacher_id=t.id) }}">
+    <div class="row">
+      <div><label>{{ L('الاسم بالعربية', 'Arabic name') }}</label><input type="text" name="name_ar" value="{{ t.name_ar }}" required></div>
+      <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input type="text" name="name_en" value="{{ t.name_en or '' }}"></div>
+    </div>
+    <div class="row" style="margin-top:10px;align-items:center">
+      <label class="shrink" style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" name="active" {{ 'checked' if t.active }}> {{ L('الكود فعّال', 'Code active') }}</label>
+      <div class="shrink"><button>{{ L('حفظ', 'Save') }}</button></div>
+    </div>
+  </form>
+  <form method="post" action="{{ url_for('admin.teacher_delete', teacher_id=t.id) }}" style="margin-top:14px" data-confirm="{{ L('حذف المعلم وكوده؟', 'Delete this teacher and their code?') }}">
+    <button class="danger sm">{{ L('حذف المعلم', 'Delete teacher') }}</button>
+  </form>
+</div>
+{% endblock %}

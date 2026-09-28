@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>جرس الحصص</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/display.css">
+<style>
+  body{overflow:auto;align-items:center;justify-content:center;padding:20px}
+  .card{background:#fff;color:#1c2533;border-radius:22px;padding:26px 22px;max-width:430px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+  .card img{width:72px;height:72px;border-radius:18px}
+  h1{font-size:23px;margin:10px 0 4px} p{color:#556;margin:0 0 16px}
+  .code-input{width:100%;font-size:30px;font-weight:800;letter-spacing:8px;text-align:center;direction:ltr;text-transform:uppercase;
+    border:2px solid #d0d8e6;border-radius:14px;padding:12px 8px;margin-bottom:12px;font-family:ui-monospace,Menlo,Consolas,monospace}
+  .msg{padding:10px;border-radius:10px;margin-bottom:12px;font-size:14px}
+  .err{background:#fdecea;color:#b42318} .warn{background:#fff7e0;color:#7a5200} .ok{background:#e6f5ed;color:#1a7f4b}
+  details{margin-top:14px;text-align:start;font-size:14px;color:#556}
+  details input{width:100%;padding:9px;border:1px solid #d0d8e6;border-radius:8px;direction:ltr;margin-top:6px;font:inherit}
+  .links{display:flex;justify-content:flex-end;margin-top:14px;font-size:14px}
+  .links a{color:#1d5fbf;cursor:pointer}
+  ol{text-align:start;padding-inline-start:20px;color:#334;font-size:15px;line-height:1.7}
+  .step-btn{margin-top:8px;background:#fff;color:#1d5fbf;border:2px solid #1d5fbf;font-size:16px;padding:10px}
+</style>
+</head>
+<body>
+<div id="bg"></div>
+
+<div class="card" id="loginCard">
+  <img src="icons/icon-192.png" alt="">
+  <h1 data-t="title"></h1>
+  <p data-t="prompt"></p>
+  <div id="msg" class="msg" hidden></div>
+  <form id="f">
+    <input class="code-input" id="code" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXXXX" required>
+    <button class="big" id="go" data-t="signin"></button>
+  </form>
+  <details>
+    <summary data-t="serverSettings"></summary>
+    <input id="server" inputmode="url" spellcheck="false">
+  </details>
+  <div class="links"><a id="lang"></a></div>
+</div>
+
+<!-- One-time setup so alerts fire in the background, on time, offline -->
+<div class="card" id="setupCard" hidden>
+  <img src="icons/icon-192.png" alt="">
+  <h1 data-t="setupTitle"></h1>
+  <p data-t="setupIntro"></p>
+  <div id="issues"></div>
+  <button class="big" id="done" data-t="continue"></button>
+</div>
+
+<script src="config.js"></script>
+<script src="js/bridge.js"></script>
+<script>
+(function () {
+  const T = {
+    ar: { title: 'جرس الحصص', prompt: 'أدخل كود الصف أو كود المعلم', signin: 'دخول', serverSettings: 'عنوان الخادم',
+      invalid: 'الكود غير صحيح. تأكد منه وأعد المحاولة.', offline: 'يلزم اتصال بالإنترنت لتسجيل الدخول أول مرة فقط، ثم يعمل التطبيق بدون إنترنت.',
+      server: 'تعذر الوصول للخادم. تحقق من العنوان أو الاتصال.', lang: 'English', checking: 'جارٍ التحقق…',
+      setupTitle: 'خطوة أخيرة', setupIntro: 'حتى يرن التنبيه في موعده والتطبيق مغلق وبدون إنترنت:',
+      continue: 'متابعة', fix: 'فتح الإعداد', allGood: 'كل شيء جاهز ✓' },
+    en: { title: 'School Bell', prompt: 'Enter the section code or teacher code', signin: 'Sign in', serverSettings: 'Server address',
+      invalid: 'Invalid code. Check it and try again.', offline: 'An internet connection is needed for the first sign-in only; after that the app works offline.',
+      server: 'Could not reach the server. Check the address or connection.', lang: 'العربية', checking: 'Checking…',
+      setupTitle: 'One last step', setupIntro: 'So alerts ring on time with the app closed and no internet:',
+      continue: 'Continue', fix: 'Open setting', allGood: 'All set ✓' },
+  };
+  let lang = localStorage.getItem('bell:lang') || 'ar';
+  const t = (k) => T[lang][k];
+  const $ = (id) => document.getElementById(id);
+  function applyLang() {
+    document.documentElement.lang = lang; document.documentElement.dir = lang === 'en' ? 'ltr' : 'rtl';
+    document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
+    $('lang').textContent = t('lang');
+  }
+  function show(kind, text) { const m = $('msg'); m.className = 'msg ' + kind; m.textContent = text; m.hidden = !text; }
+  $('lang').onclick = () => { lang = lang === 'en' ? 'ar' : 'en'; localStorage.setItem('bell:lang', lang); applyLang(); };
+  $('server').value = BellNative.apiBase;
+  applyLang();
+
+  $('f').onsubmit = async (e) => {
+    e.preventDefault();
+    const server = $('server').value.trim().replace(/\/+$/, '');
+    const code = $('code').value.replace(/[\s-]/g, '').toUpperCase();
+    show('warn', t('checking')); $('go').disabled = true;
+    try {
+      const r = await fetch(server + '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                     body: JSON.stringify({ code }) });
+      if (r.status === 401) { show('err', t('invalid')); return; }
+      if (!r.ok) { show('err', t('server')); return; }
+      await BellNative.saveLogin(code, server);
+      show('', '');
+      await setupStep();
+    } catch (err) {
+      show('err', navigator.onLine === false ? t('offline') : t('server'));
+    } finally { $('go').disabled = false; }
+  };
+
+  async function setupStep() {
+    const issues = BellNative.setup ? await BellNative.setup(lang) : [];
+    if (!issues.length) { location.replace('app.html'); return; }
+    $('loginCard').hidden = true; $('setupCard').hidden = false;
+    const box = $('issues'); box.innerHTML = '';
+    const ol = document.createElement('ol');
+    issues.forEach((it) => {
+      const li = document.createElement('li'); li.textContent = it.text;
+      if (it.action) {
+        const b = document.createElement('button'); b.className = 'big step-btn'; b.textContent = t('fix');
+        b.onclick = async () => { await it.action(); b.textContent = t('allGood'); b.disabled = true; };
+        li.appendChild(document.createElement('br')); li.appendChild(b);
+      }
+      ol.appendChild(li);
+    });
+    box.appendChild(ol);
+  }
+  $('done').onclick = () => location.replace('app.html');
+})();
+</script>
+</body>
+</html>

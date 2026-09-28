@@ -1,0 +1,222 @@
+"""Business logic: code generation, time resolution and the schedule payload
+that devices download and cache for offline use."""
+import re
+import secrets
+
+from models import (db, AppSetting, GradePeriodTime, Section, Stage,
+                    StageDayPeriodTime, Teacher)
+
+# No 0/O/1/I/L so codes are easy to read off a screen and type on a tablet.
+CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+CODE_LEN = 6
+TIME_RE = re.compile(r'^([01]\d|2[0-3]):[0-5]\d$')
+
+AR_ORDINALS = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة',
+               'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة']
+
+
+def normalize_code(code):
+    return re.sub(r'[\s-]', '', (code or '')).upper()
+
+
+def generate_code():
+    """A code unique across BOTH sections and teachers, so login needs only the code."""
+    while True:
+        code = ''.join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LEN))
+        if not Section.query.filter_by(code=code).first() and \
+           not Teacher.query.filter_by(code=code).first():
+            return code
+
+
+def find_by_code(code):
+    """Return ('section', Section) / ('teacher', Teacher) / (None, None)."""
+    code = normalize_code(code)
+    if not code:
+        return None, None
+    s = Section.query.filter_by(code=code).first()
+    if s:
+        return 'section', s
+    t = Teacher.query.filter_by(code=code, active=True).first()
+    if t:
+        return 'teacher', t
+    return None, None
+
+
+def valid_time(v):
+    return bool(v and TIME_RE.match(v))
+
+
+def to_minutes(hhmm):
+    h, m = hhmm.split(':')
+    return int(h) * 60 + int(m)
+
+
+def from_minutes(total):
+    return f'{total // 60:02d}:{total % 60:02d}'
+
+
+def minutes_between(start, end):
+    return to_minutes(end) - to_minutes(start)
+
+
+def chain_times(day_start, durations):
+    """Back-to-back periods: [(start, end), ...] from a start time and durations.
+    Returns None if the day would run past midnight."""
+    t = to_minutes(day_start)
+    out = []
+    for d in durations:
+        if t + d >= 24 * 60:
+            return None
+        out.append((from_minutes(t), from_minutes(t + d)))
+        t += d
+    return out
+
+
+def parse_duration(v):
+    try:
+        d = int(str(v).strip())
+    except (TypeError, ValueError):
+        return None
+    return d if 1 <= d <= 240 else None
+
+
+def rechain_stage(stage):
+    """Recompute default period times, then every override set (stage-day and
+    grade-day), so adding/removing a period keeps every schedule gap-free.
+    Each override set keeps its own start time and durations; a period it
+    doesn't cover yet takes the stage default duration."""
+    periods = list(stage.periods)
+    chained = chain_times(stage.day_start, [p.duration for p in periods])
+    if chained:
+        for p, (s, e) in zip(periods, chained):
+            p.start_time, p.end_time = s, e
+    numbers = [p.number for p in periods]
+    defaults = {p.number: p.duration for p in periods}
+
+    def _rechain(model, owner_field, owner_id, weekday):
+        rows = model.query.filter_by(**{owner_field: owner_id}, weekday=weekday).all()
+        if not rows:
+            return
+        by_n = {r.period_number: r for r in rows}
+        start = min(r.start_time for r in rows)
+        durs = [minutes_between(by_n[n].start_time, by_n[n].end_time) if n in by_n else defaults[n]
+                for n in numbers]
+        times = chain_times(start, durs)
+        for r in rows:
+            if r.period_number not in numbers:
+                db.session.delete(r)
+        if not times:
+            return
+        for n, (s, e) in zip(numbers, times):
+            r = by_n.get(n)
+            if r:
+                r.start_time, r.end_time = s, e
+            else:
+                db.session.add(model(**{owner_field: owner_id}, weekday=weekday,
+                                     period_number=n, start_time=s, end_time=e))
+
+    for wd in {r.weekday for r in stage.day_times}:
+        _rechain(StageDayPeriodTime, 'stage_id', stage.id, wd)
+    for g in stage.grades:
+        for wd in {r.weekday for r in g.period_times}:
+            _rechain(GradePeriodTime, 'grade_id', g.id, wd)
+
+
+def default_period_labels(kind, class_index):
+    """Suggested labels when the admin adds a period (they stay editable)."""
+    if kind == 'break':
+        return 'الاستراحة', 'Break'
+    ar = AR_ORDINALS[class_index - 1] if class_index <= len(AR_ORDINALS) else str(class_index)
+    return f'الحصة {ar}', f'Period {class_index}'
+
+
+def bump_schedule_version():
+    """Any admin change that affects what devices display bumps this, so
+    devices re-download only when something actually changed."""
+    v = int(AppSetting.get('schedule_version', '0') or 0) + 1
+    AppSetting.set('schedule_version', v)
+    return v
+
+
+def schedule_version():
+    return int(AppSetting.get('schedule_version', '0') or 0)
+
+
+def resolve_grade_day(grade, weekday):
+    """The periods of one grade on one weekday, with the effective times."""
+    stage = grade.stage
+    grade_ovr = {g.period_number: g for g in GradePeriodTime.query.filter_by(
+        grade_id=grade.id, weekday=weekday)}
+    stage_ovr = {s.period_number: s for s in StageDayPeriodTime.query.filter_by(
+        stage_id=stage.id, weekday=weekday)}
+    out = []
+    for p in stage.periods:
+        src, o = 'default', None
+        if p.number in grade_ovr:
+            src, o = 'grade', grade_ovr[p.number]
+        elif p.number in stage_ovr:
+            src, o = 'stage', stage_ovr[p.number]
+        out.append({
+            'n': p.number, 'kind': p.kind,
+            'ar': p.label_ar, 'en': p.label_en or p.label_ar,
+            'start': o.start_time if o else p.start_time,
+            'end': o.end_time if o else p.end_time,
+            'source': src,
+        })
+    for r in out:
+        r['dur'] = minutes_between(r['start'], r['end'])
+    out.sort(key=lambda x: x['n'])
+    return out
+
+
+def build_schedule_payload(code_type, owner):
+    """Everything a device needs to run fully offline."""
+    sections = [owner] if code_type == 'section' else owner.sections
+    stages, grades_done, targets = {}, {}, []
+    for sec in sections:
+        grade = sec.grade
+        stage = grade.stage
+        if not stage.active:
+            continue
+        if stage.id not in stages:
+            stages[stage.id] = {
+                'id': stage.id, 'ar': stage.name_ar, 'en': stage.name_en or stage.name_ar,
+                'logo': stage.logo.url if stage.logo else None,
+                'background': stage.background.url if stage.background else None,
+            }
+        if grade.id not in grades_done:
+            grades_done[grade.id] = {
+                str(wd): resolve_grade_day(grade, wd) for wd in stage.weekday_list
+            }
+        targets.append({
+            'sectionId': sec.id, 'stageId': stage.id, 'gradeId': grade.id,
+            'ar': sec.full_name('ar'), 'en': sec.full_name('en'),
+        })
+    tone_id = AppSetting.get('tone_id')
+    tone_url = None
+    if tone_id:
+        from models import MediaFile
+        m = db.session.get(MediaFile, int(tone_id))
+        tone_url = m.url if m else None
+    if code_type == 'section':
+        who = {'type': 'section', 'ar': owner.full_name('ar'), 'en': owner.full_name('en')}
+    else:
+        who = {'type': 'teacher', 'ar': owner.name_ar, 'en': owner.name_en or owner.name_ar}
+    return {
+        'version': schedule_version(),
+        'who': who,
+        'stages': stages,
+        'targets': targets,
+        'days': {str(gid): days for gid, days in grades_done.items()},
+        'tone': tone_url or '/static/sounds/chime.wav',
+    }
+
+
+def weekday_names(lang):
+    if lang == 'en':
+        return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    return ['الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد']
+
+
+# Admin forms list Sunday first (the school week in Jordan).
+WEEK_ORDER = [6, 0, 1, 2, 3, 4, 5]

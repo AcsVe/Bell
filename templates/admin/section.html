@@ -1,0 +1,59 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ s.full_name(lang) }}{% endblock %}
+{% block content %}
+{% set g = s.grade %}{% set st = g.stage %}
+<div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">{{ L('المراحل', 'Stages') }}</a> ›
+  <a href="{{ url_for('admin.stage_view', stage_id=st.id) }}">{{ L(st.name_ar, st.name_en or st.name_ar) }}</a> ›
+  <a href="{{ url_for('admin.grade_view', grade_id=g.id) }}">{{ L(g.name_ar, g.name_en or g.name_ar) }}</a></div>
+<h1>{{ s.full_name(lang) }}</h1>
+
+<div class="card">
+  <h2>{{ L('كود الصف', 'Section code') }}</h2>
+  <p><span class="code copy" data-copy="{{ s.code }}">{{ s.code }}</span>
+    <button class="ghost sm" data-copy="{{ s.code }}">{{ L('نسخ', 'Copy') }}</button></p>
+  <p class="muted small">{{ L('أدخل هذا الكود على الشاشة/التابلت الثابت في الصف.', 'Enter this code on the fixed classroom screen/tablet.') }}
+    {% if devices %}· {{ L('أجهزة مسجلة:', 'Registered devices:') }} {{ devices|length }}{% endif %}</p>
+  <form method="post" action="{{ url_for('admin.section_regen', section_id=s.id) }}" class="inline"
+        data-confirm="{{ L('سيتوقف الكود الحالي عن العمل على كل الأجهزة. متابعة؟', 'The current code will stop working on all devices. Continue?') }}">
+    <button class="ghost sm">{{ L('توليد كود جديد', 'Regenerate code') }}</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>{{ L('المعلمون المرتبطون بهذه الشعبة', 'Teachers linked to this section') }}</h2>
+  <form method="post" action="{{ url_for('admin.section_teacher_add', section_id=s.id) }}" class="row">
+    <div>
+      <select name="teacher_id" required>
+        <option value="">{{ L('— اختر معلماً —', '— choose a teacher —') }}</option>
+        {% for t in teachers %}
+        <option value="{{ t.id }}" {{ 'disabled' if t.id in linked_ids }}>{{ L(t.name_ar, t.name_en or t.name_ar) }}{{ L(' (مضاف)', ' (added)') if t.id in linked_ids }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="shrink"><button>{{ L('ربط', 'Link') }}</button></div>
+  </form>
+  {% if not teachers %}<p class="muted small">{{ L('أضف المعلمين من صفحة', 'Add teachers from the') }} <a href="{{ url_for('admin.teachers') }}">{{ L('المعلمون', 'Teachers page') }}</a>.</p>{% endif %}
+  <table style="margin-top:12px">
+    {% for l in s.teacher_links %}
+    <tr>
+      <td><a href="{{ url_for('admin.teacher_view', teacher_id=l.teacher.id) }}">{{ L(l.teacher.name_ar, l.teacher.name_en or l.teacher.name_ar) }}</a></td>
+      <td><span class="code" style="font-size:14px">{{ l.teacher.code }}</span></td>
+      <td style="text-align:end"><form method="post" action="{{ url_for('admin.link_delete', link_id=l.id) }}" class="inline"><button class="danger sm">{{ L('إزالة', 'Remove') }}</button></form></td>
+    </tr>
+    {% else %}<tr><td class="muted">{{ L('لا يوجد معلمون مرتبطون بعد.', 'No teachers linked yet.') }}</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h2>{{ L('تعديل الشعبة', 'Edit section') }}</h2>
+  <form method="post" action="{{ url_for('admin.section_update', section_id=s.id) }}" class="row">
+    <div><label>{{ L('الاسم بالعربية', 'Arabic name') }}</label><input type="text" name="name_ar" value="{{ s.name_ar }}" required></div>
+    <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input type="text" name="name_en" value="{{ s.name_en or '' }}"></div>
+    <div class="shrink" style="width:110px"><label>{{ L('الترتيب', 'Order') }}</label><input type="number" name="sort_order" value="{{ s.sort_order }}"></div>
+    <div class="shrink"><button>{{ L('حفظ', 'Save') }}</button></div>
+  </form>
+  <form method="post" action="{{ url_for('admin.section_delete', section_id=s.id) }}" style="margin-top:14px" data-confirm="{{ L('حذف الشعبة وكودها؟', 'Delete this section and its code?') }}">
+    <button class="danger sm">{{ L('حذف الشعبة', 'Delete section') }}</button>
+  </form>
+</div>
+{% endblock %}

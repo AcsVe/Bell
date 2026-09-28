@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#12305e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>جرس الحصص</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/static/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/display.css">
+</head>
+<body data-lang="{{ lang }}">
+<div id="bg"></div>
+
+<header class="bar">
+  <div class="who">
+    <img id="logo" alt="" hidden>
+    <div>
+      <div id="stageName" class="stage"></div>
+      <div id="whoName" class="whoname"></div>
+    </div>
+  </div>
+  <div class="tools">
+    <span id="status" class="status"><i></i><span></span></span>
+    <button id="menuBtn" class="icon" aria-label="menu">⋯</button>
+  </div>
+</header>
+
+<main id="idle">
+  <div id="clock" class="clock"><span id="hm">--:--</span><small id="sec"></small></div>
+  <div id="date" class="date"></div>
+  <section id="now" class="now"></section>
+  <section id="next" class="next"></section>
+</main>
+
+<div id="banner" class="banner" hidden></div>
+
+<!-- Full-screen alert -->
+<div id="alert" class="alert" hidden>
+  <div class="alert-inner">
+    <img id="alertLogo" alt="" hidden>
+    <div id="alertTime" class="alert-time"></div>
+    <div id="alertText" class="alert-text"></div>
+    <div id="alertTargets" class="alert-targets"></div>
+    <div class="alert-hint" data-t="tapToClose"></div>
+  </div>
+</div>
+
+<!-- Tap-to-start gate: browsers only allow sound after one user tap -->
+<div id="gate" class="gate" hidden>
+  <div class="gate-card">
+    <div class="gate-icon">🔔</div>
+    <h1 data-t="gateTitle"></h1>
+    <p data-t="gateText"></p>
+    <button id="gateBtn" class="big" data-t="gateBtn"></button>
+  </div>
+</div>
+
+<!-- First run with no cached schedule -->
+<div id="empty" class="gate" hidden>
+  <div class="gate-card">
+    <div class="gate-icon">📶</div>
+    <h1 data-t="needNetTitle"></h1>
+    <p id="emptyText" data-t="needNetText"></p>
+    <button id="retryBtn" class="big" data-t="retry"></button>
+  </div>
+</div>
+
+<!-- Menu -->
+<div id="menu" class="sheet" hidden>
+  <div class="sheet-card">
+    <button data-act="lang" id="langBtn"></button>
+    <button data-act="test" data-t="testAlert"></button>
+    <button data-act="install" id="installBtn" data-t="install" hidden></button>
+    <button data-act="fullscreen" data-t="fullscreen"></button>
+    <button data-act="sync" data-t="syncNow"></button>
+    <button data-act="logout" class="danger" data-t="logout"></button>
+    <button data-act="close" class="ghost" data-t="close"></button>
+    <p id="syncInfo" class="small"></p>
+  </div>
+</div>
+
+<audio id="tone" preload="auto"></audio>
+<script src="/static/js/store.js"></script>
+<script src="/static/js/alerts.js"></script>
+<script src="/static/js/display.js"></script>
+</body>
+</html>
