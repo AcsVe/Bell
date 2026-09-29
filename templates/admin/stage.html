@@ -46,6 +46,15 @@
   </form>
 </div>
 
+{% set with_prog = st.grades|selectattr('day_programs')|list %}
+{% if with_prog %}
+<div class="card">
+  <p style="margin:0">{{ L('صفوف هذه المرحلة تتبع برامج الجرس:', 'Grades of this stage follow bell programs:') }}
+  {% for g in with_prog %}<a class="chip" href="{{ url_for('admin.grade_view', grade_id=g.id) }}">{{ g.name_ar }}</a>{% endfor %}
+  — <a href="{{ url_for('admin.programs_assign') }}">{{ L('التوزيع', 'assignments') }}</a>.
+  <span class="muted small">{{ L('الحصص أدناه تُستخدم فقط للصفوف والأيام بلا برنامج.', 'The periods below apply only to grades/days without a program.') }}</span></p>
+</div>
+{% endif %}
 <div class="card" id="periods">
   <h2>{{ L('الحصص اليومية (الافتراضي لكل الأيام)', 'Daily periods (default, every day)') }}</h2>
   <p class="hint">{{ L('الحصص متتالية بلا فراغ: كل حصة تبدأ لحظة انتهاء التي قبلها، فيكفي تحديد بداية الدوام ومدة كل حصة. نص التنبيه يُبنى من التسميات: «انتهت الحصة الأولى - بداية الحصة الثانية».',

@@ -113,6 +113,10 @@ class Grade(db.Model):
     sections    = db.relationship('Section', backref='grade', cascade='all, delete-orphan',
                                   order_by='Section.sort_order')
     period_times = db.relationship('GradePeriodTime', backref='grade', cascade='all, delete-orphan')
+    day_programs = db.relationship('GradeDayProgram', backref='grade', cascade='all, delete-orphan')
+
+    def program_for(self, weekday):
+        return next((a.program for a in self.day_programs if a.weekday == weekday), None)
 
 
 class GradePeriodTime(db.Model):
@@ -128,6 +132,55 @@ class GradePeriodTime(db.Model):
     __table_args__ = (
         db.UniqueConstraint('grade_id', 'weekday', 'period_number', name='uq_grade_period_time'),
     )
+
+
+class BellProgram(db.Model):
+    """A complete bell program: an ordered list of periods and breaks with
+    their times (e.g. "الصفوف 3+4" or "الصفوف 3+4 — الثلاثاء"). Grades are
+    assigned a program per weekday; that assignment beats every other layer."""
+    __tablename__ = 'bell_programs'
+    id         = db.Column(db.Integer, primary_key=True)
+    name       = db.Column(db.String(200), unique=True, nullable=False)
+    sort_order = db.Column(db.Integer, default=0)
+
+    periods     = db.relationship('BellProgramPeriod', backref='program', cascade='all, delete-orphan',
+                                  order_by='BellProgramPeriod.number')
+    assignments = db.relationship('GradeDayProgram', backref='program', cascade='all, delete-orphan')
+
+    @property
+    def day_start(self):
+        return self.periods[0].start_time if self.periods else '08:00'
+
+    @property
+    def day_end(self):
+        return self.periods[-1].end_time if self.periods else ''
+
+
+class BellProgramPeriod(db.Model):
+    __tablename__ = 'bell_program_periods'
+    id         = db.Column(db.Integer, primary_key=True)
+    program_id = db.Column(db.Integer, db.ForeignKey('bell_programs.id'), nullable=False)
+    number     = db.Column(db.Integer, nullable=False)
+    kind       = db.Column(db.String(10), nullable=False, default='class')   # class | break
+    label_ar   = db.Column(db.String(100), nullable=False)
+    label_en   = db.Column(db.String(100))
+    start_time = db.Column(db.String(5), nullable=False)
+    end_time   = db.Column(db.String(5), nullable=False)
+    __table_args__ = (db.UniqueConstraint('program_id', 'number', name='uq_program_period'),)
+
+    @property
+    def duration(self):
+        from services import minutes_between
+        return minutes_between(self.start_time, self.end_time)
+
+
+class GradeDayProgram(db.Model):
+    __tablename__ = 'grade_day_programs'
+    id         = db.Column(db.Integer, primary_key=True)
+    grade_id   = db.Column(db.Integer, db.ForeignKey('grades.id'), nullable=False)
+    weekday    = db.Column(db.Integer, nullable=False)
+    program_id = db.Column(db.Integer, db.ForeignKey('bell_programs.id'), nullable=False)
+    __table_args__ = (db.UniqueConstraint('grade_id', 'weekday', name='uq_grade_day_program'),)
 
 
 class Section(db.Model):

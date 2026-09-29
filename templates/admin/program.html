@@ -1,0 +1,63 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ prog.name }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('admin.programs') }}">{{ L('برامج الجرس', 'Bell programs') }}</a></div>
+<h1>{{ prog.name }}</h1>
+
+<div class="card" id="periods">
+  <p class="hint">{{ L('الحصص متتالية: حدّد بداية الدوام ومدة كل حصة/فرصة، والتوقيتات تُحسب تلقائياً.', 'Back-to-back: set the day start and each duration; times are computed.') }}</p>
+  <form method="post" action="{{ url_for('admin.program_save', program_id=prog.id) }}">
+    <div class="row" style="margin-bottom:10px">
+      <div><label>{{ L('اسم البرنامج', 'Program name') }}</label><input type="text" name="name" value="{{ prog.name }}" required></div>
+      <div class="shrink" style="width:150px"><label>{{ L('بداية الدوام', 'Day starts at') }}</label><input type="time" name="day_start" value="{{ prog.day_start }}" required></div>
+    </div>
+    {% if prog.periods %}
+    <table class="resp">
+      <thead><tr><th>#</th><th>{{ L('النوع', 'Type') }}</th><th>{{ L('التسمية', 'Label') }}</th><th>{{ L('بالإنجليزية', 'English') }}</th><th>{{ L('المدة (د)', 'Minutes') }}</th><th>{{ L('التوقيت', 'Time') }}</th><th></th></tr></thead>
+      <tbody>
+      {% for p in prog.periods %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td><select name="p{{ p.id }}_kind"><option value="class" {{ 'selected' if p.kind=='class' }}>{{ L('حصة', 'Class') }}</option><option value="break" {{ 'selected' if p.kind=='break' }}>{{ L('فرصة', 'Break') }}</option></select></td>
+        <td><input type="text" name="p{{ p.id }}_label_ar" value="{{ p.label_ar }}"></td>
+        <td><input type="text" name="p{{ p.id }}_label_en" value="{{ p.label_en or '' }}"></td>
+        <td style="width:100px"><input type="number" min="1" max="240" name="p{{ p.id }}_duration" value="{{ p.duration }}"></td>
+        <td class="small" dir="ltr">{{ p.start_time }} – {{ p.end_time }}</td>
+        <td><button class="danger sm" form="del-p{{ p.id }}">✕</button></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted small">{{ L('نهاية الدوام:', 'Day ends at:') }} <b dir="ltr">{{ prog.day_end }}</b></p>
+    {% endif %}
+    <button>{{ L('حفظ', 'Save') }}</button>
+  </form>
+  {% for p in prog.periods %}
+  <form id="del-p{{ p.id }}" method="post" action="{{ url_for('admin.program_period_delete', period_id=p.id) }}" data-confirm="{{ L('حذف هذا السطر؟ التالي يتقدم تلقائياً.', 'Delete this row? The next ones move up.') }}"></form>
+  {% endfor %}
+
+  <h2 style="margin-top:18px">{{ L('إضافة في آخر اليوم', 'Add at the end of the day') }}</h2>
+  <form method="post" action="{{ url_for('admin.program_period_add', program_id=prog.id) }}" class="row">
+    <div class="shrink" style="width:120px"><label>{{ L('النوع', 'Type') }}</label><select name="kind"><option value="class">{{ L('حصة', 'Class') }}</option><option value="break">{{ L('فرصة', 'Break') }}</option></select></div>
+    <div><label>{{ L('التسمية (اختياري)', 'Label (optional)') }}</label><input type="text" name="label_ar" placeholder="{{ L('تُولَّد تلقائياً', 'Auto') }}"></div>
+    <div class="shrink" style="width:120px"><label>{{ L('المدة (د)', 'Minutes') }}</label><input type="number" min="1" max="240" name="duration" value="45" required></div>
+    {% if not prog.periods %}<div class="shrink" style="width:140px"><label>{{ L('بداية الدوام', 'Day start') }}</label><input type="time" name="day_start" value="08:00"></div>{% endif %}
+    <div class="shrink"><button>{{ L('إضافة', 'Add') }}</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>{{ L('الصفوف التي تتبع هذا البرنامج', 'Grades using this program') }}</h2>
+  {% set by_grade = {} %}
+  {% for a in prog.assignments %}{% set _ = by_grade.setdefault(a.grade, []).append(a.weekday) %}{% endfor %}
+  {% set names = ['الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت','الأحد'] if lang != 'en' else ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+  {% for g, wds in by_grade.items() %}
+    <div><a href="{{ url_for('admin.grade_view', grade_id=g.id) }}">{{ g.stage.name_ar }} › {{ g.name_ar }}</a>
+      <span class="muted small">— {% for wd in [6,0,1,2,3,4,5] if wd in wds %}{{ names[wd] }}{{ '، ' if not loop.last }}{% endfor %}</span></div>
+  {% else %}<p class="muted">{{ L('غير مستخدم بعد.', 'Not used yet.') }} <a href="{{ url_for('admin.programs_assign') }}">{{ L('توزيع البرامج', 'Assign programs') }}</a></p>{% endfor %}
+  <form method="post" action="{{ url_for('admin.program_delete', program_id=prog.id) }}" style="margin-top:14px"
+        data-confirm="{{ L('حذف البرنامج؟ الصفوف التي تتبعه تعود لتوقيت مرحلتها.', 'Delete? Its grades fall back to stage timing.') }}">
+    <button class="danger sm">{{ L('حذف البرنامج', 'Delete program') }}</button>
+  </form>
+</div>
+{% endblock %}

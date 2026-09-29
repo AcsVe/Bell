@@ -16,6 +16,7 @@
   <nav>
     {% set ep = request.endpoint or '' %}
     <a href="{{ url_for('admin.dashboard') }}" class="{{ 'on' if ep in ['admin.dashboard','admin.stage_view','admin.grade_view','admin.section_view'] }}">{{ L('المراحل والصفوف', 'Stages & grades') }}</a>
+    <a href="{{ url_for('admin.programs') }}" class="{{ 'on' if ep.startswith('admin.program') }}">{{ L('برامج الجرس', 'Bell programs') }}</a>
     <a href="{{ url_for('admin.teachers') }}" class="{{ 'on' if ep in ['admin.teachers','admin.teacher_view'] }}">{{ L('المعلمون', 'Teachers') }}</a>
     <a href="{{ url_for('admin.codes') }}" class="{{ 'on' if ep == 'admin.codes' }}">{{ L('الأكواد', 'Codes') }}</a>
     <a href="{{ url_for('admin.settings') }}" class="{{ 'on' if ep == 'admin.settings' }}">{{ L('النغمة والأجهزة', 'Tone & devices') }}</a>

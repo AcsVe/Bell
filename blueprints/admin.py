@@ -1,11 +1,12 @@
+import re
 from functools import wraps
 
 from flask import (Blueprint, current_app, flash, redirect, render_template, request,
                    send_file, session, url_for)
 
-from models import (db, AppSetting, Device, Grade, GradePeriodTime, MediaFile, Period,
-                    Section, Stage, StageDayPeriodTime, StageWeekday, Teacher, TeacherSection,
-                    TeacherStage)
+from models import (db, AppSetting, BellProgram, BellProgramPeriod, Device, Grade,
+                    GradeDayProgram, GradePeriodTime, MediaFile, Period, Section, Stage,
+                    StageDayPeriodTime, StageWeekday, Teacher, TeacherSection, TeacherStage)
 from services import (WEEK_ORDER, bump_schedule_version, chain_times, default_period_labels,
                       generate_code, minutes_between, parse_duration, rechain_stage,
                       resolve_grade_day, valid_time, weekday_names)
@@ -38,7 +39,8 @@ def _bump_on_change(resp):
 
 
 def _form_text(name):
-    return (request.form.get(name) or '').strip()
+    # Drop the bidi isolates the templates add around number ranges.
+    return re.sub('[\u2066-\u2069]', '', request.form.get(name) or '').strip()
 
 
 def _save_upload(field, kind, allowed_prefix, existing=None):
@@ -316,6 +318,7 @@ def grade_view(grade_id):
         grade_id=g.id, weekday=day)} if day is not None else {}
     resolved = resolve_grade_day(g, day) if day is not None else []
     return render_template('admin/grade.html', g=g, st=st, day=day, overrides=overrides,
+                           program=g.program_for(day) if day is not None else None,
                            resolved=resolved, week_order=WEEK_ORDER,
                            wd_names=weekday_names(session.get('lang', 'ar')))
 
@@ -639,6 +642,188 @@ def teacher_delete(teacher_id):
     db.session.delete(t)
     db.session.commit()
     return redirect(url_for('admin.teachers'))
+
+
+# ── Bell programs ─────────────────────────────────────────────────────────
+@admin_bp.route('/programs')
+@login_required
+def programs():
+    progs = BellProgram.query.order_by(BellProgram.sort_order, BellProgram.id).all()
+    usage = {p.id: sorted({(a.grade.stage.sort_order, a.grade.sort_order, a.grade.name_ar)
+                           for a in p.assignments}) for p in progs}
+    return render_template('admin/programs.html', progs=progs, usage=usage)
+
+
+@admin_bp.route('/programs/add', methods=['POST'])
+@login_required
+def program_add():
+    name = _form_text('name')
+    if not name or BellProgram.query.filter_by(name=name).first():
+        flash(_msg('اكتب اسماً غير مستخدم للبرنامج', 'Enter an unused program name'), 'error')
+        return redirect(url_for('admin.programs'))
+    prog = BellProgram(name=name, sort_order=BellProgram.query.count())
+    src = db.session.get(BellProgram, request.form.get('copy_from', type=int) or 0)
+    for p in (src.periods if src else []):
+        prog.periods.append(BellProgramPeriod(number=p.number, kind=p.kind, label_ar=p.label_ar,
+                                              label_en=p.label_en, start_time=p.start_time,
+                                              end_time=p.end_time))
+    db.session.add(prog)
+    db.session.commit()
+    return redirect(url_for('admin.program_view', program_id=prog.id))
+
+
+@admin_bp.route('/programs/<int:program_id>')
+@login_required
+def program_view(program_id):
+    prog = db.get_or_404(BellProgram, program_id)
+    return render_template('admin/program.html', prog=prog)
+
+
+def _rechain_program(prog, day_start, durations):
+    times = chain_times(day_start, durations)
+    if times is None:
+        return False
+    for p, (a, b) in zip(prog.periods, times):
+        p.start_time, p.end_time = a, b
+    return True
+
+
+@admin_bp.route('/programs/<int:program_id>/save', methods=['POST'])
+@login_required
+def program_save(program_id):
+    prog = db.get_or_404(BellProgram, program_id)
+    name = _form_text('name') or prog.name
+    if name != prog.name and BellProgram.query.filter_by(name=name).first():
+        flash(_msg('يوجد برنامج بهذا الاسم', 'A program with this name exists'), 'error')
+        return redirect(url_for('admin.program_view', program_id=prog.id))
+    day_start = _form_text('day_start') or prog.day_start
+    if not valid_time(day_start):
+        flash(_msg('وقت البداية غير صالح', 'Invalid start time'), 'error')
+        return redirect(url_for('admin.program_view', program_id=prog.id))
+    durs = []
+    for p in prog.periods:
+        pre = f'p{p.id}_'
+        durs.append(parse_duration(request.form.get(pre + 'duration')) or p.duration)
+        p.label_ar = _form_text(pre + 'label_ar') or p.label_ar
+        p.label_en = _form_text(pre + 'label_en') or None
+        p.kind = 'break' if request.form.get(pre + 'kind') == 'break' else 'class'
+    if not _rechain_program(prog, day_start, durs):
+        db.session.rollback()
+        flash(_msg('مجموع المدد يتجاوز منتصف الليل', 'Total duration runs past midnight'), 'error')
+        return redirect(url_for('admin.program_view', program_id=prog.id))
+    prog.name = name
+    db.session.commit()
+    flash(_msg('تم حفظ البرنامج', 'Program saved'), 'ok')
+    return redirect(url_for('admin.program_view', program_id=prog.id))
+
+
+@admin_bp.route('/programs/<int:program_id>/periods/add', methods=['POST'])
+@login_required
+def program_period_add(program_id):
+    prog = db.get_or_404(BellProgram, program_id)
+    kind = 'break' if request.form.get('kind') == 'break' else 'class'
+    dur = parse_duration(request.form.get('duration'))
+    start = prog.periods[-1].end_time if prog.periods else (_form_text('day_start') or '08:00')
+    times = chain_times(start, [dur]) if dur and valid_time(start) else None
+    if not times:
+        flash(_msg('أدخل مدة صحيحة بالدقائق', 'Enter a valid duration in minutes'), 'error')
+        return redirect(url_for('admin.program_view', program_id=prog.id))
+    class_index = sum(1 for p in prog.periods if p.kind == 'class') + 1
+    d_ar, d_en = default_period_labels(kind, class_index)
+    if kind == 'break':
+        d_ar = 'الفرصة'
+    prog.periods.append(BellProgramPeriod(number=len(prog.periods) + 1, kind=kind,
+                                          label_ar=_form_text('label_ar') or d_ar,
+                                          label_en=_form_text('label_en') or d_en,
+                                          start_time=times[0][0], end_time=times[0][1]))
+    db.session.commit()
+    return redirect(url_for('admin.program_view', program_id=prog.id) + '#periods')
+
+
+@admin_bp.route('/program-periods/<int:period_id>/delete', methods=['POST'])
+@login_required
+def program_period_delete(period_id):
+    p = db.get_or_404(BellProgramPeriod, period_id)
+    prog = p.program
+    start = prog.day_start
+    db.session.delete(p)
+    db.session.flush()
+    db.session.expire(prog, ['periods'])
+    for n, q in enumerate(prog.periods, start=1):
+        q.number = n
+    _rechain_program(prog, start, [q.duration for q in prog.periods])
+    db.session.commit()
+    return redirect(url_for('admin.program_view', program_id=prog.id) + '#periods')
+
+
+@admin_bp.route('/programs/<int:program_id>/delete', methods=['POST'])
+@login_required
+def program_delete(program_id):
+    prog = db.get_or_404(BellProgram, program_id)
+    db.session.delete(prog)
+    db.session.commit()
+    flash(_msg('تم حذف البرنامج؛ الصفوف التي كانت تتبعه عادت لتوقيت مرحلتها',
+               'Program deleted; its grades fell back to their stage timing'), 'ok')
+    return redirect(url_for('admin.programs'))
+
+
+@admin_bp.route('/programs/assign', methods=['GET', 'POST'])
+@login_required
+def programs_assign():
+    stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
+    progs = BellProgram.query.order_by(BellProgram.sort_order, BellProgram.id).all()
+    if request.method == 'POST':
+        valid = {p.id for p in progs}
+        for st in stages:
+            for g in st.grades:
+                current = {a.weekday: a for a in g.day_programs}
+                for wd in st.weekday_list:
+                    pid = request.form.get(f'g{g.id}_d{wd}', type=int)
+                    if pid in valid:
+                        if wd in current:
+                            current[wd].program_id = pid
+                        else:
+                            db.session.add(GradeDayProgram(grade_id=g.id, weekday=wd, program_id=pid))
+                    elif wd in current:
+                        db.session.delete(current[wd])
+        db.session.commit()
+        flash(_msg('تم حفظ التوزيع', 'Assignments saved'), 'ok')
+        return redirect(url_for('admin.programs_assign'))
+    return render_template('admin/programs_assign.html', stages=stages, progs=progs,
+                           week_order=WEEK_ORDER, wd_names=weekday_names(session.get('lang', 'ar')))
+
+
+@admin_bp.route('/programs/export')
+@login_required
+def programs_export():
+    from programs_io import export_programs
+    return send_file(export_programs(), mimetype=XLSX, as_attachment=True,
+                     download_name='برامج الجرس.xlsx')
+
+
+@admin_bp.route('/programs/import', methods=['POST'])
+@login_required
+def programs_import():
+    from programs_io import import_programs
+    f = request.files.get('file')
+    if not f or not f.filename:
+        flash(_msg('اختر الملف أولاً', 'Choose the file first'), 'error')
+        return redirect(url_for('admin.programs'))
+    try:
+        r = import_programs(f.stream)
+    except ValueError as e:
+        db.session.rollback()
+        flash(str(e), 'error')
+        return redirect(url_for('admin.programs'))
+    flash(_msg(f'تم: {r["programs"]} برنامج · {r["assigned"]} تعيين يوم/صف'
+               + (f' · مراحل جديدة {r["stages"]}' if r['stages'] else '')
+               + (f' · صفوف جديدة {r["grades"]}' if r['grades'] else ''),
+               f'Done: {r["programs"]} programs · {r["assigned"]} grade/day assignments'
+               + (f' · {r["stages"]} new stages' if r['stages'] else '')
+               + (f' · {r["grades"]} new grades' if r['grades'] else '')), 'ok')
+    for w in r['warnings'][:5]:
+        flash(w, 'error')
+    return redirect(url_for('admin.programs'))
 
 
 # ── Codes overview ────────────────────────────────────────────────────────

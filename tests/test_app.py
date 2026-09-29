@@ -300,7 +300,7 @@ def _upload(admin, sid, data, sync=True):
     if sync:
         form['sync'] = '1'
     return admin.post('/admin/teachers/import', data=form, content_type='multipart/form-data',
-                      follow_redirects=True).get_data(as_text=True)
+                      follow_redirects=True).get_data(as_text=True).replace('\u2066', '').replace('\u2069', '')
 
 
 def test_teacher_template_import_by_stage(admin, app):
@@ -403,7 +403,7 @@ CSV_SAMPLE_2 = ('"Name","PrimarySmtpAddress","RecipientType"\n'
 
 def _csv_upload(admin, form):
     return admin.post('/admin/teachers/import-members', data=form, content_type='multipart/form-data',
-                      follow_redirects=True).get_data(as_text=True)
+                      follow_redirects=True).get_data(as_text=True).replace('\u2066', '').replace('\u2069', '')
 
 
 def test_members_csv_import_creates_stage_and_links(admin, app):
@@ -508,3 +508,155 @@ def test_schema_migration_adds_email_column(tmp_path):
         t.email = 'x@y.example'
         db.session.commit()
     create_app({'TESTING': True, 'SQLALCHEMY_DATABASE_URI': f'sqlite:///{dbfile}'})   # idempotent
+
+
+def _prog_xlsx(programs, assign):
+    """programs: {name: [(kind, label, start, end), ...]}; assign: [(stage, grade, {day_name: prog})]"""
+    import openpyxl
+    from programs_io import PROG_HEAD, DAY_COLS
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'البرامج'
+    ws.append(PROG_HEAD)
+    for name, rows in programs.items():
+        for i, (k, lab, a, b) in enumerate(rows, 1):
+            ws.append([name, i, k, lab, '', a, b])
+    wa = wb.create_sheet('التوزيع')
+    wa.append(['المرحلة', 'الصف', 'الصف بالإنجليزية'] + [n for _, n in DAY_COLS])
+    for st, g, days in assign:
+        wa.append([st, g, ''] + [days.get(n, '') for _, n in DAY_COLS])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def _prog_upload(admin, data):
+    return admin.post('/admin/programs/import', data={'file': (io.BytesIO(data), 'p.xlsx')},
+                      content_type='multipart/form-data', follow_redirects=True).get_data(as_text=True).replace('\u2066', '').replace('\u2069', '')
+
+
+def test_bell_programs_import_assign_and_resolve(admin, app):
+    import openpyxl
+    from models import BellProgram, GradeDayProgram
+    from programs_io import parse_time
+    from services import build_schedule_payload, resolve_grade_day
+    import datetime as dt
+    assert parse_time('8:00') == '08:00' and parse_time('1:10') == '13:10' and parse_time('12:25') == '12:25'
+    assert parse_time(dt.time(13, 5)) == '13:05' and parse_time('بلا') is None
+
+    sid, gid = _setup_school(admin, app)          # stage with default periods, grade الصف الأول
+    progs = {
+        'P34': [('حصة', 'الحصة الأولى', '8:00', '8:45'), ('', 'الفرصة', '8:45', '9:05'),
+                ('حصة', 'الحصة الثانية', '9:05', '9:50')],
+        'P34 — الثلاثاء': [('حصة', 'الحصة الأولى', '8:00', '8:35'), ('استراحة', 'الفرصة', '8:35', '8:50'),
+                          ('حصة', 'الحصة الثانية', '8:50', '1:20')],
+    }
+    week = {'الأحد': 'P34', 'الاثنين': 'P34', 'الثلاثاء': 'P34 — الثلاثاء', 'الأربعاء': 'P34', 'الخميس': 'P34'}
+    data = _prog_xlsx(progs, [('المرحلة الأساسية 1-3', 'الصف الأول', week),
+                              ('المرحلة الأساسية 4-6', 'الصف الرابع', week)])
+    html = _prog_upload(admin, data)
+    assert 'برنامج' in html and 'مراحل جديدة 1' in html and 'صفوف جديدة 1' in html
+    with app.app_context():
+        g1 = db.session.get(Grade, gid)
+        sun = resolve_grade_day(g1, 6)
+        assert [(r['kind'], r['start'], r['end'], r['source']) for r in sun] == [
+            ('class', '08:00', '08:45', 'program'), ('break', '08:45', '09:05', 'program'),
+            ('class', '09:05', '09:50', 'program')]
+        assert resolve_grade_day(g1, 1)[-1]['end'] == '13:20'           # "1:20" → afternoon
+        g4 = Grade.query.filter_by(name_ar='الصف الرابع').one()
+        assert g4.stage.name_ar == 'المرحلة الأساسية 4-6' and sorted(g4.stage.weekday_list) == [0, 1, 2, 3, 6]
+        assert resolve_grade_day(g4, 1) == resolve_grade_day(g1, 1)     # same program across stages
+        g2 = Grade.query.filter_by(name_ar='الصف الثاني').one()
+        assert resolve_grade_day(g2, 6)[0]['source'] == 'default'      # unassigned grade: stage timing
+        sec_id = Section.query.filter_by(grade_id=gid).first().id
+
+    # device payload follows the program
+    with app.app_context():
+        p = build_schedule_payload('section', db.session.get(Section, sec_id))
+        assert [x['end'] for x in p['days'][str(gid)]['1']] == ['08:35', '08:50', '13:20']
+
+    # pages render
+    for url in ['/admin/programs', '/admin/programs/assign', f'/admin/grades/{gid}?day=6',
+                f'/admin/stages/{sid}']:
+        assert admin.get(url).status_code == 200, url
+    assert 'يتبع برنامج الجرس' in admin.get(f'/admin/grades/{gid}?day=6').get_data(as_text=True)
+
+    # export → re-import round trip is stable
+    exported = admin.get('/admin/programs/export').data
+    wb = openpyxl.load_workbook(io.BytesIO(exported))
+    assert wb['البرامج'].max_row == 1 + 6 and wb['التوزيع'].max_row == 1 + 3
+    _prog_upload(admin, exported)
+    with app.app_context():
+        assert BellProgram.query.count() == 2 and GradeDayProgram.query.count() == 10
+        assert resolve_grade_day(db.session.get(Grade, gid), 6)[1]['end'] == '09:05'
+
+    # editor: change a duration → the chain moves; add and delete rows
+    with app.app_context():
+        prog = BellProgram.query.filter_by(name='P34').one()
+        pid, rows = prog.id, [(q.id, q.kind, q.label_ar) for q in prog.periods]
+    form = {'name': 'P34', 'day_start': '07:45'}
+    for qid, kind, lab in rows:
+        form.update({f'p{qid}_kind': kind, f'p{qid}_label_ar': lab, f'p{qid}_duration': 40})
+    admin.post(f'/admin/programs/{pid}/save', data=form)
+    admin.post(f'/admin/programs/{pid}/periods/add', data={'kind': 'class', 'duration': 45})
+    with app.app_context():
+        prog = db.session.get(BellProgram, pid)
+        assert [(q.start_time, q.end_time) for q in prog.periods] == [
+            ('07:45', '08:25'), ('08:25', '09:05'), ('09:05', '09:45'), ('09:45', '10:30')]
+        assert prog.periods[-1].label_ar == 'الحصة الثالثة'
+        first = prog.periods[0].id
+    admin.post(f'/admin/program-periods/{first}/delete')
+    with app.app_context():
+        prog = db.session.get(BellProgram, pid)
+        assert [q.number for q in prog.periods] == [1, 2, 3] and prog.periods[0].start_time == '07:45'
+
+    # assignment grid: clear Sunday for grade 1
+    with app.app_context():
+        st = db.session.get(Stage, sid)
+        form = {f'g{g.id}_d{wd}': (g.program_for(wd).id if g.program_for(wd) else '')
+                for g in st.grades for wd in st.weekday_list}
+    form[f'g{gid}_d6'] = ''
+    admin.post('/admin/programs/assign', data=form)
+    with app.app_context():
+        g1 = db.session.get(Grade, gid)
+        assert g1.program_for(6) is None and g1.program_for(0).id == pid
+
+    # copy, then delete → grades fall back
+    admin.post('/admin/programs/add', data={'name': 'نسخة', 'copy_from': pid})
+    with app.app_context():
+        assert len(BellProgram.query.filter_by(name='نسخة').one().periods) == 3
+    admin.post(f'/admin/programs/{pid}/delete')
+    with app.app_context():
+        assert db.session.get(Grade, gid).program_for(0) is None
+
+    # errors: bad time / unknown program / overlap → nothing saved
+    before = None
+    with app.app_context():
+        before = BellProgram.query.count()
+    bad = _prog_xlsx({'X': [('حصة', 'أ', '8:00', 'x')]}, [])
+    assert 'لم يُحفظ شيء' in _prog_upload(admin, bad)
+    bad = _prog_xlsx({'Y': [('حصة', 'أ', '8:00', '8:45')]}, [('المرحلة الأساسية 1-3', 'الصف الأول', {'الأحد': 'مجهول'})])
+    assert 'غير موجود' in _prog_upload(admin, bad)
+    bad = _prog_xlsx({'Z': [('حصة', 'أ', '8:00', '8:45'), ('حصة', 'ب', '8:40', '9:30')]}, [])
+    assert 'متداخلتان' in _prog_upload(admin, bad)
+    with app.app_context():
+        assert BellProgram.query.count() == before
+    # a gap is accepted with a warning
+    gap = _prog_xlsx({'G': [('حصة', 'أ', '8:00', '8:45'), ('حصة', 'ب', '8:50', '9:30')]}, [])
+    assert 'فجوة 5' in _prog_upload(admin, gap)
+
+
+def test_bidi_isolates_number_ranges(admin, app):
+    from app import bidi_fix
+    assert bidi_fix('المرحلة الأساسية 1-3') == 'المرحلة الأساسية \u20661-3\u2069'
+    assert bidi_fix('08:00 – 14:35') == '08:00 – 14:35' and bidi_fix('2026-09-28') == '2026-09-28'
+    assert bidi_fix(bidi_fix('الصفوف 1+2')) == 'الصفوف \u20661+2\u2069'
+    admin.post('/admin/stages/add', data={'name_ar': 'المرحلة الأساسية 1-3'})
+    with app.app_context():
+        sid = Stage.query.one().id
+    html = admin.get(f'/admin/stages/{sid}').get_data(as_text=True)
+    assert 'المرحلة الأساسية \u20661-3\u2069' in html
+    # re-saving the form (value prefilled with isolates) stores the clean name
+    admin.post(f'/admin/stages/{sid}/update', data={'name_ar': 'المرحلة الأساسية \u20661-3\u2069', 'active': '1'})
+    with app.app_context():
+        assert db.session.get(Stage, sid).name_ar == 'المرحلة الأساسية 1-3'

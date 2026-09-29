@@ -7,6 +7,21 @@ from flask import (Flask, Response, abort, redirect, request, send_from_director
 from models import db, MediaFile, ensure_schema
 
 
+import re as _re
+
+# In right-to-left text "1-3" renders as "3-1" and "1+2" as "2+1". Wrap number
+# ranges in a left-to-right isolate (U+2066 … U+2069) wherever a template prints text.
+_NUM_RANGE = _re.compile(r'(?<![\u2066\d:./\-])(\d+\s*[-+–]\s*\d+)(?![\d\u2069:./\-])')
+
+
+def bidi_fix(value):
+    if isinstance(value, str) and _NUM_RANGE.search(value):
+        from markupsafe import Markup
+        fixed = _NUM_RANGE.sub('\u2066\\1\u2069', str(value))
+        return Markup(fixed) if isinstance(value, Markup) else fixed
+    return value
+
+
 def normalize_db_url(url):
     """Whatever form Render/Neon give (postgres://, postgresql://,
     postgresql+psycopg2://, postgresql+psycopg://), always use the psycopg 3
@@ -42,6 +57,7 @@ def create_app(test_config=None):
         app.config.update(test_config)
 
     db.init_app(app)
+    app.jinja_env.finalize = bidi_fix
 
     from blueprints.admin import admin_bp
     from blueprints.client import client_bp

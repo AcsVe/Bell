@@ -142,8 +142,21 @@ def schedule_version():
     return int(AppSetting.get('schedule_version', '0') or 0)
 
 
+def resolve_program(program):
+    out = [{'n': p.number, 'kind': p.kind, 'ar': p.label_ar, 'en': p.label_en or p.label_ar,
+            'start': p.start_time, 'end': p.end_time, 'source': 'program',
+            'dur': minutes_between(p.start_time, p.end_time)} for p in program.periods]
+    out.sort(key=lambda x: x['n'])
+    return out
+
+
 def resolve_grade_day(grade, weekday):
-    """The periods of one grade on one weekday, with the effective times."""
+    """The periods of one grade on one weekday, with the effective times.
+    Priority: bell program assigned to the grade for that day → grade time
+    override → stage day override → stage default."""
+    program = grade.program_for(weekday)
+    if program is not None:
+        return resolve_program(program)
     stage = grade.stage
     grade_ovr = {g.period_number: g for g in GradePeriodTime.query.filter_by(
         grade_id=grade.id, weekday=weekday)}
@@ -222,7 +235,9 @@ def build_schedule_payload(code_type, owner):
                     continue
                 seen.add(('g', grade.id))
                 add_grade(grade)
-                targets.append({'sectionId': None, 'stageId': stage.id, 'gradeId': grade.id, **name})
+                # Grade name, so a merged alert says which grades it is for.
+                targets.append({'sectionId': None, 'stageId': stage.id, 'gradeId': grade.id,
+                                'ar': grade.name_ar, 'en': grade.name_en or grade.name_ar})
         else:
             key = f'stage-{stage.id}'
             days[key] = {str(wd): resolve_stage_day(stage, wd) for wd in stage.weekday_list}

@@ -1,0 +1,34 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ L('توزيع برامج الجرس', 'Assign bell programs') }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('admin.programs') }}">{{ L('برامج الجرس', 'Bell programs') }}</a></div>
+<h1>{{ L('توزيع البرامج على الصفوف والأيام', 'Assign programs to grades & days') }}</h1>
+<p class="hint">{{ L('اختر برنامج كل صف في كل يوم دوام. «توقيت المرحلة» يعني أن الصف يتبع حصص مرحلته الافتراضية.', 'Choose each grade’s program per school day. “Stage timing” means the grade follows its stage defaults.') }}</p>
+{% if not progs %}<div class="card muted">{{ L('أنشئ برنامجاً أولاً.', 'Create a program first.') }}</div>{% endif %}
+<form method="post">
+{% for st in stages %}
+<div class="card" style="overflow-x:auto">
+  <h2>{{ L(st.name_ar, st.name_en or st.name_ar) }}</h2>
+  {% if st.grades %}
+  <table>
+    <thead><tr><th>{{ L('الصف', 'Grade') }}</th>{% for wd in week_order if wd in st.weekday_list %}<th>{{ wd_names[wd] }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for g in st.grades %}
+    <tr>
+      <td style="white-space:nowrap"><b>{{ L(g.name_ar, g.name_en or g.name_ar) }}</b></td>
+      {% for wd in week_order if wd in st.weekday_list %}{% set cur = g.program_for(wd) %}
+      <td><select name="g{{ g.id }}_d{{ wd }}" style="min-width:150px">
+        <option value="">{{ L('— توقيت المرحلة —', '— stage timing —') }}</option>
+        {% for p in progs %}<option value="{{ p.id }}" {{ 'selected' if cur and cur.id == p.id }}>{{ p.name }}</option>{% endfor %}
+      </select></td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">{{ L('لا توجد صفوف في هذه المرحلة.', 'No grades in this stage.') }} <a href="{{ url_for('admin.stage_view', stage_id=st.id) }}#grades">{{ L('أضف صفوفاً', 'Add grades') }}</a></p>{% endif %}
+</div>
+{% endfor %}
+{% if stages and progs %}<button>{{ L('حفظ التوزيع', 'Save assignments') }}</button>{% endif %}
+</form>
+{% endblock %}

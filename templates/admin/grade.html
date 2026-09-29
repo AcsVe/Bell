@@ -47,7 +47,14 @@
     <a href="{{ url_for('admin.grade_view', grade_id=g.id, day=wd) }}#times" class="{{ 'on' if wd == day }}">{{ wd_names[wd] }}</a>
     {% endfor %}
   </div>
-  {% if day is not none and st.periods %}
+  {% if day is not none and program %}
+  <p><span class="chip break">{{ L('يتبع برنامج الجرس', 'Follows bell program') }}: <a href="{{ url_for('admin.program_view', program_id=program.id) }}">{{ program.name }}</a></span>
+     <a class="small" href="{{ url_for('admin.programs_assign') }}">{{ L('تغيير', 'Change') }}</a></p>
+  <table class="resp">
+    <thead><tr><th>{{ L('الحصة', 'Period') }}</th><th>{{ L('المدة', 'Minutes') }}</th><th>{{ L('التوقيت', 'Time') }}</th></tr></thead>
+    <tbody>{% for r in resolved %}<tr><td><span class="chip {{ 'break' if r.kind=='break' }}">{{ L(r.ar, r.en) }}</span></td><td>{{ r.dur }}</td><td class="small" dir="ltr">{{ r.start }} – {{ r.end }}</td></tr>{% endfor %}</tbody>
+  </table>
+  {% elif day is not none and st.periods %}
   {% set src = resolved[0].source %}
   <p><span class="chip {{ 'break' if src != 'default' }}">{{ {'grade': L('توقيت مخصص لهذا الصف','Custom timing for this grade'), 'stage': L('يرث توقيت يوم المرحلة','Inherits the stage day timing'), 'default': L('يستخدم الافتراضي','Using default')}[src] }}</span></p>
   <form method="post" action="{{ url_for('admin.grade_times', grade_id=g.id) }}">
@@ -73,7 +80,7 @@
       {% if overrides %}<div class="shrink"><button class="ghost" name="reset" value="1" formnovalidate>{{ L('رجوع لتوقيت المرحلة', 'Reset to stage timing') }}</button></div>{% endif %}
     </div>
   </form>
-  {% elif not st.periods %}<p class="muted">{{ L('أضف حصص المرحلة أولاً.', 'Add the stage periods first.') }}</p>{% endif %}
+  {% elif not st.periods %}<p class="muted">{{ L('لا يوجد برنامج جرس لهذا اليوم ولا حصص للمرحلة.', 'No bell program for this day and no stage periods.') }} <a href="{{ url_for('admin.programs_assign') }}">{{ L('توزيع البرامج', 'Assign programs') }}</a></p>{% endif %}
 </div>
 
 <form method="post" action="{{ url_for('admin.grade_delete', grade_id=g.id) }}" data-confirm="{{ L('حذف الصف بكل شعبه وأكوادها؟', 'Delete this grade with all its sections and codes?') }}">

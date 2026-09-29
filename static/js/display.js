@@ -51,7 +51,10 @@
   const t = (k) => (I18N[lang] || I18N.ar)[k] || k;
   const pick = (o) => (o ? (lang === 'en' ? o.en || o.ar : o.ar) : '');
   const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const ph = (o) => esc(pick(o));   // for innerHTML
+  // RTL shows "1-3" as "3-1": isolate number ranges left-to-right.
+  // (no lookbehind: older iOS Safari rejects it)
+  const bd = (v) => String(v).replace(/(^|[^\d:.\/\-\u2066])(\d+\s*[-+–]\s*\d+)(?![\d:.\/\-\u2069])/g, '$1\u2066$2\u2069');
+  const ph = (o) => esc(bd(pick(o)));   // for innerHTML
 
   function deviceId() {
     let id = localStorage.getItem('bell:device');
@@ -149,10 +152,10 @@
     if (!schedule) return;
     const st = mainStage();
     const multi = stages().length > 1;
-    $('stageName').textContent = st ? (multi ? stages().map(pick).join(' · ') : pick(st)) : '';
+    $('stageName').textContent = bd(st ? (multi ? stages().map(pick).join(' · ') : pick(st)) : '');
     const who = schedule.who;
     $('whoName').textContent = who.type === 'teacher'
-      ? `${t('teacher')}: ${pick(who)} · ${schedule.targets.length} ${t('sectionCount')}` : pick(who);
+      ? `${t('teacher')}: ${pick(who)} · ${schedule.targets.length} ${t('sectionCount')}` : bd(pick(who));
     const logo = $('logo');
     if (st && st.logo) { logo.src = abs(st.logo); logo.hidden = false; } else logo.hidden = true;
     const bg = $('bg');

@@ -1,0 +1,52 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ L('برامج الجرس', 'Bell programs') }}{% endblock %}
+{% block content %}
+<div class="row" style="align-items:center;margin-bottom:6px">
+  <h1 style="margin:0">{{ L('برامج الجرس', 'Bell programs') }}</h1>
+  <div class="shrink"><a class="btn" href="{{ url_for('admin.programs_assign') }}">{{ L('توزيع البرامج على الصفوف والأيام', 'Assign to grades & days') }}</a></div>
+</div>
+<p class="hint">{{ L('برنامج الجرس قائمة كاملة بالحصص والفرص وتوقيتها. يُسند لكل صف برنامج لكل يوم (مثلاً «الصفوف 3+4» في الأيام العادية و«الصفوف 3+4 — الثلاثاء» يوم الثلاثاء)، وله الأولوية على توقيت المرحلة.',
+  'A bell program is a full list of periods and breaks with times. Each grade is assigned a program per day (e.g. “Grades 3+4” on normal days and “Grades 3+4 — Tuesday” on Tuesday); it takes priority over the stage timing.') }}</p>
+
+<div class="card">
+  {% if progs %}
+  <table class="resp">
+    <thead><tr><th>{{ L('البرنامج', 'Program') }}</th><th>{{ L('الدوام', 'Day') }}</th><th>{{ L('الحصص والفرص', 'Periods & breaks') }}</th><th>{{ L('مستخدم في', 'Used by') }}</th></tr></thead>
+    <tbody>
+    {% for p in progs %}
+    <tr>
+      <td><a href="{{ url_for('admin.program_view', program_id=p.id) }}"><b>{{ p.name }}</b></a></td>
+      <td class="small" dir="ltr">{{ p.day_start }} – {{ p.day_end }}</td>
+      <td class="small" style="white-space:nowrap">{% set ns = namespace(i=0) %}{% for q in p.periods %}{% if q.kind == 'class' %}{% set ns.i = ns.i + 1 %}{% endif %}<span class="chip {{ 'break' if q.kind=='break' }}" title="{{ q.start_time }} – {{ q.end_time }}">{{ L('فرصة', 'B') if q.kind=='break' else ns.i }}</span>{% endfor %}</td>
+      <td class="small">{% for u in usage[p.id] %}<span class="chip">{{ u[2] }}</span>{% else %}<span class="muted">—</span>{% endfor %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">{{ L('لا توجد برامج بعد. ارفع ملف Excel أو أنشئ برنامجاً.', 'No programs yet. Upload an Excel file or create one.') }}</p>{% endif %}
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>{{ L('استيراد / تصدير (Excel)', 'Import / export (Excel)') }}</h2>
+    <p class="muted small">{{ L('الملف يحتوي البرامج وتوزيعها على الصفوف والأيام. صدّر الحالي، عدّل عليه، ثم ارفعه.', 'The file holds the programs and their grade/day assignment. Export, edit, re-upload.') }}</p>
+    <form method="post" action="{{ url_for('admin.programs_import') }}" enctype="multipart/form-data">
+      <input type="file" name="file" accept=".xlsx" required>
+      <div class="row" style="margin-top:10px">
+        <div class="shrink"><button>{{ L('رفع', 'Upload') }}</button></div>
+        <div class="shrink"><a class="btn ghost" href="{{ url_for('admin.programs_export') }}">⬇ {{ L('تصدير', 'Export') }}</a></div>
+      </div>
+    </form>
+  </div>
+  <div class="card">
+    <h2>{{ L('برنامج جديد', 'New program') }}</h2>
+    <form method="post" action="{{ url_for('admin.program_add') }}">
+      <label>{{ L('الاسم', 'Name') }}</label>
+      <input type="text" name="name" placeholder="الصفوف 3+4 — الثلاثاء" required>
+      <label style="margin-top:8px">{{ L('نسخ من (اختياري)', 'Copy from (optional)') }}</label>
+      <select name="copy_from"><option value="">—</option>{% for p in progs %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>
+      <button style="margin-top:10px">{{ L('إنشاء', 'Create') }}</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
