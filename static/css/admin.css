@@ -145,3 +145,30 @@ td input[type=checkbox],th input[type=checkbox]{min-width:0}
 .code-cols h3{font-size:14px;color:var(--muted);margin:6px 0}
 @media (max-width:760px){ .code-cols{grid-template-columns:1fr} }
 @media print{ .code-card{page-break-inside:auto} .code .copy{border:0} }
+
+/* Bell program list: every period with its time, wraps on phones */
+.ptimes{display:flex;flex-wrap:wrap;gap:4px}
+.pt{display:inline-flex;flex-direction:column;align-items:center;min-width:74px;padding:3px 6px;border-radius:8px;background:var(--chip);line-height:1.25}
+.pt b{font-size:12px}.pt span{font-size:11.5px;color:var(--muted)}
+.pt.break{background:#fff4e0}.pt.break b{color:#8a5a00}
+td.open{white-space:nowrap}
+@media (max-width:640px){ table.resp tbody tr[data-row] td.open{display:block;padding-top:6px} }
+
+/* Bell program editor: one compact line per period */
+.plist{display:flex;flex-direction:column;gap:6px;margin:6px 0 10px}
+.prow{display:grid;grid-template-columns:30px 118px 1fr 1fr 96px 84px 40px;gap:8px;align-items:center;
+  padding:8px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.prow.break{background:#fffaf0}
+.prow .num{font-weight:700;text-align:center;color:var(--muted)}
+.prow .tm{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.prow input,.prow select{margin:0}
+.prow .dur{display:flex;align-items:center;gap:4px}.prow .dur input{width:64px;min-width:0;text-align:center}
+.prow-head{border:0;background:none;padding:0 8px;font-size:12px;color:var(--muted)}
+@media (max-width:760px){
+  .prow{grid-template-columns:26px 1fr 92px 36px;grid-template-areas:"n t d x" "n l l l" "n k e e";row-gap:6px}
+  .prow-head{display:none}
+  .prow .num{grid-area:n;align-self:start;padding-top:6px}.prow .tm{grid-area:t;font-size:16px}
+  .prow .dur{grid-area:d}.prow .del{grid-area:x}.prow .lab{grid-area:l}
+  .prow .kind{grid-area:k}.prow .en{grid-area:e}
+  .prow .kind select{min-width:0}
+}

@@ -4,6 +4,7 @@
 <div class="crumbs"><a href="{{ url_for('admin.programs') }}">{{ L('برامج الجرس', 'Bell programs') }}</a></div>
 <h1>{{ L('توزيع البرامج على الصفوف والأيام', 'Assign programs to grades & days') }}</h1>
 <p class="hint">{{ L('اختر برنامج كل صف في كل يوم دوام. «توقيت المرحلة» يعني أن الصف يتبع حصص مرحلته الافتراضية.', 'Choose each grade’s program per school day. “Stage timing” means the grade follows its stage defaults.') }}</p>
+{% include 'admin/_dupes.html' %}
 {% if not progs %}<div class="card muted">{{ L('أنشئ برنامجاً أولاً.', 'Create a program first.') }}</div>{% endif %}
 <form method="post">
 {% for st in stages %}

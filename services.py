@@ -272,3 +272,78 @@ def weekday_names(lang):
 
 # Admin forms list Sunday first (the school week in Jordan).
 WEEK_ORDER = [6, 0, 1, 2, 3, 4, 5]
+
+
+# ── Duplicate stages (e.g. «Primary 4-6» from the staff CSV and
+#    «المرحلة الأساسية 4-6» from the bell programs) ────────────────────────
+_DIGITS = str.maketrans('٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹', '01234567890123456789')
+_RANGE_RE = re.compile(r'(\d{1,2})\s*[-–—‐‑−+/]\s*(\d{1,2})')
+
+
+def name_range(text):
+    """(first, last) grade numbers in a stage name, e.g. 'Primary 4-6' → (4, 6)."""
+    m = _RANGE_RE.search((text or '').translate(_DIGITS))
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def stage_range(st):
+    return name_range(f'{st.name_ar} {st.name_en or ""}')
+
+
+def duplicate_stages(stages):
+    """Pairs (src, dst) of stages that look like the same stage: same grade
+    range in the name. dst is the one to keep (more teachers, then older)."""
+    by_range = {}
+    for st in stages:
+        r = stage_range(st)
+        if r:
+            by_range.setdefault(r, []).append(st)
+    pairs = []
+    for group in by_range.values():
+        if len(group) < 2:
+            continue
+        group = sorted(group, key=lambda s: (-len(s.teacher_links), s.id))
+        pairs += [(src, group[0]) for src in group[1:]]
+    return pairs
+
+
+def merge_stages(src, dst):
+    """Move everything from src into dst, then delete src. Grades with the
+    same name are combined (sections, programs and times move over)."""
+    if src.id == dst.id:
+        return
+    for g in list(src.grades):
+        twin = next((x for x in dst.grades if x.name_ar.strip() == g.name_ar.strip()), None)
+        if twin is None:
+            g.sort_order = len(dst.grades)
+            g.stage = dst
+            continue
+        for sec in list(g.sections):
+            sec.sort_order = len(twin.sections)
+            sec.grade = twin
+        have = {a.weekday for a in twin.day_programs}
+        for a in list(g.day_programs):
+            if a.weekday not in have:
+                a.grade = twin
+        have = {(t.weekday, t.period_number) for t in twin.period_times}
+        for t in list(g.period_times):
+            if (t.weekday, t.period_number) not in have:
+                t.grade = twin
+        twin.name_en = twin.name_en or g.name_en
+        db.session.flush()
+        db.session.delete(g)
+    linked = {l.teacher_id for l in dst.teacher_links}
+    for link in list(src.teacher_links):
+        if link.teacher_id in linked:
+            db.session.delete(link)
+        else:
+            link.stage = dst
+            linked.add(link.teacher_id)
+    if not dst.logo_id and src.logo_id:
+        dst.logo_id, src.logo_id = src.logo_id, None
+    if not dst.background_id and src.background_id:
+        dst.background_id, src.background_id = src.background_id, None
+    if not dst.name_en and src.name_en:
+        dst.name_en = src.name_en
+    db.session.flush()
+    db.session.delete(src)

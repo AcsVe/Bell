@@ -37,20 +37,21 @@
 </nav>
 <section class="tabpane" data-pane="list-tab">
 {% if not progs %}{{ seed_card(true) }}{% endif %}
-<p class="hint">{{ L('برنامج الجرس = قائمة الحصص والفرص بتوقيتها. لكل صف برنامج لكل يوم، وله الأولوية على توقيت المرحلة.', 'A bell program = the periods and breaks with times. Each grade has a program per day; it overrides the stage timing.') }}</p>
+<p class="hint">{{ L('برنامج الجرس = قائمة الحصص والفرص بتوقيتها. اضغط «عرض وتعديل» لتغيير المدد أو إضافة/حذف حصة. لإنشاء برنامج: تبويب «برنامج جديد». للحذف: حدّد ثم «حذف».', 'A bell program = the periods and breaks with times. Tap “View & edit” to change durations or add/remove a period. New: the “New program” tab. Delete: select, then “Delete”.') }}</p>
 {% if progs %}<div class="card">
   {% if progs %}
   {{ bulk_bar('programs', [('delete', 'حذف', 'Delete', true)]) }}
   <table class="resp">
-    <thead><tr><th class="chk">{{ bulk_all('programs') }}</th><th>{{ L('البرنامج', 'Program') }}</th><th>{{ L('الدوام', 'Day') }}</th><th>{{ L('الحصص والفرص', 'Periods & breaks') }}</th><th>{{ L('مستخدم في', 'Used by') }}</th></tr></thead>
+    <thead><tr><th class="chk">{{ bulk_all('programs') }}</th><th>{{ L('البرنامج', 'Program') }}</th><th>{{ L('الحصص والفرص', 'Periods & breaks') }}</th><th>{{ L('مستخدم في', 'Used by') }}</th><th></th></tr></thead>
     <tbody>
     {% for p in progs %}
     <tr data-row>
       <td class="chk">{{ bulk_item('programs', p.id) }}</td>
-      <td><a href="{{ url_for('admin.program_view', program_id=p.id) }}"><b>{{ p.name }}</b></a></td>
-      <td class="small" dir="ltr">{{ p.day_start }} – {{ p.day_end }}</td>
-      <td class="small" style="white-space:nowrap">{% set ns = namespace(i=0) %}{% for q in p.periods %}{% if q.kind == 'class' %}{% set ns.i = ns.i + 1 %}{% endif %}<span class="chip {{ 'break' if q.kind=='break' }}" title="{{ q.start_time }} – {{ q.end_time }}">{{ L('فرصة', 'B') if q.kind=='break' else ns.i }}</span>{% endfor %}</td>
+      <td><a href="{{ url_for('admin.program_view', program_id=p.id) }}"><b>{{ p.name }}</b></a>
+        <div class="small muted" dir="ltr" style="text-align:start">{{ p.day_start }} – {{ p.day_end }}</div></td>
+      <td class="small"><div class="ptimes">{% set ns = namespace(i=0) %}{% for q in p.periods %}{% if q.kind == 'class' %}{% set ns.i = ns.i + 1 %}{% endif %}<span class="pt {{ 'break' if q.kind=='break' }}"><b>{{ L('فرصة', 'Break') if q.kind=='break' else ns.i }}</b><span dir="ltr">{{ q.start_time }}–{{ q.end_time }}</span></span>{% endfor %}</div></td>
       <td class="small">{% for u in usage[p.id] %}<span class="chip">{{ u[2] }}</span>{% else %}<span class="muted">—</span>{% endfor %}</td>
+      <td class="open"><a class="btn sm" href="{{ url_for('admin.program_view', program_id=p.id) }}">{{ L('عرض وتعديل ›', 'View & edit ›') }}</a></td>
     </tr>
     {% endfor %}
     </tbody>

@@ -61,8 +61,15 @@ _MATCH = {
 }
 
 
+RANGES = {'g13': (1, 3), 'g46': (4, 6)}
+
+
 def guess_stage(group, stages):
     """The existing stage whose name matches the group (e.g. 'Primary1-3'), or None."""
+    from services import stage_range
+    for st in stages:
+        if group in RANGES and stage_range(st) == RANGES[group]:
+            return st
     for st in stages:
         names = f'{st.name_ar} {st.name_en or ""}'.replace('⁦', '').replace('⁩', '')
         if _MATCH[group].search(names):

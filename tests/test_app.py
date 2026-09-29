@@ -885,3 +885,30 @@ def test_seed_programs_into_english_named_stages_and_codes_export(admin, app):
     assert rows[1][0] == 'منى' and rows[1][4] == 'الصف الرابع - أ' and rows[2][4] == 'الصف الرابع - ب'
     # stylesheet URL carries a version so phones don't keep an old copy
     assert 'css/admin.css?v=' in html
+
+
+def test_duplicate_stage_merge(tmp_path):
+    from app import create_app
+    from models import Stage, Teacher, TeacherStage, db
+    app = create_app({'SQLALCHEMY_DATABASE_URI': f'sqlite:///{tmp_path}/m.db', 'TESTING': True})
+    c = app.test_client()
+    c.post('/admin/login', data={'username': 'admin', 'password': 'admin'})
+    c.post('/admin/programs/seed', data={'g13': 'new', 'g46': 'new', 'g712': 'new'})
+    c.post('/admin/stages/add', data={'name_ar': 'Primary 4-6'})
+    with app.app_context():
+        st = Stage.query.filter_by(name_ar='Primary 4-6').one()
+        t = Teacher(name_ar='t', code='ZZZZZ2'); db.session.add(t); db.session.flush()
+        db.session.add(TeacherStage(teacher_id=t.id, stage_id=st.id)); db.session.commit()
+        src = Stage.query.filter_by(name_ar='المرحلة الأساسية 4-6').one()
+        src_id, dst_id = src.id, st.id
+    assert f'/admin/stages/{src_id}/merge' in c.get('/admin/programs/assign').get_data(as_text=True)
+    c.post(f'/admin/stages/{src_id}/merge', data={'into': dst_id})
+    with app.app_context():
+        assert db.session.get(Stage, src_id) is None
+        dst = db.session.get(Stage, dst_id)
+        assert [g.name_ar for g in dst.grades] == ['الصف الرابع', 'الصف الخامس', 'الصف السادس']
+        assert all(len(g.day_programs) == 5 for g in dst.grades) and len(dst.teacher_links) == 1
+    # seeding again with "new" reuses the existing 4-6 stage instead of creating a twin
+    c.post('/admin/programs/seed', data={'g13': 'new', 'g46': 'new', 'g712': 'new'})
+    with app.app_context():
+        assert Stage.query.count() == 3

@@ -9,7 +9,8 @@ from models import (db, AppSetting, BellProgram, BellProgramPeriod, Device, Grad
                     StageDayPeriodTime, StageWeekday, Teacher, TeacherSection, TeacherStage)
 from services import (WEEK_ORDER, bump_schedule_version, chain_times, default_period_labels,
                       generate_code, minutes_between, parse_duration, rechain_stage,
-                      resolve_grade_day, valid_time, weekday_names)
+                      resolve_grade_day, valid_time, weekday_names,
+                      duplicate_stages, merge_stages, name_range, stage_range)
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -102,7 +103,8 @@ def dashboard():
         'teachers': Teacher.query.count(),
         'devices': Device.query.count(),
     }
-    return render_template('admin/dashboard.html', stages=stages, stats=stats)
+    return render_template('admin/dashboard.html', stages=stages, stats=stats,
+                           dupes=duplicate_stages(stages))
 
 
 def _create_stage(name_ar, name_en=None):
@@ -140,7 +142,8 @@ def stage_view(stage_id):
         o = overrides.get(p.number)
         s, e = (o.start_time, o.end_time) if o else (p.start_time, p.end_time)
         eff.append({'p': p, 'start': s, 'end': e, 'dur': minutes_between(s, e)})
-    return render_template('admin/stage.html', st=st, day=day, overrides=overrides, eff=eff,
+    others = Stage.query.filter(Stage.id != st.id).order_by(Stage.sort_order, Stage.id).all()
+    return render_template('admin/stage.html', st=st, day=day, overrides=overrides, eff=eff, others=others,
                            week_order=WEEK_ORDER, wd_names=weekday_names(session.get('lang', 'ar')))
 
 
@@ -196,6 +199,31 @@ def stage_delete(stage_id):
     db.session.commit()
     flash(_msg('تم حذف المرحلة', 'Stage deleted'), 'ok')
     return redirect(url_for('admin.dashboard'))
+
+
+@admin_bp.route('/stages/<int:stage_id>/merge', methods=['POST'])
+@login_required
+def stage_merge(stage_id):
+    """Merge this stage into another: grades, sections, programs and teacher
+    links move over; this stage is removed."""
+    src = db.get_or_404(Stage, stage_id)
+    dst = db.session.get(Stage, request.form.get('into', type=int) or 0)
+    back = request.form.get('next') or url_for('admin.dashboard')
+    if dst is None or dst.id == src.id:
+        flash(_msg('اختر المرحلة التي تريد الدمج فيها', 'Choose the stage to merge into'), 'error')
+        return redirect(back)
+    src_media = [src.logo_id, src.background_id]
+    src_name, dst_name = src.name_ar, dst.name_ar
+    merge_stages(src, dst)
+    for mid in src_media:
+        if mid and mid not in (dst.logo_id, dst.background_id):
+            m = db.session.get(MediaFile, mid)
+            if m:
+                db.session.delete(m)
+    db.session.commit()
+    flash(_msg(f'تم دمج «{src_name}» في «{dst_name}»: الصفوف والشعب والبرامج والمعلمون أصبحوا في مرحلة واحدة.',
+               f'Merged «{src_name}» into «{dst_name}».'), 'ok')
+    return redirect(back if request.form.get('next') else url_for('admin.stage_view', stage_id=dst.id))
 
 
 # ── Periods (back-to-back: day start + durations) ─────────────────────────
@@ -507,6 +535,12 @@ def teachers_import_members():
             flash(_msg('اكتب اسم المرحلة الجديدة', 'Enter the new stage name'), 'error')
             return redirect(back)
         st = Stage.query.filter_by(name_ar=name).first()
+        if st is None:                  # same grade range as an existing stage → use it
+            want = name_range(name)
+            st = next((s for s in Stage.query.all() if want and stage_range(s) == want), None)
+            if st is not None:
+                flash(_msg(f'أُضيفوا إلى المرحلة الموجودة «{st.name_ar}» (نفس الصفوف)',
+                           f'Added to the existing stage «{st.name_en or st.name_ar}» (same grades)'), 'ok')
         if st is None:
             st = _create_stage(name)
             db.session.commit()          # the stage stays even if the file turns out empty
@@ -858,6 +892,7 @@ def programs_assign():
         flash(_msg('تم حفظ التوزيع', 'Assignments saved'), 'ok')
         return redirect(url_for('admin.programs_assign'))
     return render_template('admin/programs_assign.html', stages=stages, progs=progs,
+                           dupes=duplicate_stages(stages),
                            week_order=WEEK_ORDER, wd_names=weekday_names(session.get('lang', 'ar')))
 
 
@@ -869,9 +904,12 @@ def programs_seed():
     import seed_programs as sp
     from programs_io import import_programs
     names = {}
+    all_stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
     for group, (_, default_name, _) in sp.GROUPS.items():
         choice = request.form.get(group, '')
         st = db.session.get(Stage, int(choice)) if choice.isdigit() else None
+        if st is None:                  # never create a twin of an existing stage
+            st = sp.guess_stage(group, all_stages)
         names[group] = st.name_ar if st else (_form_text(group + '_new') or default_name)
     try:
         r = import_programs(sp.build_workbook(names))

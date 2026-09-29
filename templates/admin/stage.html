@@ -176,6 +176,18 @@
   </form>
 </div>
 
+{% if others %}
+<div class="card">
+  <h2>{{ L('دمج مع مرحلة أخرى', 'Merge into another stage') }}</h2>
+  <p class="muted small">{{ L('إذا كانت هذه المرحلة مكررة: تنتقل صفوفها وشعبها وبرامجها ومعلموها إلى المرحلة المختارة، ثم تُحذف هذه.', 'If this stage is a duplicate: its grades, sections, programs and teachers move to the chosen stage, then this one is removed.') }}</p>
+  <form method="post" action="{{ url_for('admin.stage_merge', stage_id=st.id) }}" class="row"
+        data-confirm="{{ L('دمج هذه المرحلة في المرحلة المختارة وحذفها؟', 'Merge this stage into the chosen one and remove it?') }}">
+    <div><select name="into" required><option value="">—</option>{% for o in others %}<option value="{{ o.id }}">{{ L(o.name_ar, o.name_en or o.name_ar) }}</option>{% endfor %}</select></div>
+    <div class="shrink"><button class="sm">{{ L('دمج', 'Merge') }}</button></div>
+  </form>
+</div>
+{% endif %}
+
 <div class="card">
   <h2>{{ L('حذف المرحلة', 'Delete stage') }}</h2>
 <form method="post" action="{{ url_for('admin.stage_delete', stage_id=st.id) }}" data-confirm="{{ L('حذف المرحلة بكل صفوفها وشعبها وأكوادها؟ لا يمكن التراجع.', 'Delete this stage with all grades, sections and codes? This cannot be undone.') }}">

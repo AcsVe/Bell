@@ -1,0 +1,16 @@
+{# Stages that look duplicated (same grade range in the name) → one-tap merge. #}
+{% for src, dst in dupes %}
+<div class="card" style="border-color:#e6b800;background:#fffbe8">
+  <p style="margin:0 0 8px">⚠️ {{ L('يبدو أن هاتين نفس المرحلة:', 'These look like the same stage:') }}
+    <b><bdi>{{ L(src.name_ar, src.name_en or src.name_ar) }}</bdi></b>
+    <span class="muted small">({{ src.grades|length }} {{ L('صف', 'grades') }} · {{ src.teacher_links|length }} {{ L('معلم', 'teachers') }})</span>
+    {{ L('و', 'and') }} <b><bdi>{{ L(dst.name_ar, dst.name_en or dst.name_ar) }}</bdi></b>
+    <span class="muted small">({{ dst.grades|length }} {{ L('صف', 'grades') }} · {{ dst.teacher_links|length }} {{ L('معلم', 'teachers') }})</span></p>
+  <form method="post" action="{{ url_for('admin.stage_merge', stage_id=src.id) }}"
+        data-confirm="{{ L('دمج «' ~ src.name_ar ~ '» في «' ~ dst.name_ar ~ '»؟ تنتقل الصفوف والشعب والبرامج والمعلمون، وتُحذف المرحلة المكررة.', 'Merge «' ~ (src.name_en or src.name_ar) ~ '» into «' ~ (dst.name_en or dst.name_ar) ~ '»?') }}">
+    <input type="hidden" name="into" value="{{ dst.id }}">
+    <input type="hidden" name="next" value="{{ request.path }}">
+    <button class="sm">{{ L('دمجهما في', 'Merge into') }} «<bdi>{{ L(dst.name_ar, dst.name_en or dst.name_ar) }}</bdi>»</button>
+  </form>
+</div>
+{% endfor %}

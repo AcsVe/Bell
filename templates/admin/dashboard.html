@@ -17,6 +17,7 @@
   <a href="#add-tab" data-tab="add-tab">{{ L('مرحلة جديدة', 'New stage') }}</a>
 </nav>
 <section class="tabpane" data-pane="stages-tab">
+{% include 'admin/_dupes.html' %}
 {% if stages %}{{ bulk_bar('stages', [('delete', 'حذف المراحل المحددة', 'Delete selected stages', true)]) }}{% endif %}
 <div class="grid">
 {% for st in stages %}
