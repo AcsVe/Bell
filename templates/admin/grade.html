@@ -2,7 +2,7 @@
 {% block title %}{{ L(g.name_ar, g.name_en or g.name_ar) }}{% endblock %}
 {% block content %}
 {% from 'admin/_bulk.html' import bulk_bar, bulk_all, bulk_item with context %}
-<div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">{{ L('المراحل', 'Stages') }}</a> ›
+<div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">{{ L('المراحل', 'Stages') }}</a> <span class="fwd">›</span>
   <a href="{{ url_for('admin.stage_view', stage_id=st.id) }}">{{ L(st.name_ar, st.name_en or st.name_ar) }}</a></div>
 <div class="page-head">
   <h1>{{ L(g.name_ar, g.name_en or g.name_ar) }}</h1>

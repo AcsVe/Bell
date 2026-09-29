@@ -17,7 +17,7 @@ window.normText = (v) => String(v || '').toLowerCase()
 </head>
 <body>
 <header class="top">
-  <a class="brand" href="{{ url_for('admin.dashboard') if session.admin_logged_in else '#' }}">🔔 {{ L('جرس الحصص', 'School Bell') }}</a>
+  <a class="brand" href="{{ url_for('admin.dashboard') if session.admin_logged_in else '#' }}"><span aria-hidden="true">🔔</span><span>{{ L('جرس الحصص', 'School Bell') }}</span></a>
   {% if session.admin_logged_in %}
   {% set ep = request.endpoint or '' %}
   {% set nav = [
@@ -28,7 +28,7 @@ window.normText = (v) => String(v || '').toLowerCase()
       ('admin.settings', ['admin.settings'], 'النغمة والأجهزة', 'Tone & devices')] %}
   {% set ns = namespace(cur=None) %}{% for item in nav if ep in item[1] %}{% set ns.cur = item %}{% endfor %}{% set current = ns.cur %}
   <button type="button" class="menu-btn" aria-expanded="false" aria-controls="mainnav">
-    <span class="menu-current">{{ L(current[2], current[3]) if current else L('القائمة', 'Menu') }}</span> <span aria-hidden="true">☰</span>
+    <span class="menu-ico" aria-hidden="true">☰</span><span class="menu-current">{{ L(current[2], current[3]) if current else L('القائمة', 'Menu') }}</span>
   </button>
   <nav id="mainnav">
     {% for endpoint, eps, ar, en in nav %}

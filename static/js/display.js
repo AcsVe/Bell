@@ -130,6 +130,7 @@
     for (const st of Object.values(data.stages || {})) {
       if (st.logo) st.logo = await toData(st.logo);
       if (st.background) st.background = await toData(st.background);
+      if (st.tone) st.tone = await toData(st.tone);
     }
     data.tone = await toData(data.tone);
   }
@@ -145,7 +146,7 @@
   function precacheAssets() {
     if (!schedule || !navigator.serviceWorker || !navigator.serviceWorker.controller) return;
     const urls = [schedule.tone];
-    Object.values(schedule.stages || {}).forEach((s) => { if (s.logo) urls.push(s.logo); if (s.background) urls.push(s.background); });
+    Object.values(schedule.stages || {}).forEach((s) => { [s.logo, s.background, s.tone].forEach((u) => { if (u) urls.push(u); }); });
     navigator.serviceWorker.controller.postMessage({ type: 'precache', urls: urls.filter(Boolean) });
   }
 
@@ -167,7 +168,19 @@
     if (st && st.background && !multi) {
       bg.style.backgroundImage = `url("${abs(st.background)}")`; bg.classList.add('has-img');
     } else { bg.style.backgroundImage = ''; bg.classList.remove('has-img'); }
-    $('tone').src = abs(schedule.tone);
+    setTone(st && st.id);
+  }
+
+  /* Each stage may have its own tone; otherwise the school default. */
+  function toneFor(stageId) {
+    const st = schedule && schedule.stages && schedule.stages[stageId];
+    return (st && st.tone) || (schedule && schedule.tone);
+  }
+  function setTone(stageId) {
+    const a = $('tone'), u = toneFor(stageId);
+    if (!u) return;
+    const src = abs(u);
+    if (a.dataset.src !== src) { a.dataset.src = src; a.src = src; }
   }
 
   function renderStatus() {
@@ -232,8 +245,9 @@
   }
 
   // ── Alerts ─────────────────────────────────────────────────────────────
-  function playTone() {
+  function playTone(stageId) {
     if (N && N.nativeSound) return;   // the OS notification already plays the tone
+    setTone(stageId);
     const a = $('tone');
     try { a.currentTime = 0; const p = a.play(); if (p && p.catch) p.catch(() => showGate()); } catch (e) { /* ignore */ }
   }
@@ -259,7 +273,7 @@
     $('alertTargets').textContent = isTest ? t('testText')
       : multiTargets && !perItem ? ev.items.map((it) => it.targets.map(pick).join('، ')).join(' | ') : '';
     box.hidden = false;
-    playTone();
+    playTone(item.stageId != null ? item.stageId : st && st.id);
     clearTimeout(alertTimer);
     alertTimer = setTimeout(() => { box.hidden = true; }, ALERT_SHOW_MS);
   }
@@ -312,7 +326,7 @@
       const now = new Date();
       const nx = A.nextEvent(todayEvents, now) || todayEvents[0];
       const ev = nx ? Object.assign({}, nx, { time: hm(now) }) : { time: hm(now), items: [{ ar: t('testText'), en: t('testText'), stageId: null, targets: [] }] };
-      if (N && N.test) N.test(ev.items.map(pick).join(' | '), t('testText')).catch(() => {});
+      if (N && N.test) N.test(ev.items.map(pick).join(' | '), t('testText'), ev.items[0] && ev.items[0].stageId).catch(() => {});
       if (!(N && N.inAppAlerts === false)) fire(ev, true);
       return;
     }

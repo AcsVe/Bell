@@ -18,7 +18,11 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import org.json.JSONArray;
 import org.json.JSONException;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /** JS API: BellAlarm.setAlarms / clear / status / open*Settings. */
 @CapacitorPlugin(name = "BellAlarm")
@@ -42,6 +46,33 @@ public class BellAlarmPlugin extends Plugin {
         BellScheduler.scheduleAll(ctx);
         JSObject ret = status(ctx);
         call.resolve(ret);
+    }
+
+    /** Saves custom tones (base64) under files/sounds; removes ones no longer used. */
+    @PluginMethod
+    public void setSounds(PluginCall call) {
+        File dir = BellScheduler.soundDir(getContext());
+        JSArray sounds = call.getArray("sounds", new JSArray());
+        Set<String> keep = new HashSet<>();
+        try {
+            for (int i = 0; i < sounds.length(); i++) {
+                org.json.JSONObject o = sounds.getJSONObject(i);
+                String name = new File(o.getString("name")).getName();   // no paths
+                keep.add(name);
+                File f = new File(dir, name);
+                if (f.exists() && f.length() > 0) continue;
+                byte[] data = android.util.Base64.decode(o.getString("data"), android.util.Base64.DEFAULT);
+                File tmp = new File(dir, name + ".tmp");
+                try (FileOutputStream out = new FileOutputStream(tmp)) { out.write(data); }
+                if (!tmp.renameTo(f)) { tmp.delete(); throw new java.io.IOException("rename failed"); }
+            }
+        } catch (Exception e) {
+            call.reject("could not save tones: " + e.getMessage());
+            return;
+        }
+        File[] old = dir.listFiles();
+        if (old != null) for (File f : old) if (!keep.contains(f.getName())) f.delete();
+        call.resolve();
     }
 
     @PluginMethod
@@ -89,7 +120,8 @@ public class BellAlarmPlugin extends Plugin {
         a.id = 999999;
         a.title = call.getString("title", "تنبيه تجريبي");
         a.body = call.getString("body", "");
-        BellAlarmReceiver.show(getContext(), a);
+        a.sound = call.getString("sound", "");
+        BellAlarmReceiver.show(getContext(), a, null);
         call.resolve();
     }
 

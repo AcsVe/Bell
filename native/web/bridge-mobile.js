@@ -13,6 +13,31 @@
   // Python weekday (Mon=0..Sun=6) → Capacitor/iOS weekday (Sun=1..Sat=7)
   const capWeekday = (pyWd) => ((pyWd + 1) % 7) + 1;
 
+  /* Custom tones (a stage's own tone, else the school tone when it isn't the
+   * built-in chime) arrive as data: URIs (display.js inlines them). They are
+   * saved on the device under a content-hash name, so a changed tone gets a
+   * new file and the OS picks it up. null → the bundled chime. */
+  const EXT = { 'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/wave': 'wav', 'audio/vnd.wave': 'wav',
+                'audio/aiff': 'aiff', 'audio/x-aiff': 'aiff', 'audio/x-caf': 'caf', 'audio/mpeg': 'mp3',
+                'audio/mp3': 'mp3', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/aac': 'aac' };
+  const IOS_OK = new Set(['wav', 'aiff', 'caf']);       // formats iOS notifications can play
+  function hashStr(str) {
+    let h = 5381;
+    for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+    return (h >>> 0).toString(36) + str.length.toString(36);
+  }
+  function toneFile(uri) {
+    const m = /^data:([^;,]+)((?:;[^;,]*)*),(.*)$/.exec(uri || '');
+    if (!m || !/;base64/.test(m[2])) return null;
+    const ext = EXT[m[1].toLowerCase()] || 'snd';
+    return { name: `tone-${hashStr(uri)}.${ext}`, ext, data: m[3] };
+  }
+  function customTone(schedule, stageId) {
+    const st = schedule && schedule.stages && schedule.stages[stageId];
+    if (st && st.tone) return st.tone;
+    return schedule && schedule.toneCustom ? schedule.tone : null;
+  }
+
   function createBridge(Capacitor, Alerts, ls, cfg) {
     const P = Capacitor.Plugins;
     const LN = P.LocalNotifications;
@@ -77,7 +102,28 @@
       return issues;
     }
 
+    // stageId → {name, ext, data} | null, for one schedule.
+    function soundsFor(schedule) {
+      const cache = new Map(), byUri = new Map();
+      return (stageId) => {
+        if (cache.has(stageId)) return cache.get(stageId);
+        const uri = customTone(schedule, stageId);
+        let f = null;
+        if (uri) { if (!byUri.has(uri)) byUri.set(uri, toneFile(uri)); f = byUri.get(uri); }
+        cache.set(stageId, f);
+        return f;
+      };
+    }
+
     function buildRequests(schedule, lang, now) {
+      const soundOf = soundsFor(schedule);
+      const files = new Map();
+      const use = (stageId, ok) => {
+        const f = soundOf(stageId);
+        if (!f || (ok && !ok(f))) return null;
+        files.set(f.name, f);
+        return f.name;
+      };
       let plan = Alerts.weeklyPlan(schedule, lang);
       let mode = 'weekly';
       if (isIOS && plan.length > IOS_LIMIT) {
@@ -89,15 +135,19 @@
       if (isAndroid && BA) {
         // Native weekly alarms: Calendar weekday (Sun=1..Sat=7) = capWeekday.
         const alarms = plan.map((p) => ({ id: p.id, weekday: capWeekday(p.pyWeekday), hour: p.hour,
-                                          minute: p.minute, title: p.title, body: p.body || '' }));
-        return { mode: 'android', alarms, requests: [], signature: `android|${lang}|${Alerts.planSignature(plan)}` };
+                                          minute: p.minute, title: p.title, body: p.body || '',
+                                          sound: use(p.stageId) || '' }));
+        const sounds = [...files.values()];
+        return { mode: 'android', alarms, sounds, requests: [],
+                 signature: `android|${lang}|${Alerts.planSignature(plan)}|${sounds.map((f) => f.name).join(',')}|${alarms.map((a) => a.sound).join(',')}` };
       }
+      const iosSound = (stageId) => use(stageId, (f) => IOS_OK.has(f.ext)) || 'chime.wav';
       const requests = plan.map((p) => ({
         id: p.id,
         title: p.title,
         body: p.body || '',
         channelId: CHANNEL,
-        sound: 'chime.wav',
+        sound: iosSound(p.stageId),
         autoCancel: true,
         extra: { time: p.time, stageId: p.stageId },
         schedule: mode === 'weekly'
@@ -105,17 +155,39 @@
               allowWhileIdle: true }
           : { at: p.at, allowWhileIdle: true },
       }));
-      return { mode, requests, signature: `${mode}|${lang}|${Alerts.planSignature(plan)}` };
+      const sounds = [...files.values()];
+      return { mode, requests, sounds,
+               signature: `${mode}|${lang}|${Alerts.planSignature(plan)}|${requests.map((r) => r.sound).join(',')}` };
     }
+
+    // iOS: notification sounds must live in Library/Sounds.
+    async function writeIOSSounds(sounds) {
+      if (!P.Filesystem) return;
+      for (const f of sounds) {
+        const k = 'bell:snd:' + f.name;
+        if (ls.getItem(k) === '1') continue;
+        try {
+          await P.Filesystem.writeFile({ path: 'Sounds/' + f.name, data: f.data, directory: 'LIBRARY', recursive: true });
+          ls.setItem(k, '1');
+        } catch (e) { /* that alert falls back to the default sound */ }
+      }
+    }
+
+    let lastSchedule = null;
 
     async function onSchedule(schedule, lang, now) {
       now = now || new Date();
+      lastSchedule = schedule;
       const built = buildRequests(schedule, lang, now);
       const { mode, requests, signature } = built;
       if (mode === 'android') {
         const st = await BA.status();
         if (ls.getItem('bell:sig') !== signature || st.count !== built.alarms.length) {
           await permissionIssues(lang);                 // prompts for notifications once
+          if (BA.setSounds) {
+            try { await BA.setSounds({ sounds: built.sounds.map((f) => ({ name: f.name, data: f.data })) }); }
+            catch (e) { built.alarms.forEach((a) => { a.sound = ''; }); }   // default chime instead
+          }
           await BA.setAlarms({ alarms: built.alarms });
           ls.setItem('bell:sig', signature);
         }
@@ -130,6 +202,7 @@
         return status(lang, mode, requests.length);
       }
       await ensureIOSSound();
+      await writeIOSSounds(built.sounds || []);
       const issues = await permissionIssues(lang);
       if (issues.some((i) => i.key === 'notifications')) return issues[0].text;
       if (pending.length) await LN.cancel({ notifications: pending.map((n) => ({ id: n.id })) });
@@ -166,9 +239,11 @@
         if (pending.length) await LN.cancel({ notifications: pending.map((n) => ({ id: n.id })) });
       },
       goLogin() { root.location.href = 'login.html'; },
-      async test(title, body) {   // real OS alert, to check sound/volume on this device
-        if (isAndroid && BA) return BA.testAlarm({ title, body });
-        return LN.schedule({ notifications: [{ id: 999999, title, body, sound: 'chime.wav',
+      async test(title, body, stageId) {   // real OS alert, to check sound/volume on this device
+        const f = lastSchedule ? soundsFor(lastSchedule)(stageId) : null;
+        if (isAndroid && BA) return BA.testAlarm({ title, body, sound: f ? f.name : '' });
+        const snd = f && IOS_OK.has(f.ext) && ls.getItem('bell:snd:' + f.name) === '1' ? f.name : 'chime.wav';
+        return LN.schedule({ notifications: [{ id: 999999, title, body, sound: snd,
                                                schedule: { at: new Date(Date.now() + 1500) } }] });
       },
       setup: permissionIssues,
@@ -178,7 +253,7 @@
   }
 
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { createBridge, capWeekday };
+    module.exports = { createBridge, capWeekday, toneFile, customTone };
   } else {
     // alerts.js loads after this file, so resolve BellAlerts lazily.
     const lazy = { weeklyPlan: (...a) => root.BellAlerts.weeklyPlan(...a),

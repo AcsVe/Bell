@@ -186,11 +186,36 @@ def stage_media(stage_id):
     return redirect(url_for('admin.stage_view', stage_id=st.id))
 
 
+@admin_bp.route('/stages/<int:stage_id>/tone', methods=['POST'])
+@login_required
+def stage_tone(stage_id):
+    """Upload or remove this stage's own alert tone."""
+    st = db.get_or_404(Stage, stage_id)
+    back = request.form.get('next') or url_for('admin.settings') + '#tone-tab'
+    if request.form.get('reset'):
+        old = st.tone
+        st.tone = None
+        if old:
+            db.session.delete(old)
+        db.session.commit()
+        flash(_msg(f'«{st.name_ar}» تعود للنغمة العامة', f'«{st.name_en or st.name_ar}» uses the default tone'), 'ok')
+        return redirect(back)
+    m, changed = _save_upload('tone', 'tone', 'audio/', st.tone)
+    if changed:
+        if m is not st.tone:
+            st.tone = m
+        db.session.commit()
+        flash(_msg(f'تم حفظ نغمة «{st.name_ar}»', f'Tone saved for «{st.name_en or st.name_ar}»'), 'ok')
+    elif not request.files.get('tone') or not request.files['tone'].filename:
+        flash(_msg('اختر ملف النغمة', 'Choose the tone file'), 'error')
+    return redirect(back)
+
+
 @admin_bp.route('/stages/<int:stage_id>/delete', methods=['POST'])
 @login_required
 def stage_delete(stage_id):
     st = db.get_or_404(Stage, stage_id)
-    for m in (st.logo, st.background):
+    for m in (st.logo, st.background, st.tone):
         if m:
             db.session.delete(m)
     for g in st.grades:
@@ -212,11 +237,11 @@ def stage_merge(stage_id):
     if dst is None or dst.id == src.id:
         flash(_msg('اختر المرحلة التي تريد الدمج فيها', 'Choose the stage to merge into'), 'error')
         return redirect(back)
-    src_media = [src.logo_id, src.background_id]
+    src_media = [src.logo_id, src.background_id, src.tone_id]
     src_name, dst_name = src.name_ar, dst.name_ar
     merge_stages(src, dst)
     for mid in src_media:
-        if mid and mid not in (dst.logo_id, dst.background_id):
+        if mid and mid not in (dst.logo_id, dst.background_id, dst.tone_id):
             m = db.session.get(MediaFile, mid)
             if m:
                 db.session.delete(m)
@@ -964,7 +989,7 @@ def programs_import():
 
 # ── Bulk actions (checkbox selection on every list) ───────────────────────
 def _delete_stage(st):
-    for m in (st.logo, st.background):
+    for m in (st.logo, st.background, st.tone):
         if m:
             db.session.delete(m)
     for g in st.grades:
@@ -1108,7 +1133,8 @@ def settings():
         else:
             t = db.session.get(Teacher, d.owner_id)
             owners[d.id] = t.name_ar if t else '—'
-    return render_template('admin/settings.html', tone=tone, devices=devices, owners=owners)
+    stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
+    return render_template('admin/settings.html', tone=tone, devices=devices, owners=owners, stages=stages)
 
 
 @admin_bp.route('/devices/<int:device_id>/delete', methods=['POST'])

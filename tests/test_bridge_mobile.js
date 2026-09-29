@@ -118,5 +118,26 @@ const schedule = {
   assert.strictEqual(built.requests.length, 60);
   assert.ok(built.requests.every((r) => r.schedule.at instanceof Date));
 
+  // Per-stage tones: stage 2 has its own WAV, stage 3 an MP3, stage 1 the default.
+  const { toneFile } = require('../native/web/bridge-mobile.js');
+  const WAV = 'data:audio/wav;base64,UklGRgAAAAA=', MP3 = 'data:audio/mpeg;base64,SUQzAAAA';
+  const toned = JSON.parse(JSON.stringify(busy));
+  toned.stages = { 1: { id: 1 }, 2: { id: 2, tone: WAV }, 3: { id: 3, tone: MP3 } };
+  const wavName = toneFile(WAV).name, mp3Name = toneFile(MP3).name;
+  assert.ok(/^tone-\w+\.wav$/.test(wavName) && /\.mp3$/.test(mp3Name));
+  const bi = ib._buildRequests(toned, 'ar', new Date(2026, 8, 27, 7, 0));
+  const sounds = new Set(bi.requests.map((r) => r.sound));
+  assert.deepStrictEqual([...sounds].sort(), ['chime.wav', wavName].sort(), 'iOS: WAV used, MP3 falls back to chime');
+  assert.deepStrictEqual(bi.sounds.map((f) => f.name), [wavName]);
+  const ab = createBridge(android, A, memLS(), { defaultServer: 'https://x.example' });
+  const ba = ab._buildRequests(toned, 'ar', new Date(2026, 8, 27, 7, 0));
+  assert.deepStrictEqual([...new Set(ba.alarms.map((a) => a.sound))].sort(), ['', mp3Name, wavName].sort());
+  assert.strictEqual(ba.sounds.length, 2);
+  // school tone uploaded (toneCustom) → stages without their own use it
+  toned.toneCustom = true; toned.tone = WAV;
+  const bc = ab._buildRequests(toned, 'ar', new Date(2026, 8, 27, 7, 0));
+  assert.ok(!bc.alarms.some((a) => a.sound === ''), 'no alarm left on the bundled chime');
+  assert.notStrictEqual(bc.signature, ba.signature);
+
   console.log('bridge-mobile.js: all tests passed');
 })().catch((e) => { console.error(e); process.exit(1); });

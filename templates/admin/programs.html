@@ -10,7 +10,7 @@
     <div class="row">
     {% for g, label, default, guess in seed %}
       <div>
-        <label>{{ label }} ←</label>
+        <label>{{ label }}</label>
         <select name="{{ g }}" data-seed="{{ g }}">
           {% for st in stages %}<option value="{{ st.id }}" {{ 'selected' if guess and guess.id == st.id }}>{{ L(st.name_ar, st.name_en or st.name_ar) }}</option>{% endfor %}
           <option value="new" {{ 'selected' if not guess }}>{{ L('+ مرحلة جديدة', '+ New stage') }}: {{ default }}</option>
@@ -51,7 +51,7 @@
         <div class="small muted" dir="ltr" style="text-align:start">{{ p.day_start }} – {{ p.day_end }}</div></td>
       <td class="small"><div class="ptimes">{% set ns = namespace(i=0) %}{% for q in p.periods %}{% if q.kind == 'class' %}{% set ns.i = ns.i + 1 %}{% endif %}<span class="pt {{ 'break' if q.kind=='break' }}"><b>{{ L('فرصة', 'Break') if q.kind=='break' else ns.i }}</b><span dir="ltr">{{ q.start_time }}–{{ q.end_time }}</span></span>{% endfor %}</div></td>
       <td class="small">{% for u in usage[p.id] %}<span class="chip">{{ u[2] }}</span>{% else %}<span class="muted">—</span>{% endfor %}</td>
-      <td class="open"><a class="btn sm" href="{{ url_for('admin.program_view', program_id=p.id) }}">{{ L('عرض وتعديل ›', 'View & edit ›') }}</a></td>
+      <td class="open"><a class="btn sm" href="{{ url_for('admin.program_view', program_id=p.id) }}">{{ L('عرض وتعديل', 'View & edit') }} <span class="fwd">›</span></a></td>
     </tr>
     {% endfor %}
     </tbody>

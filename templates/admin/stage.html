@@ -176,6 +176,23 @@
   </form>
 </div>
 
+<div class="card">
+  <h2>🔔 {{ L('نغمة تنبيه المرحلة', 'Stage alert tone') }}</h2>
+  <p class="muted small">{% if st.tone %}🎵 <bdi>{{ st.tone.filename }}</bdi>{% else %}{{ L('تستخدم النغمة العامة للمدرسة.', 'Uses the school default tone.') }}{% endif %}
+    <a href="{{ url_for('admin.settings') }}#tone-tab">{{ L('كل النغمات', 'All tones') }}</a></p>
+  {% if st.tone %}<audio controls preload="none" src="{{ st.tone.url }}"></audio>{% endif %}
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('admin.stage_tone', stage_id=st.id) }}" class="row" style="margin-top:8px">
+    <input type="hidden" name="next" value="{{ url_for('admin.stage_view', stage_id=st.id) }}#settings-tab">
+    <div><input type="file" name="tone" accept="audio/*" required></div>
+    <div class="shrink"><button>{{ L('رفع نغمة', 'Upload tone') }}</button></div>
+  </form>
+  {% if st.tone %}
+  <form method="post" action="{{ url_for('admin.stage_tone', stage_id=st.id) }}" style="margin-top:8px">
+    <input type="hidden" name="next" value="{{ url_for('admin.stage_view', stage_id=st.id) }}#settings-tab">
+    <input type="hidden" name="reset" value="1"><button class="ghost sm">{{ L('العودة للنغمة العامة', 'Use the default tone') }}</button></form>
+  {% endif %}
+</div>
+
 {% if others %}
 <div class="card">
   <h2>{{ L('دمج مع مرحلة أخرى', 'Merge into another stage') }}</h2>

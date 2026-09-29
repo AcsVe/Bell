@@ -22,6 +22,8 @@ import java.util.List;
  */
 final class BellScheduler {
     static final String CHANNEL_ID = "bell_alarm_v1";
+    /** Same alert without a channel sound: the app plays the stage's own tone. */
+    static final String CHANNEL_CUSTOM_ID = "bell_alarm_custom_v1";
     static final String EXTRA_ID = "bell_id";
     static final String EXTRA_AT = "bell_at";
     /** A device that was off/asleep through an alert doesn't ring it late. */
@@ -102,9 +104,32 @@ final class BellScheduler {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
+    static java.io.File soundDir(Context ctx) {
+        java.io.File d = new java.io.File(ctx.getFilesDir(), "sounds");
+        if (!d.exists()) d.mkdirs();
+        return d;
+    }
+
+    /** The custom tone file for an alarm, or null to use the bundled chime. */
+    static java.io.File customSound(Context ctx, String name) {
+        if (name == null || name.isEmpty()) return null;
+        java.io.File f = new java.io.File(soundDir(ctx), new java.io.File(name).getName());
+        return f.exists() && f.length() > 0 ? f : null;
+    }
+
     static void ensureChannel(Context ctx) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (nm.getNotificationChannel(CHANNEL_CUSTOM_ID) == null) {
+            NotificationChannel c = new NotificationChannel(CHANNEL_CUSTOM_ID, "تنبيهات الحصص (نغمة المرحلة)",
+                    NotificationManager.IMPORTANCE_HIGH);
+            c.setDescription("نهاية وبداية الحصص بنغمة المرحلة");
+            c.enableVibration(true);
+            c.setVibrationPattern(new long[] {0, 400, 200, 400});
+            c.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+            c.setSound(null, null);
+            nm.createNotificationChannel(c);
+        }
         if (nm.getNotificationChannel(CHANNEL_ID) != null) return;
         NotificationChannel ch = new NotificationChannel(CHANNEL_ID, "تنبيهات الحصص",
                 NotificationManager.IMPORTANCE_HIGH);

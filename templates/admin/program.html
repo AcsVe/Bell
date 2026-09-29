@@ -60,7 +60,7 @@
   {% for a in prog.assignments %}{% set _ = by_grade.setdefault(a.grade, []).append(a.weekday) %}{% endfor %}
   {% set names = ['الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت','الأحد'] if lang != 'en' else ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
   {% for g, wds in by_grade.items() %}
-    <div><a href="{{ url_for('admin.grade_view', grade_id=g.id) }}">{{ g.stage.name_ar }} › {{ g.name_ar }}</a>
+    <div><a href="{{ url_for('admin.grade_view', grade_id=g.id) }}"><bdi>{{ g.stage.name_ar }}</bdi> <span class="fwd">›</span> {{ g.name_ar }}</a>
       <span class="muted small">— {% for wd in [6,0,1,2,3,4,5] if wd in wds %}{{ names[wd] }}{{ '، ' if not loop.last }}{% endfor %}</span></div>
   {% else %}<p class="muted">{{ L('غير مستخدم بعد.', 'Not used yet.') }} <a href="{{ url_for('admin.programs_assign') }}">{{ L('توزيع البرامج', 'Assign programs') }}</a></p>{% endfor %}
 </div>

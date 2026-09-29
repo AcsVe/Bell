@@ -36,17 +36,41 @@
 </section>
 <section class="tabpane" data-pane="tone-tab">
 <div class="card">
-  <h2>{{ L('نغمة التنبيه', 'Alert tone') }}</h2>
-  <p class="muted small">{{ tone.filename if tone else L('النغمة الافتراضية المدمجة', 'Built-in default tone') }}</p>
+  <h2>{{ L('النغمة العامة للمدرسة', 'School default tone') }}</h2>
+  <p class="muted small">{{ L('تُستخدم لكل مرحلة ليس لها نغمة خاصة.', 'Used by every stage without its own tone.') }}
+    — {{ tone.filename if tone else L('النغمة الافتراضية المدمجة', 'Built-in default tone') }}</p>
   <audio controls preload="none" src="{{ tone.url if tone else url_for('static', filename='sounds/chime.wav') }}"></audio>
   <form method="post" enctype="multipart/form-data" class="row" style="margin-top:12px">
-    <div><label>{{ L('رفع نغمة جديدة (mp3 / wav / ogg)', 'Upload a new tone (mp3 / wav / ogg)') }}</label><input type="file" name="tone" accept="audio/*" required></div>
+    <div><label>{{ L('رفع نغمة جديدة', 'Upload a new tone') }}</label><input type="file" name="tone" accept="audio/*" required></div>
     <div class="shrink"><button>{{ L('رفع', 'Upload') }}</button></div>
   </form>
   {% if tone %}
   <form method="post" style="margin-top:10px"><input type="hidden" name="reset_tone" value="1">
     <button class="ghost sm">{{ L('العودة للنغمة الافتراضية', 'Restore default tone') }}</button></form>
   {% endif %}
+</div>
+
+<div class="card">
+  <h2>{{ L('نغمة خاصة لكل مرحلة', 'A tone per stage') }}</h2>
+  <p class="muted small">{{ L('اختياري: ارفع نغمة لمرحلة معيّنة لتميّز تنبيهاتها. الأفضل ملف WAV قصير (أقل من 30 ثانية) ليعمل على الكمبيوتر وAndroid وiPhone؛ ملفات MP3 تعمل على الكمبيوتر وAndroid، وiPhone يستخدم النغمة الافتراضية بدلاً منها.',
+    'Optional: give a stage its own tone to tell its alerts apart. Best: a short WAV file (under 30 s) — works on computers, Android and iPhone; MP3 works on computers and Android, iPhone falls back to the default tone.') }}</p>
+  <div class="tone-list">
+  {% for st in stages %}
+    <div class="tone-row">
+      <div class="tn"><b><bdi>{{ L(st.name_ar, st.name_en or st.name_ar) }}</bdi></b>
+        <div class="muted small">{% if st.tone %}🎵 <bdi>{{ st.tone.filename }}</bdi>{% else %}{{ L('النغمة العامة', 'Default tone') }}{% endif %}</div></div>
+      <audio controls preload="none" src="{{ st.tone.url if st.tone else (tone.url if tone else url_for('static', filename='sounds/chime.wav')) }}"></audio>
+      <form method="post" enctype="multipart/form-data" action="{{ url_for('admin.stage_tone', stage_id=st.id) }}" class="tone-up">
+        <input type="file" name="tone" accept="audio/*" required>
+        <button class="sm">{{ L('رفع', 'Upload') }}</button>
+      </form>
+      {% if st.tone %}
+      <form method="post" action="{{ url_for('admin.stage_tone', stage_id=st.id) }}">
+        <input type="hidden" name="reset" value="1"><button class="ghost sm">{{ L('العودة للعامة', 'Use default') }}</button></form>
+      {% else %}<span></span>{% endif %}
+    </div>
+  {% else %}<p class="muted">{{ L('لا توجد مراحل بعد.', 'No stages yet.') }}</p>{% endfor %}
+  </div>
 </div>
 </section>
 {% endblock %}

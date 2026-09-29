@@ -3,8 +3,8 @@
 {% block content %}
 {% from 'admin/_bulk.html' import bulk_bar, bulk_all, bulk_item, picker with context %}
 {% set g = s.grade %}{% set st = g.stage %}
-<div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">{{ L('المراحل', 'Stages') }}</a> ›
-  <a href="{{ url_for('admin.stage_view', stage_id=st.id) }}">{{ L(st.name_ar, st.name_en or st.name_ar) }}</a> ›
+<div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">{{ L('المراحل', 'Stages') }}</a> <span class="fwd">›</span>
+  <a href="{{ url_for('admin.stage_view', stage_id=st.id) }}">{{ L(st.name_ar, st.name_en or st.name_ar) }}</a> <span class="fwd">›</span>
   <a href="{{ url_for('admin.grade_view', grade_id=g.id) }}">{{ L(g.name_ar, g.name_en or g.name_ar) }}</a></div>
 <div class="page-head">
   <h1>{{ s.full_name(lang) }}</h1>

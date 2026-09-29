@@ -207,6 +207,7 @@ def build_schedule_payload(code_type, owner):
                 'id': stage.id, 'ar': stage.name_ar, 'en': stage.name_en or stage.name_ar,
                 'logo': stage.logo.url if stage.logo else None,
                 'background': stage.background.url if stage.background else None,
+                'tone': stage.tone.url if stage.tone else None,     # None = school default
             }
 
     def add_grade(grade):
@@ -261,6 +262,7 @@ def build_schedule_payload(code_type, owner):
         'targets': targets,
         'days': days,
         'tone': tone_url or '/static/sounds/chime.wav',
+        'toneCustom': bool(tone_url),      # False = the built-in chime (bundled in the apps)
     }
 
 
@@ -343,6 +345,8 @@ def merge_stages(src, dst):
         dst.logo_id, src.logo_id = src.logo_id, None
     if not dst.background_id and src.background_id:
         dst.background_id, src.background_id = src.background_id, None
+    if not dst.tone_id and src.tone_id:
+        dst.tone_id, src.tone_id = src.tone_id, None
     if not dst.name_en and src.name_en:
         dst.name_en = src.name_en
     db.session.flush()

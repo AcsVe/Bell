@@ -19,6 +19,7 @@ final class BellAlarmStore {
         int minute;
         String title;
         String body;
+        String sound;     // file name in files/sounds (custom tone), "" = bundled chime
     }
 
     private static final String PREFS = "bell_alarms";
@@ -59,6 +60,7 @@ final class BellAlarmStore {
         a.minute = o.getInt("minute");
         a.title = o.optString("title", "");
         a.body = o.optString("body", "");
+        a.sound = o.optString("sound", "");
         return a;
     }
 

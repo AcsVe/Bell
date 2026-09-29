@@ -912,3 +912,30 @@ def test_duplicate_stage_merge(tmp_path):
     c.post('/admin/programs/seed', data={'g13': 'new', 'g46': 'new', 'g712': 'new'})
     with app.app_context():
         assert Stage.query.count() == 3
+
+
+def test_stage_tone(tmp_path):
+    import io
+    from app import create_app
+    from models import MediaFile, Stage, db
+    app = create_app({'SQLALCHEMY_DATABASE_URI': f'sqlite:///{tmp_path}/t.db', 'TESTING': True})
+    c = app.test_client()
+    c.post('/admin/login', data={'username': 'admin', 'password': 'admin'})
+    c.post('/admin/stages/add', data={'name_ar': 'أ 1-3'})
+    c.post('/admin/stages/add', data={'name_ar': 'ب 4-6'})
+    c.post('/admin/stages/1/grades/add', data={'names': 'الأول'})
+    c.post('/admin/grades/1/sections/add', data={'names': 'أ'})
+    c.post('/admin/stages/1/tone', data={'tone': (io.BytesIO(b'RIFFxxxxWAVE'), 'a.wav', 'audio/wav')},
+           content_type='multipart/form-data')
+    c.post('/admin/stages/2/tone', data={'tone': (io.BytesIO(b'no'), 'x.txt', 'text/plain')},
+           content_type='multipart/form-data')
+    with app.app_context():
+        s1, s2 = db.session.get(Stage, 1), db.session.get(Stage, 2)
+        assert s1.tone and s1.tone.mime == 'audio/wav' and s2.tone is None
+        code = s1.grades[0].sections[0].code
+    j = app.test_client().get('/api/schedule', headers={'X-Bell-Code': code}).get_json()
+    assert j['stages']['1']['tone'].startswith('/media/') and j['toneCustom'] is False
+    assert '/admin/stages/2/tone' in c.get('/admin/settings').get_data(as_text=True)
+    c.post('/admin/stages/1/tone', data={'reset': '1'})
+    with app.app_context():
+        assert db.session.get(Stage, 1).tone is None and MediaFile.query.count() == 0

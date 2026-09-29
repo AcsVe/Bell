@@ -49,7 +49,7 @@ function showAlert(ev, schedule, isTest) {
       ? ev.items.map((it) => it.targets.map((t) => (lang === 'en' ? t.en || t.ar : t.ar)).join('، ')) : null,
     logo: st && st.logo && st.logo.startsWith('data:') ? st.logo : null,
     background: st && st.background && st.background.startsWith('data:') ? st.background : null,
-    tone: schedule && schedule.tone && schedule.tone.startsWith('data:') ? schedule.tone : null,
+    tone: [st && st.tone, schedule && schedule.tone].find((u) => u && u.startsWith('data:')) || null,
   };
   fs.writeFileSync(file('current-alert.json'), JSON.stringify(payload));
   // One window per screen, so it's seen whichever screen faces the class.

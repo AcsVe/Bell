@@ -41,9 +41,12 @@ class Stage(db.Model):
     day_start     = db.Column(db.String(5), nullable=False, default='08:00')
     logo_id       = db.Column(db.Integer, db.ForeignKey('media_files.id', ondelete='SET NULL'))
     background_id = db.Column(db.Integer, db.ForeignKey('media_files.id', ondelete='SET NULL'))
+    # Own alert tone for this stage; empty = the school's default tone.
+    tone_id       = db.Column(db.Integer, db.ForeignKey('media_files.id', ondelete='SET NULL'))
 
     logo       = db.relationship('MediaFile', foreign_keys=[logo_id])
     background = db.relationship('MediaFile', foreign_keys=[background_id])
+    tone       = db.relationship('MediaFile', foreign_keys=[tone_id])
     weekdays   = db.relationship('StageWeekday', backref='stage', cascade='all, delete-orphan',
                                  order_by='StageWeekday.weekday')
     periods    = db.relationship('Period', backref='stage', cascade='all, delete-orphan',
@@ -285,3 +288,8 @@ def ensure_schema():
             with db.engine.begin() as conn:
                 conn.execute(text('ALTER TABLE teachers ADD COLUMN email VARCHAR(255)'))
                 conn.execute(text('CREATE UNIQUE INDEX IF NOT EXISTS uq_teachers_email ON teachers (email)'))
+    if 'stages' in insp.get_table_names():
+        cols = {c['name'] for c in insp.get_columns('stages')}
+        if 'tone_id' not in cols:
+            with db.engine.begin() as conn:
+                conn.execute(text('ALTER TABLE stages ADD COLUMN tone_id INTEGER REFERENCES media_files(id) ON DELETE SET NULL'))
