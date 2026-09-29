@@ -45,6 +45,8 @@ function showAlert(ev, schedule, isTest) {
     lines: ev.items.map((it) => (lang === 'en' ? it.en || it.ar : it.ar)),
     targets: schedule && schedule.who && schedule.who.type === 'teacher'
       ? ev.items.map((it) => it.targets.map((t) => (lang === 'en' ? t.en || t.ar : t.ar)).join('، ')).join(' | ') : '',
+    itemTargets: schedule && schedule.who && schedule.who.type === 'teacher' && ev.items.length > 1
+      ? ev.items.map((it) => it.targets.map((t) => (lang === 'en' ? t.en || t.ar : t.ar)).join('، ')) : null,
     logo: st && st.logo && st.logo.startsWith('data:') ? st.logo : null,
     background: st && st.background && st.background.startsWith('data:') ? st.background : null,
     tone: schedule && schedule.tone && schedule.tone.startsWith('data:') ? schedule.tone : null,

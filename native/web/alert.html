@@ -26,11 +26,15 @@
   if (!p) return;
   document.documentElement.lang = p.lang; document.documentElement.dir = p.lang === 'en' ? 'ltr' : 'rtl';
   $('alertTime').textContent = p.time;
-  $('alertText').innerHTML = p.lines.map((l) => {
-    const parts = esc(l).split(/ [-—] /);
-    return parts.length === 2 ? `<span>${parts[0]}</span><span class="l2">${parts[1]}</span>` : `<span>${parts[0]}</span>`;
+  const bd = (v) => String(v).replace(/(^|[^\d:.\/\-\u2066])(\d+\s*[-+–]\s*\d+)(?![\d:.\/\-\u2069])/g, '$1\u2066$2\u2069');
+  const per = !p.test && p.itemTargets;
+  $('alertText').innerHTML = p.lines.map((l, i) => {
+    const parts = esc(bd(l)).split(/ [-—] /);
+    const txt = parts.length === 2 ? `<span>${parts[0]}</span><span class="l2">${parts[1]}</span>` : `<span>${parts[0]}</span>`;
+    return per ? `${txt}<span class="tg">${esc(p.itemTargets[i] || '')}</span>` : txt;
   }).join('<span class="sep"></span>');
-  $('alertTargets').textContent = p.test ? (p.lang === 'en' ? 'This is a test alert' : 'هذا تنبيه تجريبي') : p.targets;
+  $('alertText').classList.toggle('multi', p.lines.length > 1);
+  $('alertTargets').textContent = p.test ? (p.lang === 'en' ? 'This is a test alert' : 'هذا تنبيه تجريبي') : (per ? '' : p.targets);
   $('hint').textContent = p.lang === 'en' ? 'Click or press Esc to dismiss' : 'اضغط أو Esc للإغلاق';
   if (p.background) { $('alert').style.backgroundImage = `url("${p.background}")`; $('alert').classList.add('has-img'); }
   if (p.logo) { $('alertLogo').src = p.logo; $('alertLogo').hidden = false; }

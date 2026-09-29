@@ -242,13 +242,17 @@
     const logo = $('alertLogo');
     if (st && st.logo) { logo.src = abs(st.logo); logo.hidden = false; } else logo.hidden = true;
     $('alertTime').textContent = ev.time;
+    const multiTargets = !isTest && schedule && schedule.who.type === 'teacher';
+    // Several alerts at once (a teacher across programs): each one with its own grades.
+    const perItem = multiTargets && ev.items.length > 1;
     $('alertText').innerHTML = ev.items.map((it) => {
       const parts = ph(it).split(/ [-—] /);
-      return parts.length === 2 ? `<span>${parts[0]}</span><span class="l2">${parts[1]}</span>` : `<span>${parts[0]}</span>`;
+      const txt = parts.length === 2 ? `<span>${parts[0]}</span><span class="l2">${parts[1]}</span>` : `<span>${parts[0]}</span>`;
+      return perItem ? `${txt}<span class="tg">${(it.targets || []).map(ph).join('، ')}</span>` : txt;
     }).join('<span class="sep"></span>');
-    const multiTargets = schedule && schedule.who.type === 'teacher';
+    $('alertText').classList.toggle('multi', ev.items.length > 1);
     $('alertTargets').textContent = isTest ? t('testText')
-      : multiTargets ? ev.items.map((it) => it.targets.map(pick).join('، ')).join(' | ') : '';
+      : multiTargets && !perItem ? ev.items.map((it) => it.targets.map(pick).join('، ')).join(' | ') : '';
     box.hidden = false;
     playTone();
     clearTimeout(alertTimer);

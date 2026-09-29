@@ -50,6 +50,8 @@ main{flex:1;display:flex;flex-direction:column;align-items:center;justify-conten
 .alert-text{font-weight:800;font-size:clamp(40px,8vw,120px);line-height:1.25;margin:14px 0;animation:pulse 1.6s ease-in-out 3}
 .alert-text .l2{display:block;color:var(--accent)}
 .alert-text .sep{display:block;height:.15em}
+.alert-text .tg{display:block;font-size:max(14px,.26em);font-weight:500;color:var(--muted);line-height:1.4;margin:.25em 0 .5em}
+.alert-text.multi{font-size:clamp(30px,6vw,90px)}
 .alert-targets{color:var(--muted);font-size:clamp(15px,2vw,24px)}
 .alert-hint{color:var(--muted);font-size:14px;margin-top:28px}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
