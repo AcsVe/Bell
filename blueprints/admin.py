@@ -509,6 +509,12 @@ def teachers_import_members():
         db.session.rollback()
         flash(str(e), 'error')
         return redirect(back)
+    except Exception as e:                      # never a 500 page for a bad file
+        db.session.rollback()
+        current_app.logger.exception('members import failed')
+        flash(_msg(f'تعذّر قراءة الملف ({type(e).__name__}). جرّب تصديره من جديد من Microsoft 365 دون فتحه في Excel.',
+                   f'Could not read the file ({type(e).__name__}). Try exporting it again from Microsoft 365 without opening it in Excel.'), 'error')
+        return redirect(back)
     parts = [_msg(f'{st.name_ar}: {len(r["teachers"])} معلم في الملف',
                   f'{st.name_en or st.name_ar}: {len(r["teachers"])} teachers in file'),
              _msg(f'جديد {r["created"]}', f'{r["created"]} new'),
@@ -556,6 +562,11 @@ def teachers_import():
     except ValueError as e:
         db.session.rollback()
         flash(str(e), 'error')
+        return redirect(url_for('admin.teachers') + '#import')
+    except Exception as e:                      # never a 500 page for a bad file
+        db.session.rollback()
+        current_app.logger.exception('import failed')
+        flash(_msg(f'تعذّر قراءة الملف ({type(e).__name__}).', f'Could not read the file ({type(e).__name__}).'), 'error')
         return redirect(url_for('admin.teachers') + '#import')
     parts = [_msg(f'{st.name_ar}: {len(r["teachers"])} معلم في الملف',
                   f'{st.name_en or st.name_ar}: {len(r["teachers"])} teachers in file'),
@@ -819,6 +830,11 @@ def programs_import():
     except ValueError as e:
         db.session.rollback()
         flash(str(e), 'error')
+        return redirect(url_for('admin.programs'))
+    except Exception as e:                      # never a 500 page for a bad file
+        db.session.rollback()
+        current_app.logger.exception('import failed')
+        flash(_msg(f'تعذّر قراءة الملف ({type(e).__name__}).', f'Could not read the file ({type(e).__name__}).'), 'error')
         return redirect(url_for('admin.programs'))
     flash(_msg(f'تم: {r["programs"]} برنامج · {r["assigned"]} تعيين يوم/صف'
                + (f' · مراحل جديدة {r["stages"]}' if r['stages'] else '')

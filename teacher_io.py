@@ -278,22 +278,40 @@ def _decode(raw):
     raise ValueError('تعذّر قراءة ترميز الملف.')
 
 
+def _read_rows(raw):
+    """Rows from a CSV in any encoding / line-ending / separator, or from an
+    Excel file (the same list re-saved as .xlsx). Never raises csv.Error."""
+    if raw[:2] == b'PK':                                   # .xlsx
+        try:
+            ws = load_workbook(io.BytesIO(raw), data_only=True, read_only=True).worksheets[0]
+            return [[('' if v is None else str(v)) for v in r] for r in ws.iter_rows(values_only=True)
+                    if any(v not in (None, '') for v in r)]
+        except Exception:
+            raise ValueError('تعذّر قراءة ملف Excel.')
+    text = _decode(raw)
+    # Windows (CRLF), old Mac (CR) or Unix (LF) line endings — all become LF.
+    text = text.replace('\r\n', '\n').replace('\r', '\n').lstrip('\ufeff')
+    if not text.strip():
+        return []
+    first = next((ln for ln in text.split('\n') if ln.strip()), '')
+    delim = max([',', ';', '\t'], key=first.count) if any(d in first for d in ',;\t') else ','
+    try:
+        rows = list(csv.reader(io.StringIO(text, newline=''), delimiter=delim, quotechar='"'))
+    except csv.Error:
+        # Stray quotes: read again treating quotes as ordinary characters.
+        rows = [[c.strip().strip('"') for c in ln.split(delim)] for ln in text.split('\n')]
+    return [[c.strip() for c in r] for r in rows if any(c.strip() for c in r)]
+
+
 def import_members_csv(stage, fileobj, sync=False):
     """Microsoft 365 / Exchange group export (Name, PrimarySmtpAddress, …):
     every member is linked to the whole stage. Teachers are matched by email,
     so a person in several groups keeps one code.
     sync=True removes the stage link from teachers who are no longer in the file."""
-    text = _decode(fileobj.read())
-    if not text.strip():
-        raise ValueError('الملف فارغ — لا يحتوي أي أعضاء. أعد تصديره من Microsoft 365.')
-    sample = text[:2000]
-    try:
-        dialect = csv.Sniffer().sniff(sample, delimiters=',;\t')
-    except csv.Error:
-        dialect = csv.excel
-    rows = list(csv.reader(io.StringIO(text), dialect))
+    raw = fileobj.read()
+    rows = _read_rows(raw)
     if not rows:
-        raise ValueError('الملف فارغ.')
+        raise ValueError('الملف فارغ — لا يحتوي أي أعضاء. أعد تصديره من Microsoft 365.')
     head = [str(h or '').strip().lower() for h in rows[0]]
 
     def col(*names):

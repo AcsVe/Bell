@@ -759,3 +759,45 @@ def test_bulk_select_actions(admin, app):
     assert 'لم يُحدَّد شيء' in html
     with app.app_context():
         assert Teacher.query.count() == 4
+
+
+def test_members_import_any_file_format(admin, app):
+    """Excel re-saves and old Mac exports broke the CSV reader (500 on Render)."""
+    import csv as _csv
+    from openpyxl import Workbook
+    base = [['Name', 'PrimarySmtpAddress', 'RecipientType'],
+            ["esra'a.t", "esra'a.t@school.example", 'UserMailbox'],
+            ['22eacba1-2740-4d98-a273-3332c7d9fb8b', 'Rasha.Ayyad@school.example', 'UserMailbox'],
+            ['ala.b', 'ala.b@school.example', 'UserMailbox']]
+    quoted = '\r\n'.join(','.join(f'"{c}"' for c in r) for r in base) + '\r\n'
+    plain = lambda sep, nl: nl.join(sep.join(r) for r in base) + nl
+    wb = Workbook(); ws = wb.active
+    for r in base:
+        ws.append(r)
+    xb = io.BytesIO(); wb.save(xb)
+    variants = {
+        'crlf': ('﻿' + quoted).encode('utf-8'),
+        'cr-only quoted': quoted.replace('\r\n', '\r').encode(),
+        'cr-only excel': plain(',', '\r').encode('utf-8-sig'),
+        'semicolon': plain(';', '\r\n').encode(),
+        'utf16 tab': plain('\t', '\r\n').encode('utf-16'),
+        'cp1256': plain(',', '\r\n').encode('cp1256'),
+        'xlsx': xb.getvalue(),
+        'stray quote': quoted.replace('"ala.b"', '"ala "b"').encode(),
+    }
+    for i, (name, data) in enumerate(variants.items()):
+        stage = f'مرحلة {i}'
+        r = admin.post('/admin/teachers/import-members',
+                       data={'stage_id': 'new', 'new_stage': stage, 'file': (io.BytesIO(data), 'm.csv')},
+                       content_type='multipart/form-data', follow_redirects=True)
+        assert r.status_code == 200, name
+        with app.app_context():
+            st = Stage.query.filter_by(name_ar=stage).one()
+            emails = sorted(l.teacher.email for l in st.teacher_links)
+            assert emails == ['ala.b@school.example', "esra'a.t@school.example", 'rasha.ayyad@school.example'], name
+            assert Teacher.query.count() == 3, name        # same people every time
+    # anything unexpected becomes a message, never a server error
+    r = admin.post('/admin/teachers/import-members',
+                   data={'stage_id': 'new', 'new_stage': 'x', 'file': (io.BytesIO(b'PK\x03\x04broken'), 'm.xlsx')},
+                   content_type='multipart/form-data', follow_redirects=True)
+    assert r.status_code == 200 and 'تعذّر' in r.get_data(as_text=True)
