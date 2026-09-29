@@ -3,8 +3,12 @@
 {% block content %}
 {% from 'admin/_bulk.html' import bulk_bar, bulk_all, bulk_item, picker with context %}
 <div class="crumbs"><a href="{{ url_for('admin.teachers') }}">{{ L('المعلمون', 'Teachers') }}</a></div>
-<h1>{{ L(t.name_ar, t.name_en or t.name_ar) }}</h1>
+<div class="page-head">
+  <h1>{{ L(t.name_ar, t.name_en or t.name_ar) }}</h1>
+  <div class="actions">
 
+  </div>
+</div>
 <div class="card">
   <h2>{{ L('كود المعلم', 'Teacher code') }}</h2>
   <p><span class="code copy" data-copy="{{ t.code }}">{{ t.code }}</span>
@@ -16,7 +20,12 @@
     <button class="ghost sm">{{ L('توليد كود جديد', 'Regenerate code') }}</button>
   </form>
 </div>
-
+<nav class="tabbar" data-tabs>
+  <a href="#stages-tab" data-tab="stages-tab">{{ L('المراحل', 'Stages') }}<span class="count">{{ t.stage_links|length }}</span></a>
+  <a href="#sections-tab" data-tab="sections-tab">{{ L('الشعب', 'Sections') }}<span class="count">{{ t.section_links|length }}</span></a>
+  <a href="#details-tab" data-tab="details-tab">{{ L('البيانات', 'Details') }}</a>
+</nav>
+<section class="tabpane" data-pane="stages-tab">
 <div class="card">
   <h2>{{ L('مراحل كاملة', 'Whole stages') }}</h2>
   <p class="muted small">{{ L('يستقبل المعلم تنبيهات كل صفوف المرحلة.', 'The teacher receives alerts for every grade in the stage.') }}</p>
@@ -31,7 +40,8 @@
   {% if sitems %}<h2 style="margin-top:14px;font-size:15px">{{ L('إضافة مراحل', 'Add stages') }}</h2>
   {{ picker('pick-stages', url_for('admin.teacher_stage_add', teacher_id=t.id), 'stage_id', sitems, 'ربط المحددة', 'Link selected') }}{% endif %}
 </div>
-
+</section>
+<section class="tabpane" data-pane="sections-tab">
 <div class="card">
   <h2>{{ L('شعب محددة', 'Specific sections') }}</h2>
   {% if t.section_links %}
@@ -49,7 +59,8 @@
   <h2 style="margin-top:14px;font-size:15px">{{ L('إضافة شعب', 'Add sections') }}</h2>
   {{ picker('pick-sections', url_for('admin.teacher_section_add', teacher_id=t.id), 'section_id', items, 'ربط المحددة', 'Link selected', fl) }}
 </div>
-
+</section>
+<section class="tabpane" data-pane="details-tab">
 <div class="card">
   <h2>{{ L('تعديل البيانات', 'Edit details') }}</h2>
   <form method="post" action="{{ url_for('admin.teacher_update', teacher_id=t.id) }}">
@@ -67,4 +78,5 @@
     <button class="danger sm">{{ L('حذف المعلم', 'Delete teacher') }}</button>
   </form>
 </div>
+</section>
 {% endblock %}

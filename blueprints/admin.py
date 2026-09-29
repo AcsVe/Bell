@@ -38,6 +38,16 @@ def _bump_on_change(resp):
     return resp
 
 
+EMAIL_IN_LINE = re.compile(r'[^\s,;<>]+@[^\s,;<>]+\.[^\s,;<>]+')
+
+
+def norm_name(v):
+    """Arabic-aware comparison key (same rules as normText in the admin pages)."""
+    v = re.sub('[\u064B-\u0652\u0640\u2066-\u2069]', '', str(v or '')).lower()
+    v = re.sub('[أإآ]', 'ا', v).replace('ة', 'ه').replace('ى', 'ي')
+    return re.sub(r'\s+', ' ', v).strip()
+
+
 def _form_text(name):
     # Drop the bidi isolates the templates add around number ranges.
     return re.sub('[\u2066-\u2069]', '', request.form.get(name) or '').strip()
@@ -453,7 +463,10 @@ def link_delete(link_id):
 def teachers():
     rows = Teacher.query.order_by(Teacher.name_ar).all()
     stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
-    return render_template('admin/teachers.html', teachers=rows, stages=stages)
+    new_ids = [int(i) for i in (request.args.get('new') or '').split(',') if i.isdigit()]
+    known = [[norm_name(t.name_ar), t.email or '', t.name_ar, t.id] for t in rows]
+    return render_template('admin/teachers.html', teachers=rows, stages=stages,
+                           new_ids=new_ids, known=known)
 
 
 XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -524,7 +537,8 @@ def teachers_import_members():
     if r['skipped']:
         parts.append(_msg(f'تجاهل {r["skipped"]} (ليس بريد مستخدم)', f'{r["skipped"]} skipped (not a user mailbox)'))
     flash(' · '.join(parts), 'ok')
-    return redirect(back)
+    new = [t.id for t in r['teachers']][:400]
+    return redirect(url_for('admin.teachers', new=','.join(map(str, new))) + '#list')
 
 
 @admin_bp.route('/teachers/<int:teacher_id>/stages/add', methods=['POST'])
@@ -586,14 +600,48 @@ def teachers_import():
 @admin_bp.route('/teachers/add', methods=['POST'])
 @login_required
 def teacher_add():
-    """One teacher per line — paste a whole staff list at once."""
-    names = [n.strip() for n in (request.form.get('names') or '').splitlines() if n.strip()]
-    for n in names:
-        db.session.add(Teacher(name_ar=n, code=generate_code()))
-        db.session.flush()
+    """One teacher per line: a name, optionally with an email. Existing people
+    (same email, or same name) are not duplicated. New ones go to the top of the list."""
+    stage = db.session.get(Stage, request.form.get('stage_id', type=int) or 0)
+    by_email = {t.email: t for t in Teacher.query.filter(Teacher.email.isnot(None))}
+    by_name = {norm_name(t.name_ar): t for t in Teacher.query.all()}
+    created, existing, linked = [], [], set()
+    for line in (request.form.get('names') or '').splitlines():
+        line = re.sub('[\u2066-\u2069]', '', line).strip()
+        if not line:
+            continue
+        m = EMAIL_IN_LINE.search(line)
+        email = m.group(0).lower() if m else None
+        name = re.sub(r'[,;<>\t]+', ' ', line.replace(m.group(0), '') if m else line).strip()
+        if not name and email:
+            from teacher_io import display_name_from
+            name = display_name_from('', m.group(0))
+        t = (by_email.get(email) if email else None) or by_name.get(norm_name(name))
+        if t is None:
+            t = Teacher(name_ar=name, email=email, code=generate_code())
+            db.session.add(t)
+            db.session.flush()
+            by_name[norm_name(name)] = t
+            if email:
+                by_email[email] = t
+            created.append(t)
+        else:
+            if email and not t.email:
+                t.email = email
+            existing.append(t)
+        if stage and t.id not in linked and not any(l.stage_id == stage.id for l in t.stage_links):
+            db.session.add(TeacherStage(teacher_id=t.id, stage_id=stage.id))
+        linked.add(t.id)
     db.session.commit()
-    flash(_msg(f'تمت إضافة {len(names)} معلم', f'Added {len(names)} teacher(s)'), 'ok')
-    return redirect(url_for('admin.teachers'))
+    existing = list({t.id: t for t in existing if t not in created}.values())
+    msg = _msg(f'تمت إضافة {len(created)} معلم — ظاهرون أعلى القائمة', f'{len(created)} teacher(s) added — shown at the top')
+    if existing:
+        msg += _msg(f' · {len(existing)} موجود مسبقاً ولم يُكرَّر', f' · {len(existing)} already existed, not duplicated')
+    if stage:
+        msg += _msg(f' · رُبطوا بـ {stage.name_ar}', f' · linked to {stage.name_en or stage.name_ar}')
+    flash(msg, 'ok')
+    ids = ','.join(dict.fromkeys(str(t.id) for t in created + existing))
+    return redirect(url_for('admin.teachers', new=ids) + '#list')
 
 
 @admin_bp.route('/teachers/<int:teacher_id>')

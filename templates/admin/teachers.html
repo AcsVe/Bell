@@ -1,12 +1,27 @@
 {% extends 'admin/base.html' %}
 {% block title %}{{ L('المعلمون', 'Teachers') }}{% endblock %}
 {% block content %}
+<div class="page-head">
+  <h1>{{ L('المعلمون', 'Teachers') }}</h1>
+  <div class="actions">
+    <a class="btn" href="#add">+ {{ L('إضافة معلمين', 'Add teachers') }}</a>
+    <a class="btn ghost" href="#members">⬆ {{ L('استيراد', 'Import') }}</a>
+  </div>
+</div>
+<nav class="tabbar" data-tabs>
+  <a href="#list" data-tab="list">{{ L('القائمة', 'List') }}<span class="count">{{ teachers|length }}</span></a>
+  <a href="#add" data-tab="add">{{ L('إضافة يدوية', 'Add manually') }}</a>
+  <a href="#members" data-tab="members">{{ L('من Microsoft 365', 'From Microsoft 365') }}</a>
+  <a href="#import" data-tab="import">{{ L('قالب Excel لكل مرحلة', 'Excel template per stage') }}</a>
+</nav>
+
+<section class="tabpane" data-pane="list">
 {% from 'admin/_bulk.html' import bulk_bar, bulk_all, bulk_item with context %}
-<h1>{{ L('المعلمون', 'Teachers') }} <span class="muted small">({{ teachers|length }})</span></h1>
-<div class="card" id="list">
+<div class="card">
   {% if teachers %}
+  <div class="list-tools">
   <div class="filters">
-    <input type="search" id="tq" placeholder="{{ L('بحث بالاسم أو البريد أو الكود…', 'Search name, email or code…') }}">
+    <div class="search"><input type="search" id="tq" data-autofocus autocomplete="off" placeholder="{{ L('ابحث بالاسم أو البريد أو الكود…', 'Search name, email or code…') }}"></div>
     <select id="tstage">
       <option value="">{{ L('كل المعلمين', 'All teachers') }}</option>
       {% for st in stages %}<option value="s{{ st.id }}">{{ L(st.name_ar, st.name_en or st.name_ar) }}</option>{% endfor %}
@@ -22,20 +37,22 @@
       ('activate', 'تفعيل', 'Enable', false),
       ('regen', 'أكواد جديدة', 'New codes', true),
       ('delete', 'حذف', 'Delete', true)]) }}
+  </div>
   <table class="resp">
     <thead><tr><th class="chk">{{ bulk_all('teachers') }}</th><th>{{ L('المعلم', 'Teacher') }}</th><th>{{ L('كود المعلم', 'Teacher code') }}</th><th>{{ L('مرتبط بـ', 'Linked to') }}</th><th></th></tr></thead>
     <tbody>
-    {% for t in teachers %}
+    {% for t in (teachers|selectattr('id', 'in', new_ids)|list) + (teachers|rejectattr('id', 'in', new_ids)|list) %}
     {% set tags = [] %}{% for st in t.stages %}{% set _ = tags.append('s' ~ st.id) %}{% endfor %}{% for s in t.sections %}{% set _ = tags.append('s' ~ s.grade.stage_id) %}{% endfor %}
     {% if not t.stages and not t.sections %}{% set _ = tags.append('none') %}{% endif %}{% if not t.active %}{% set _ = tags.append('off') %}{% endif %}
-    <tr data-row data-tags=" {{ tags|join(' ') }} " data-q="{{ (t.name_ar ~ ' ' ~ (t.name_en or '') ~ ' ' ~ (t.email or '') ~ ' ' ~ t.code)|lower }}">
+    <tr data-row class="{{ 'is-new' if t.id in new_ids }}" data-tags=" {{ tags|join(' ') }} " data-q="{{ t.name_ar ~ ' ' ~ (t.name_en or '') ~ ' ' ~ (t.email or '') ~ ' ' ~ t.code }}">
       <td class="chk">{{ bulk_item('teachers', t.id) }}</td>
       <td><a href="{{ url_for('admin.teacher_view', teacher_id=t.id) }}">{{ L(t.name_ar, t.name_en or t.name_ar) }}</a>
+        {% if t.id in new_ids %}<span class="badge-new">{{ L('جديد', 'New') }}</span>{% endif %}
         {% if not t.active %}<span class="chip">{{ L('موقوف', 'Disabled') }}</span>{% endif %}
         {% if t.email %}<div class="muted small" dir="ltr" style="text-align:start">{{ t.email }}</div>{% endif %}</td>
       <td><span class="code copy" data-copy="{{ t.code }}">{{ t.code }}</span></td>
       <td class="small">{% for st in t.stages %}<span class="chip break">{{ L(st.name_ar, st.name_en or st.name_ar) }}</span>{% endfor %}{% for s in t.sections %}<span class="chip">{{ s.full_name(lang) }}</span>{% endfor %}{% if not t.stages and not t.sections %}<span class="muted">—</span>{% endif %}</td>
-      <td><a class="btn ghost sm" href="{{ url_for('admin.teacher_view', teacher_id=t.id) }}">{{ L('إدارة', 'Manage') }}</a></td>
+      <td class="act"><a class="btn ghost sm" href="{{ url_for('admin.teacher_view', teacher_id=t.id) }}">{{ L('إدارة', 'Manage') }}</a></td>
     </tr>
     {% endfor %}
     </tbody>
@@ -44,23 +61,76 @@
   <script>
   (function () {
     const q = document.getElementById('tq'), f = document.getElementById('tstage'), out = document.getElementById('tshown');
-    const rows = [...document.querySelectorAll('#list tbody tr[data-row]')];
+    const rows = [...document.querySelectorAll('[data-pane="list"] tbody tr[data-row]')];
+    rows.forEach((r) => { r.dataset.n = normText(r.dataset.q); });
     function apply() {
-      const text = q.value.trim().toLowerCase(), tag = f.value;
+      const words = normText(q.value).split(' ').filter(Boolean), tag = f.value;
       let n = 0;
       rows.forEach((r) => {
-        const show = (!text || r.dataset.q.includes(text)) && (!tag || r.dataset.tags.includes(' ' + tag + ' '));
+        const show = words.every((w) => r.dataset.n.includes(w)) && (!tag || r.dataset.tags.includes(' ' + tag + ' '));
         r.hidden = !show; if (show) n++;
       });
-      out.textContent = (text || tag) ? `{{ L('المعروض', 'Showing') }}: ${n} / ${rows.length} — {{ L('«تحديد الكل» يحدد المعروض فقط', '“Select all” selects shown rows only') }}` : '';
+      out.textContent = (words.length || tag) ? `{{ L('المعروض', 'Showing') }}: ${n} / ${rows.length} — {{ L('«تحديد الكل» يحدد المعروض فقط', '“Select all” selects shown rows only') }}` : '';
       window.bulkRefresh && window.bulkRefresh('teachers');
     }
     q.addEventListener('input', apply); f.addEventListener('change', apply);
+    q.addEventListener('keydown', (e) => { if (e.key === 'Escape') { q.value = ''; apply(); } });
+    const fresh = document.querySelector('tr.is-new');
+    if (fresh) fresh.scrollIntoView({ block: 'center' });
   })();
   </script>
   {% else %}<p class="muted">{{ L('لا يوجد معلمون بعد.', 'No teachers yet.') }}</p>{% endif %}
 </div>
-<div class="card" id="members">
+</section>
+
+<section class="tabpane" data-pane="add">
+<div class="card">
+  <h2>{{ L('إضافة معلمين', 'Add teachers') }}</h2>
+  <form method="post" action="{{ url_for('admin.teacher_add') }}">
+    <label for="addNames">{{ L('معلم في كل سطر: الاسم، ويمكن كتابة البريد بعده. يمكنك لصق قائمة كاملة.', 'One teacher per line: the name, optionally followed by the email. You can paste a whole list.') }}</label>
+    <textarea name="names" id="addNames" data-autofocus required rows="6" placeholder="منى الخطيب  muna.khatib@ras.edu.jo&#10;رامي عودة"></textarea>
+    <div class="hits" id="addHits" aria-live="polite"></div>
+    <div class="row" style="margin-top:12px">
+      <div>
+        <label>{{ L('ربطهم مباشرة بالمرحلة (اختياري)', 'Link them to a stage right away (optional)') }}</label>
+        <select name="stage_id"><option value="">{{ L('— بدون —', '— none —') }}</option>{% for st in stages %}<option value="{{ st.id }}">{{ L(st.name_ar, st.name_en or st.name_ar) }}</option>{% endfor %}</select>
+      </div>
+      <div class="shrink"><button>{{ L('إضافة', 'Add') }}</button></div>
+    </div>
+  </form>
+  <script>
+  (function () {
+    const known = {{ known|tojson }};                 // [[normalized name, email, display, id], …]
+    const byEmail = new Map(known.filter((k) => k[1]).map((k) => [k[1], k]));
+    const byName = new Map(known.map((k) => [k[0], k]));
+    const ta = document.getElementById('addNames'), out = document.getElementById('addHits');
+    const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    function parse(line) {
+      const m = line.match(/[^\s,;<>]+@[^\s,;<>]+\.[^\s,;<>]+/);
+      const email = m ? m[0].toLowerCase() : '';
+      const name = line.replace(m ? m[0] : '', '').replace(/[,;<>\t]+/g, ' ').trim();
+      return { name, email };
+    }
+    function check() {
+      const lines = ta.value.split('\n').map((l) => l.trim()).filter(Boolean);
+      if (!lines.length) { out.innerHTML = ''; return; }
+      let fresh = 0; const dup = [];
+      lines.forEach((l) => {
+        const p = parse(l);
+        const hit = (p.email && byEmail.get(p.email)) || (p.name && byName.get(normText(p.name)));
+        if (hit) dup.push(`<a href="{{ url_for('admin.teachers') }}/${hit[3]}">${esc(hit[2])}</a>`); else fresh++;
+      });
+      out.innerHTML = `<span class="fresh">{{ L('جديد', 'New') }}: ${fresh}</span>` +
+        (dup.length ? ` · <span class="exists">{{ L('موجود مسبقاً ولن يُكرَّر', 'Already exists, will not be duplicated') }} (${dup.length}): ${dup.join('، ')}</span>` : '');
+    }
+    ta.addEventListener('input', check);
+  })();
+  </script>
+</div>
+</section>
+
+<section class="tabpane" data-pane="members">
+<div class="card" id="members-card">
   <h2>{{ L('استيراد قوائم المعلمين من Microsoft 365 (CSV)', 'Import staff lists from Microsoft 365 (CSV)') }}</h2>
   <p class="hint">{{ L('ارفع ملف أعضاء مجموعة المرحلة (Name, PrimarySmtpAddress). يُنشأ كل معلم بكود ويُربط بالمرحلة كاملة، فيستقبل تنبيهات كل صفوفها. المعلم الموجود في أكثر من مجموعة يُعرَف ببريده ويبقى له كود واحد. الأسماء تُؤخذ من الحساب ويمكن تعريبها لاحقاً من قالب Excel.',
     'Upload the stage group’s member export (Name, PrimarySmtpAddress). Each teacher gets a code and is linked to the whole stage, receiving alerts for all its grades. A teacher in several groups is matched by email and keeps one code. Names come from the account and can be changed later via the Excel template.') }}</p>
@@ -98,7 +168,10 @@
   </script>
 </div>
 
-<div class="card" id="import">
+</section>
+
+<section class="tabpane" data-pane="import">
+<div class="card">
   <h2>{{ L('استيراد المعلمين حسب المرحلة (Excel)', 'Import teachers by stage (Excel)') }}</h2>
   <p class="hint">{{ L('نزّل قالب المرحلة، اكتب أسماء المعلمين وضع ✓ تحت شعب كل معلم، ثم ارفعه. يُنشأ المعلم الجديد بكوده تلقائياً، والمعلم المشترك بين مراحل يُكتب بنفس الاسم في قالب كل مرحلة فيبقى له كود واحد. القالب يُنزَّل معبأً بالمعلمين الحاليين لتعدّله وتعيد رفعه.',
     'Download the stage template, enter teacher names and put ✓ under each teacher’s sections, then upload it. New teachers get a code automatically; a teacher shared across stages is written with the same name in each stage template and keeps one code. The template comes pre-filled with current teachers so you can edit and re-upload it.') }}</p>
@@ -130,12 +203,5 @@
   {% else %}<p class="muted">{{ L('أضف المراحل والشعب أولاً.', 'Add stages and sections first.') }}</p>{% endif %}
 </div>
 
-<div class="card">
-  <h2>{{ L('إضافة معلمين', 'Add teachers') }}</h2>
-  <form method="post" action="{{ url_for('admin.teacher_add') }}">
-    <label>{{ L('اسم واحد في كل سطر — يمكنك لصق قائمة الكادر كاملة', 'One name per line — you can paste the whole staff list') }}</label>
-    <textarea name="names" required></textarea>
-    <button style="margin-top:10px">{{ L('إضافة', 'Add') }}</button>
-  </form>
-</div>
+</section>
 {% endblock %}

@@ -1,10 +1,23 @@
 {% extends 'admin/base.html' %}
-{% block title %}{{ L('الأكواد', 'Codes') }}{% endblock %}
+{% block title %}{{ L('الأكواد', 'Codes') }}<script>
+(function () {
+  const q = document.getElementById('cq');
+  const rows = [...document.querySelectorAll('main table tr')];
+  rows.forEach((r) => { r.dataset.n = normText(r.textContent); });
+  q.addEventListener('input', () => {
+    const w = normText(q.value).split(' ').filter(Boolean);
+    rows.forEach((r) => { r.hidden = !w.every((x) => r.dataset.n.includes(x)); });
+    document.querySelectorAll('main .card').forEach((c) => { c.hidden = w.length > 0 && !c.querySelector('tr:not([hidden])'); });
+  });
+})();
+</script>
+{% endblock %}
 {% block content %}
-<div class="row noprint" style="align-items:center;margin-bottom:10px">
-  <h1 style="margin:0">{{ L('كل الأكواد', 'All codes') }}</h1>
-  <div class="shrink"><button class="ghost" onclick="window.print()">{{ L('طباعة', 'Print') }}</button></div>
+<div class="page-head noprint">
+  <h1>{{ L('كل الأكواد', 'All codes') }}</h1>
+  <div class="actions"><button class="ghost" onclick="window.print()">🖨 {{ L('طباعة', 'Print') }}</button></div>
 </div>
+<div class="list-tools noprint" style="background:var(--bg)"><div class="search"><input type="search" id="cq" autocomplete="off" placeholder="{{ L('ابحث عن صف أو معلم أو كود…', 'Search a section, teacher or code…') }}"></div></div>
 <p class="muted small noprint">{{ L('اضغط أي كود لنسخه. رابط الدخول:', 'Tap any code to copy it. Sign-in link:') }}
   <span class="code copy" style="font-size:13px;letter-spacing:0" data-copy="{{ request.host_url }}login">{{ request.host_url }}login</span></p>
 
@@ -29,4 +42,16 @@
     {% else %}<tr><td class="muted">{{ L('لا يوجد معلمون.', 'No teachers.') }}</td></tr>{% endfor %}
   </table>
 </div>
+<script>
+(function () {
+  const q = document.getElementById('cq');
+  const rows = [...document.querySelectorAll('main table tr')];
+  rows.forEach((r) => { r.dataset.n = normText(r.textContent); });
+  q.addEventListener('input', () => {
+    const w = normText(q.value).split(' ').filter(Boolean);
+    rows.forEach((r) => { r.hidden = !w.every((x) => r.dataset.n.includes(x)); });
+    document.querySelectorAll('main .card').forEach((c) => { c.hidden = w.length > 0 && !c.querySelector('tr:not([hidden])'); });
+  });
+})();
+</script>
 {% endblock %}

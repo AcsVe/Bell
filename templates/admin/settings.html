@@ -2,22 +2,17 @@
 {% block title %}{{ L('النغمة والأجهزة', 'Tone & devices') }}{% endblock %}
 {% block content %}
 {% from 'admin/_bulk.html' import bulk_bar, bulk_all, bulk_item with context %}
-<h1>{{ L('النغمة والأجهزة', 'Tone & devices') }}</h1>
+<div class="page-head">
+  <h1>{{ L('النغمة والأجهزة', 'Tone & devices') }}</h1>
+  <div class="actions">
 
-<div class="card">
-  <h2>{{ L('نغمة التنبيه', 'Alert tone') }}</h2>
-  <p class="muted small">{{ tone.filename if tone else L('النغمة الافتراضية المدمجة', 'Built-in default tone') }}</p>
-  <audio controls preload="none" src="{{ tone.url if tone else url_for('static', filename='sounds/chime.wav') }}"></audio>
-  <form method="post" enctype="multipart/form-data" class="row" style="margin-top:12px">
-    <div><label>{{ L('رفع نغمة جديدة (mp3 / wav / ogg)', 'Upload a new tone (mp3 / wav / ogg)') }}</label><input type="file" name="tone" accept="audio/*" required></div>
-    <div class="shrink"><button>{{ L('رفع', 'Upload') }}</button></div>
-  </form>
-  {% if tone %}
-  <form method="post" style="margin-top:10px"><input type="hidden" name="reset_tone" value="1">
-    <button class="ghost sm">{{ L('العودة للنغمة الافتراضية', 'Restore default tone') }}</button></form>
-  {% endif %}
+  </div>
 </div>
-
+<nav class="tabbar" data-tabs>
+  <a href="#devices-tab" data-tab="devices-tab">{{ L('الأجهزة المسجلة', 'Registered devices') }}<span class="count">{{ devices|length }}</span></a>
+  <a href="#tone-tab" data-tab="tone-tab">{{ L('نغمة التنبيه', 'Alert tone') }}</a>
+</nav>
+<section class="tabpane" data-pane="devices-tab">
 <div class="card">
   <h2>{{ L('الأجهزة المسجلة', 'Registered devices') }}</h2>
   <p class="muted small">{{ L('آخر مزامنة لكل جهاز. الشاشة الشغالة تتزامن كل 5 دقائق تقريباً عند توفر الإنترنت.', 'Last sync per device. A running screen syncs about every 5 minutes when online.') }}</p>
@@ -38,4 +33,20 @@
     </tbody>
   </table>
 </div>
+</section>
+<section class="tabpane" data-pane="tone-tab">
+<div class="card">
+  <h2>{{ L('نغمة التنبيه', 'Alert tone') }}</h2>
+  <p class="muted small">{{ tone.filename if tone else L('النغمة الافتراضية المدمجة', 'Built-in default tone') }}</p>
+  <audio controls preload="none" src="{{ tone.url if tone else url_for('static', filename='sounds/chime.wav') }}"></audio>
+  <form method="post" enctype="multipart/form-data" class="row" style="margin-top:12px">
+    <div><label>{{ L('رفع نغمة جديدة (mp3 / wav / ogg)', 'Upload a new tone (mp3 / wav / ogg)') }}</label><input type="file" name="tone" accept="audio/*" required></div>
+    <div class="shrink"><button>{{ L('رفع', 'Upload') }}</button></div>
+  </form>
+  {% if tone %}
+  <form method="post" style="margin-top:10px"><input type="hidden" name="reset_tone" value="1">
+    <button class="ghost sm">{{ L('العودة للنغمة الافتراضية', 'Restore default tone') }}</button></form>
+  {% endif %}
+</div>
+</section>
 {% endblock %}

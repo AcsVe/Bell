@@ -6,8 +6,12 @@
 <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">{{ L('المراحل', 'Stages') }}</a> ›
   <a href="{{ url_for('admin.stage_view', stage_id=st.id) }}">{{ L(st.name_ar, st.name_en or st.name_ar) }}</a> ›
   <a href="{{ url_for('admin.grade_view', grade_id=g.id) }}">{{ L(g.name_ar, g.name_en or g.name_ar) }}</a></div>
-<h1>{{ s.full_name(lang) }}</h1>
-
+<div class="page-head">
+  <h1>{{ s.full_name(lang) }}</h1>
+  <div class="actions">
+    <a class="btn" href="#add-tab">+ {{ L('إضافة معلمين', 'Add teachers') }}</a>
+  </div>
+</div>
 <div class="card">
   <h2>{{ L('كود الصف', 'Section code') }}</h2>
   <p><span class="code copy" data-copy="{{ s.code }}">{{ s.code }}</span>
@@ -19,7 +23,12 @@
     <button class="ghost sm">{{ L('توليد كود جديد', 'Regenerate code') }}</button>
   </form>
 </div>
-
+<nav class="tabbar" data-tabs>
+  <a href="#teachers-tab" data-tab="teachers-tab">{{ L('المعلمون المرتبطون', 'Linked teachers') }}<span class="count">{{ s.teacher_links|length }}</span></a>
+  <a href="#add-tab" data-tab="add-tab">{{ L('إضافة معلمين', 'Add teachers') }}</a>
+  <a href="#settings-tab" data-tab="settings-tab">{{ L('الإعدادات', 'Settings') }}</a>
+</nav>
+<section class="tabpane" data-pane="teachers-tab">
 <div class="card">
   <h2>{{ L('المعلمون المرتبطون بهذه الشعبة', 'Teachers linked to this section') }} <span class="muted small">({{ s.teacher_links|length }})</span></h2>
   {% set st_links = s.grade.stage.teacher_links %}
@@ -38,7 +47,8 @@
   </table>
   {% else %}<p class="muted">{{ L('لا يوجد معلمون مرتبطون بهذه الشعبة تحديداً.', 'No teachers linked to this section specifically.') }}</p>{% endif %}
 </div>
-
+</section>
+<section class="tabpane" data-pane="add-tab">
 <div class="card">
   <h2>{{ L('إضافة معلمين للشعبة', 'Add teachers to the section') }}</h2>
   {% set items = [] %}
@@ -49,7 +59,8 @@
   {% set fl = [] %}{% for st in all_stages %}{% set _ = fl.append(('s' ~ st.id, st.name_ar)) %}{% endfor %}
   {{ picker('pick-teachers', url_for('admin.section_teacher_add', section_id=s.id), 'teacher_id', items, 'ربط المحددين', 'Link selected', fl) }}
 </div>
-
+</section>
+<section class="tabpane" data-pane="settings-tab">
 <div class="card">
   <h2>{{ L('تعديل الشعبة', 'Edit section') }}</h2>
   <form method="post" action="{{ url_for('admin.section_update', section_id=s.id) }}" class="row">
@@ -62,4 +73,5 @@
     <button class="danger sm">{{ L('حذف الشعبة', 'Delete section') }}</button>
   </form>
 </div>
+</section>
 {% endblock %}

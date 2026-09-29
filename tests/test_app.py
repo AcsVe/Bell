@@ -801,3 +801,40 @@ def test_members_import_any_file_format(admin, app):
                    data={'stage_id': 'new', 'new_stage': 'x', 'file': (io.BytesIO(b'PK\x03\x04broken'), 'm.xlsx')},
                    content_type='multipart/form-data', follow_redirects=True)
     assert r.status_code == 200 and 'تعذّر' in r.get_data(as_text=True)
+
+
+def test_manual_add_teachers_emails_duplicates_and_new_on_top(admin, app):
+    from models import TeacherStage
+    admin.post('/admin/stages/add', data={'name_ar': 'المرحلة الثانوية'})
+    with app.app_context():
+        sid = Stage.query.one().id
+    admin.post('/admin/teachers/add', data={'names': 'منى الخطيب'})
+    r = admin.post('/admin/teachers/add', follow_redirects=True, data={'stage_id': sid, 'names':
+        'رامي عودة  rami.o@school.example\n'
+        'منى الخطيب\n'                       # exists by name → not duplicated, gets linked
+        'مُنى  الخطيب\n'                      # same name with diacritics/spacing → same person
+        'Laila.H@School.example\n'            # email only → name from email
+        '\n  \n'})
+    html = r.get_data(as_text=True)
+    assert 'تمت إضافة 2' in html and 'موجود مسبقاً' in html
+    with app.app_context():
+        assert Teacher.query.count() == 3
+        rami = Teacher.query.filter_by(email='rami.o@school.example').one()
+        assert rami.name_ar == 'رامي عودة'
+        assert Teacher.query.filter_by(email='laila.h@school.example').one().name_ar == 'Laila H'
+        assert TeacherStage.query.filter_by(stage_id=sid).count() == 3
+        new_ids = [rami.id]
+    # redirect carries the ids; they are listed first and marked new
+    assert '/admin/teachers?new=' in r.request.url or 'is-new' in html
+    first_row = html.index('<tr data-row')
+    assert 'is-new' in html[first_row:first_row + 80]
+    # adding the same email again does not duplicate
+    admin.post('/admin/teachers/add', data={'names': 'اسم آخر RAMI.O@school.example'})
+    with app.app_context():
+        assert Teacher.query.count() == 3
+    # pages render with tabs and the page header
+    for url in ['/admin/', '/admin/teachers', f'/admin/stages/{sid}', '/admin/programs', '/admin/settings',
+                '/admin/codes', f'/admin/teachers/{new_ids[0]}']:
+        h = admin.get(url).get_data(as_text=True)
+        assert 'class="page-head' in h, url
+        assert 'id="mainnav"' in h and 'class="step"' in h, url

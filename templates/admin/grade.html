@@ -4,19 +4,26 @@
 {% from 'admin/_bulk.html' import bulk_bar, bulk_all, bulk_item with context %}
 <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">{{ L('المراحل', 'Stages') }}</a> ›
   <a href="{{ url_for('admin.stage_view', stage_id=st.id) }}">{{ L(st.name_ar, st.name_en or st.name_ar) }}</a></div>
-<h1>{{ L(g.name_ar, g.name_en or g.name_ar) }}</h1>
-
-<div class="card">
-  <form method="post" action="{{ url_for('admin.grade_update', grade_id=g.id) }}" class="row">
-    <div><label>{{ L('الاسم بالعربية', 'Arabic name') }}</label><input type="text" name="name_ar" value="{{ g.name_ar }}" required></div>
-    <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input type="text" name="name_en" value="{{ g.name_en or '' }}"></div>
-    <div class="shrink" style="width:110px"><label>{{ L('الترتيب', 'Order') }}</label><input type="number" name="sort_order" value="{{ g.sort_order }}"></div>
-    <div class="shrink"><button>{{ L('حفظ', 'Save') }}</button></div>
-  </form>
+<div class="page-head">
+  <h1>{{ L(g.name_ar, g.name_en or g.name_ar) }}</h1>
+  <div class="actions">
+    <a class="btn" href="#sections-tab">+ {{ L('شعب', 'Sections') }}</a>
+    <a class="btn ghost" href="{{ url_for('admin.programs_assign') }}">{{ L('برنامج الجرس', 'Bell program') }}</a>
+  </div>
 </div>
-
+<nav class="tabbar" data-tabs>
+  <a href="#sections-tab" data-tab="sections-tab">{{ L('الشعب والأكواد', 'Sections & codes') }}<span class="count">{{ g.sections|length }}</span></a>
+  <a href="#times-tab" data-tab="times-tab">{{ L('التوقيت', 'Timing') }}</a>
+  <a href="#settings-tab" data-tab="settings-tab">{{ L('الإعدادات', 'Settings') }}</a>
+</nav>
+<section class="tabpane" data-pane="sections-tab">
 <div class="card" id="sections">
   <h2>{{ L('الشعب وأكوادها', 'Sections & codes') }}</h2>
+  <form method="post" action="{{ url_for('admin.section_add', grade_id=g.id) }}" class="row" style="margin-bottom:14px">
+    <div><label>{{ L('أسماء الشعب (افصل بفاصلة) — يُولَّد لكل شعبة كود تلقائياً', 'Section names (comma-separated) — each gets a code automatically') }}</label>
+      <input type="text" name="names" placeholder="أ، ب، ج" required></div>
+    <div class="shrink"><button>{{ L('إضافة', 'Add') }}</button></div>
+  </form>
   {% if g.sections %}
   {{ bulk_bar('sections', [('regen', 'أكواد جديدة', 'New codes', true), ('delete', 'حذف', 'Delete', true)]) }}
   <table class="resp">
@@ -34,13 +41,10 @@
     </tbody>
   </table>
   {% else %}<p class="muted">{{ L('لا توجد شعب بعد.', 'No sections yet.') }}</p>{% endif %}
-  <form method="post" action="{{ url_for('admin.section_add', grade_id=g.id) }}" class="row" style="margin-top:12px">
-    <div><label>{{ L('أسماء الشعب (افصل بفاصلة) — يُولَّد لكل شعبة كود تلقائياً', 'Section names (comma-separated) — each gets a code automatically') }}</label>
-      <input type="text" name="names" placeholder="أ، ب، ج" required></div>
-    <div class="shrink"><button>{{ L('إضافة', 'Add') }}</button></div>
-  </form>
-</div>
 
+</div>
+</section>
+<section class="tabpane" data-pane="times-tab">
 <div class="card" id="times">
   <h2>{{ L('توقيت مختلف لهذا الصف', 'Different timing for this grade') }}</h2>
   <p class="hint">{{ L('عدّل بداية الدوام أو مدد الحصص لهذا الصف في يوم معيّن (أو كل الأيام). الترتيب: تخصيص الصف ← يوم المرحلة ← الافتراضي.',
@@ -85,8 +89,21 @@
   </form>
   {% elif not st.periods %}<p class="muted">{{ L('لا يوجد برنامج جرس لهذا اليوم ولا حصص للمرحلة.', 'No bell program for this day and no stage periods.') }} <a href="{{ url_for('admin.programs_assign') }}">{{ L('توزيع البرامج', 'Assign programs') }}</a></p>{% endif %}
 </div>
-
+</section>
+<section class="tabpane" data-pane="settings-tab">
+<div class="card">
+  <form method="post" action="{{ url_for('admin.grade_update', grade_id=g.id) }}" class="row">
+    <div><label>{{ L('الاسم بالعربية', 'Arabic name') }}</label><input type="text" name="name_ar" value="{{ g.name_ar }}" required></div>
+    <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input type="text" name="name_en" value="{{ g.name_en or '' }}"></div>
+    <div class="shrink" style="width:110px"><label>{{ L('الترتيب', 'Order') }}</label><input type="number" name="sort_order" value="{{ g.sort_order }}"></div>
+    <div class="shrink"><button>{{ L('حفظ', 'Save') }}</button></div>
+  </form>
+</div>
+<div class="card">
+  <h2>{{ L('حذف الصف', 'Delete grade') }}</h2>
 <form method="post" action="{{ url_for('admin.grade_delete', grade_id=g.id) }}" data-confirm="{{ L('حذف الصف بكل شعبه وأكوادها؟', 'Delete this grade with all its sections and codes?') }}">
   <button class="danger">{{ L('حذف الصف', 'Delete grade') }}</button>
 </form>
+</div>
+</section>
 {% endblock %}

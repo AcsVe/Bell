@@ -1,14 +1,22 @@
 {% extends 'admin/base.html' %}
 {% block content %}
 {% from 'admin/_bulk.html' import bulk_bar, bulk_all, bulk_item with context %}
-<h1>{{ L('المراحل والصفوف', 'Stages & grades') }}</h1>
-
+<div class="page-head">
+  <h1>{{ L('المراحل والصفوف', 'Stages & grades') }}</h1>
+  <div class="actions">
+    <a class="btn" href="#add-tab">+ {{ L('مرحلة جديدة', 'New stage') }}</a>
+  </div>
+</div>
 <div class="grid" style="margin-bottom:18px">
   <div class="card"><div class="muted small">{{ L('الشعب', 'Sections') }}</div><div class="stat">{{ stats.sections }}</div></div>
   <div class="card"><div class="muted small">{{ L('المعلمون', 'Teachers') }}</div><div class="stat">{{ stats.teachers }}</div></div>
   <div class="card"><div class="muted small">{{ L('الأجهزة المسجلة', 'Registered devices') }}</div><div class="stat">{{ stats.devices }}</div></div>
 </div>
-
+<nav class="tabbar" data-tabs>
+  <a href="#stages-tab" data-tab="stages-tab">{{ L('المراحل', 'Stages') }}<span class="count">{{ stages|length }}</span></a>
+  <a href="#add-tab" data-tab="add-tab">{{ L('مرحلة جديدة', 'New stage') }}</a>
+</nav>
+<section class="tabpane" data-pane="stages-tab">
 {% if stages %}{{ bulk_bar('stages', [('delete', 'حذف المراحل المحددة', 'Delete selected stages', true)]) }}{% endif %}
 <div class="grid">
 {% for st in stages %}
@@ -34,7 +42,8 @@
   <div class="card muted">{{ L('لا توجد مراحل بعد — أضف أول مرحلة.', 'No stages yet — add the first one.') }}</div>
 {% endfor %}
 </div>
-
+</section>
+<section class="tabpane" data-pane="add-tab">
 <div class="card">
   <h2>{{ L('إضافة مرحلة', 'Add a stage') }}</h2>
   <form method="post" action="{{ url_for('admin.stage_add') }}" class="row">
@@ -43,4 +52,5 @@
     <div class="shrink"><button>{{ L('إضافة', 'Add') }}</button></div>
   </form>
 </div>
+</section>
 {% endblock %}

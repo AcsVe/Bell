@@ -3,50 +3,20 @@
 {% block content %}
 {% from 'admin/_bulk.html' import bulk_bar, bulk_all, bulk_item with context %}
 <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">{{ L('المراحل', 'Stages') }}</a></div>
-<h1>{{ L(st.name_ar, st.name_en or st.name_ar) }}</h1>
-
-<div class="card">
-  <h2>{{ L('بيانات المرحلة وأيام الدوام', 'Stage details & school days') }}</h2>
-  <form method="post" action="{{ url_for('admin.stage_update', stage_id=st.id) }}">
-    <div class="row">
-      <div><label>{{ L('الاسم بالعربية', 'Arabic name') }}</label><input type="text" name="name_ar" value="{{ st.name_ar }}" required></div>
-      <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input type="text" name="name_en" value="{{ st.name_en or '' }}"></div>
-      <div class="shrink" style="width:110px"><label>{{ L('الترتيب', 'Order') }}</label><input type="number" name="sort_order" value="{{ st.sort_order }}"></div>
-    </div>
-    <label style="margin-top:12px">{{ L('أيام الدوام', 'School days') }}</label>
-    <div class="days">
-      {% for wd in week_order %}
-      <label><input type="checkbox" name="weekdays" value="{{ wd }}" {{ 'checked' if wd in st.weekday_list }}> {{ wd_names[wd] }}</label>
-      {% endfor %}
-    </div>
-    <div class="row" style="margin-top:12px;align-items:center">
-      <label class="shrink" style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" name="active" {{ 'checked' if st.active }}> {{ L('المرحلة فعّالة', 'Stage active') }}</label>
-      <div class="shrink"><button>{{ L('حفظ', 'Save') }}</button></div>
-    </div>
-  </form>
+<div class="page-head">
+  <h1>{{ L(st.name_ar, st.name_en or st.name_ar) }}</h1>
+  <div class="actions">
+    <a class="btn" href="#grades">+ {{ L('صفوف', 'Grades') }}</a>
+    <a class="btn ghost" href="{{ url_for('admin.programs_assign') }}">{{ L('برامج الجرس للصفوف', 'Grade bell programs') }}</a>
+  </div>
 </div>
-
-<div class="card">
-  <h2>{{ L('الشعار والخلفية', 'Logo & background') }}</h2>
-  <form method="post" enctype="multipart/form-data" action="{{ url_for('admin.stage_media', stage_id=st.id) }}">
-    <div class="row">
-      <div>
-        <label>{{ L('الشعار', 'Logo') }}</label>
-        {% if st.logo %}<img class="thumb" src="{{ st.logo.url }}" alt=""><br>
-          <label style="display:inline-flex;gap:6px;color:var(--err)"><input type="checkbox" name="remove_logo" value="1"> {{ L('حذف', 'Remove') }}</label>{% endif %}
-        <input type="file" name="logo" accept="image/*">
-      </div>
-      <div>
-        <label>{{ L('الخلفية', 'Background') }}</label>
-        {% if st.background %}<img class="thumb" src="{{ st.background.url }}" alt=""><br>
-          <label style="display:inline-flex;gap:6px;color:var(--err)"><input type="checkbox" name="remove_background" value="1"> {{ L('حذف', 'Remove') }}</label>{% endif %}
-        <input type="file" name="background" accept="image/*">
-      </div>
-      <div class="shrink"><button>{{ L('رفع', 'Upload') }}</button></div>
-    </div>
-  </form>
-</div>
-
+<nav class="tabbar" data-tabs>
+  <a href="#grades-tab" data-tab="grades-tab">{{ L('الصفوف والشعب', 'Grades & sections') }}<span class="count">{{ st.grades|length }}</span></a>
+  <a href="#periods-tab" data-tab="periods-tab">{{ L('الحصص الافتراضية', 'Default periods') }}</a>
+  <a href="#daytimes-tab" data-tab="daytimes-tab">{{ L('يوم بتوقيت مختلف', 'Different day') }}</a>
+  <a href="#settings-tab" data-tab="settings-tab">{{ L('الإعدادات والشعار', 'Settings & logo') }}</a>
+</nav>
+<section class="tabpane" data-pane="grades-tab">
 {% set with_prog = st.grades|selectattr('day_programs')|list %}
 {% if with_prog %}
 <div class="card">
@@ -56,6 +26,31 @@
   <span class="muted small">{{ L('الحصص أدناه تُستخدم فقط للصفوف والأيام بلا برنامج.', 'The periods below apply only to grades/days without a program.') }}</span></p>
 </div>
 {% endif %}
+<div class="card" id="grades">
+  <h2>{{ L('الصفوف', 'Grades') }}</h2>
+  <form method="post" action="{{ url_for('admin.grade_add', stage_id=st.id) }}" class="row" style="margin-bottom:14px">
+    <div><label>{{ L('أسماء الصفوف (افصل بفاصلة لإضافة عدة صفوف)', 'Grade names (comma-separate to add several)') }}</label>
+      <input type="text" name="names" placeholder="الصف الأول، الصف الثاني، الصف الثالث" required></div>
+    <div class="shrink"><button>{{ L('إضافة', 'Add') }}</button></div>
+  </form>
+  {% if st.grades %}
+  {{ bulk_bar('grades', [('delete', 'حذف', 'Delete', true)]) }}
+  <table>
+    <thead><tr><th class="chk">{{ bulk_all('grades') }}</th><th>{{ L('الصف', 'Grade') }}</th><th>{{ L('الشعب', 'Sections') }}</th></tr></thead>
+    <tbody>
+    {% for g in st.grades %}
+    <tr data-row><td class="chk">{{ bulk_item('grades', g.id) }}</td>
+      <td><a href="{{ url_for('admin.grade_view', grade_id=g.id) }}">{{ L(g.name_ar, g.name_en or g.name_ar) }}</a></td>
+      <td class="small">{% for sec in g.sections %}<span class="chip">{{ sec.name_ar }}</span>{% else %}<span class="muted">—</span>{% endfor %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">{{ L('لا توجد صفوف بعد.', 'No grades yet.') }}</p>{% endif %}
+
+</div>
+
+</section>
+<section class="tabpane" data-pane="periods-tab">
 <div class="card" id="periods">
   <h2>{{ L('الحصص اليومية (الافتراضي لكل الأيام)', 'Daily periods (default, every day)') }}</h2>
   <p class="hint">{{ L('الحصص متتالية بلا فراغ: كل حصة تبدأ لحظة انتهاء التي قبلها، فيكفي تحديد بداية الدوام ومدة كل حصة. نص التنبيه يُبنى من التسميات: «انتهت الحصة الأولى - بداية الحصة الثانية».',
@@ -98,6 +93,8 @@
   </form>
 </div>
 
+</section>
+<section class="tabpane" data-pane="daytimes-tab">
 <div class="card" id="daytimes">
   <h2>{{ L('يوم بتوقيت مختلف لكل المرحلة', 'A day with different timing for the whole stage') }}</h2>
   <p class="hint">{{ L('مثال: الخميس بحصص أقصر لكل صفوف المرحلة. عدّل المدد واحفظ، أو «رجوع للافتراضي». الصفوف الجديدة ترث هذا تلقائياً.',
@@ -135,29 +132,55 @@
   {% elif not st.weekday_list %}<p class="muted">{{ L('اختر أيام الدوام أولاً.', 'Choose school days first.') }}</p>{% endif %}
 </div>
 
-<div class="card" id="grades">
-  <h2>{{ L('الصفوف', 'Grades') }}</h2>
-  {% if st.grades %}
-  {{ bulk_bar('grades', [('delete', 'حذف', 'Delete', true)]) }}
-  <table>
-    <thead><tr><th class="chk">{{ bulk_all('grades') }}</th><th>{{ L('الصف', 'Grade') }}</th><th>{{ L('الشعب', 'Sections') }}</th></tr></thead>
-    <tbody>
-    {% for g in st.grades %}
-    <tr data-row><td class="chk">{{ bulk_item('grades', g.id) }}</td>
-      <td><a href="{{ url_for('admin.grade_view', grade_id=g.id) }}">{{ L(g.name_ar, g.name_en or g.name_ar) }}</a></td>
-      <td class="small">{% for sec in g.sections %}<span class="chip">{{ sec.name_ar }}</span>{% else %}<span class="muted">—</span>{% endfor %}</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% else %}<p class="muted">{{ L('لا توجد صفوف بعد.', 'No grades yet.') }}</p>{% endif %}
-  <form method="post" action="{{ url_for('admin.grade_add', stage_id=st.id) }}" class="row" style="margin-top:12px">
-    <div><label>{{ L('أسماء الصفوف (افصل بفاصلة لإضافة عدة صفوف)', 'Grade names (comma-separate to add several)') }}</label>
-      <input type="text" name="names" placeholder="الصف الأول، الصف الثاني، الصف الثالث" required></div>
-    <div class="shrink"><button>{{ L('إضافة', 'Add') }}</button></div>
+</section>
+<section class="tabpane" data-pane="settings-tab">
+<div class="card">
+  <h2>{{ L('بيانات المرحلة وأيام الدوام', 'Stage details & school days') }}</h2>
+  <form method="post" action="{{ url_for('admin.stage_update', stage_id=st.id) }}">
+    <div class="row">
+      <div><label>{{ L('الاسم بالعربية', 'Arabic name') }}</label><input type="text" name="name_ar" value="{{ st.name_ar }}" required></div>
+      <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input type="text" name="name_en" value="{{ st.name_en or '' }}"></div>
+      <div class="shrink" style="width:110px"><label>{{ L('الترتيب', 'Order') }}</label><input type="number" name="sort_order" value="{{ st.sort_order }}"></div>
+    </div>
+    <label style="margin-top:12px">{{ L('أيام الدوام', 'School days') }}</label>
+    <div class="days">
+      {% for wd in week_order %}
+      <label><input type="checkbox" name="weekdays" value="{{ wd }}" {{ 'checked' if wd in st.weekday_list }}> {{ wd_names[wd] }}</label>
+      {% endfor %}
+    </div>
+    <div class="row" style="margin-top:12px;align-items:center">
+      <label class="shrink" style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" name="active" {{ 'checked' if st.active }}> {{ L('المرحلة فعّالة', 'Stage active') }}</label>
+      <div class="shrink"><button>{{ L('حفظ', 'Save') }}</button></div>
+    </div>
   </form>
 </div>
 
+<div class="card">
+  <h2>{{ L('الشعار والخلفية', 'Logo & background') }}</h2>
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('admin.stage_media', stage_id=st.id) }}">
+    <div class="row">
+      <div>
+        <label>{{ L('الشعار', 'Logo') }}</label>
+        {% if st.logo %}<img class="thumb" src="{{ st.logo.url }}" alt=""><br>
+          <label style="display:inline-flex;gap:6px;color:var(--err)"><input type="checkbox" name="remove_logo" value="1"> {{ L('حذف', 'Remove') }}</label>{% endif %}
+        <input type="file" name="logo" accept="image/*">
+      </div>
+      <div>
+        <label>{{ L('الخلفية', 'Background') }}</label>
+        {% if st.background %}<img class="thumb" src="{{ st.background.url }}" alt=""><br>
+          <label style="display:inline-flex;gap:6px;color:var(--err)"><input type="checkbox" name="remove_background" value="1"> {{ L('حذف', 'Remove') }}</label>{% endif %}
+        <input type="file" name="background" accept="image/*">
+      </div>
+      <div class="shrink"><button>{{ L('رفع', 'Upload') }}</button></div>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>{{ L('حذف المرحلة', 'Delete stage') }}</h2>
 <form method="post" action="{{ url_for('admin.stage_delete', stage_id=st.id) }}" data-confirm="{{ L('حذف المرحلة بكل صفوفها وشعبها وأكوادها؟ لا يمكن التراجع.', 'Delete this stage with all grades, sections and codes? This cannot be undone.') }}">
   <button class="danger">{{ L('حذف المرحلة', 'Delete stage') }}</button>
 </form>
+</div>
+</section>
 {% endblock %}

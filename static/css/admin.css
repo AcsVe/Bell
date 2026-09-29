@@ -6,21 +6,33 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:'Tajawal',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;line-height:1.55}
 a{color:var(--brand);text-decoration:none} a:hover{text-decoration:underline}
-header.top{background:#12305e;color:#fff;padding:0 16px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;min-height:56px}
-header.top .brand{font-weight:700;font-size:17px}
-header.top nav{display:flex;gap:4px;flex-wrap:wrap;flex:1}
-header.top nav a{color:#dbe6f7;padding:8px 12px;border-radius:8px}
-header.top nav a.on,header.top nav a:hover{background:rgba(255,255,255,.12);color:#fff;text-decoration:none}
-header.top .side{display:flex;gap:10px;align-items:center}
-header.top .side a{color:#dbe6f7}
-main{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
+header.top{background:#12305e;color:#fff;padding:0 16px;display:flex;align-items:center;gap:14px;min-height:56px;
+  position:sticky;top:0;z-index:20;box-shadow:0 1px 0 rgba(0,0,0,.15)}
+header.top a{color:#dbe6f7}
+header.top .brand{font-weight:700;font-size:17px;color:#fff;white-space:nowrap;text-decoration:none}
+header.top nav{display:flex;align-items:center;gap:2px;flex:1;min-width:0}
+header.top nav>a{padding:8px 10px;border-radius:8px;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+header.top nav>a.on,header.top nav>a:hover{background:rgba(255,255,255,.14);color:#fff;text-decoration:none}
+header.top nav .step{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.18);font-size:12px;font-weight:700}
+header.top nav>a.on .step{background:#ffc83d;color:#12305e}
+header.top .side{display:flex;gap:12px;align-items:center;margin-inline-start:auto;white-space:nowrap}
+.menu-btn{display:none;margin-inline-start:auto;background:rgba(255,255,255,.12);border:0;color:#fff;padding:8px 12px;font-weight:600}
+@media (max-width:900px){
+  .menu-btn{display:inline-flex}
+  header.top{flex-wrap:wrap}
+  header.top nav{display:none;flex-basis:100%;flex-direction:column;align-items:stretch;padding:4px 0 12px;gap:2px}
+  header.top nav.open{display:flex}
+  header.top nav>a{padding:11px 10px;font-size:16px}
+  header.top .side{margin:8px 0 0;padding-top:10px;border-top:1px solid rgba(255,255,255,.15);justify-content:space-between}
+}
+main{max-width:1100px;margin:0 auto;padding:18px 16px 60px}
 h1{font-size:22px;margin:4px 0 16px} h2{font-size:17px;margin:0 0 12px}
 .crumbs{color:var(--muted);font-size:13px;margin-bottom:6px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:18px}
 .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
 .stat{font-size:28px;font-weight:700} .muted{color:var(--muted)} .small{font-size:13px}
 label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
-input[type=text],input[type=password],input[type=number],input[type=time],select,textarea{
+input[type=text],input[type=password],input[type=number],input[type=time],input[type=search],input[type=email],select,textarea{
   width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff;color:var(--ink)}
 textarea{min-height:110px}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
@@ -78,3 +90,54 @@ th.chk,td.chk{width:34px;text-align:center}
 .pick-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;margin:0;color:var(--ink);cursor:pointer}
 .pick-item:hover{background:#f3f6fb}
 .pick-item[hidden]{display:none}
+
+/* anything hidden by filters/tabs must stay hidden, even rows styled as blocks on phones */
+[hidden]{display:none !important}
+/* page header: title + main actions */
+.page-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.page-head h1{margin:0}
+.page-head .actions{display:flex;flex-wrap:wrap;gap:8px}
+/* in-page tabs */
+.tabbar{display:flex;gap:4px;overflow-x:auto;border-bottom:2px solid var(--line);margin-bottom:14px;scrollbar-width:none}
+.tabbar::-webkit-scrollbar{display:none}
+.tabbar a{padding:10px 14px;border-radius:8px 8px 0 0;color:var(--muted);font-weight:600;white-space:nowrap;border-bottom:3px solid transparent;margin-bottom:-2px}
+.tabbar a:hover{color:var(--ink);text-decoration:none;background:#eef2f8}
+.tabbar a.on{color:var(--brand);border-bottom-color:var(--brand)}
+.tabbar .count{font-weight:500;color:var(--muted);font-size:12px;margin-inline-start:4px}
+/* sticky list tools under the sticky header */
+.list-tools{position:sticky;top:56px;z-index:6;background:var(--card);padding:10px 0 2px;margin-top:-6px}
+.bulk-bar{position:static}
+tr.is-new td{background:#fff8e1}
+.badge-new{display:inline-block;background:#ffc83d;color:#12305e;border-radius:6px;font-size:11px;font-weight:700;padding:1px 6px;margin-inline-start:6px}
+.hits{margin-top:8px;font-size:13px}
+.hits .exists{color:#8a5a00}
+.hits .fresh{color:var(--ok)}
+.search{position:relative}
+.search input{padding-inline-start:34px}
+.search::before{content:'⌕';position:absolute;inset-inline-start:11px;top:50%;transform:translateY(-52%);color:var(--muted);font-size:18px}
+@media (max-width:640px){
+  table.resp td.chk{display:inline-block;width:auto;padding:4px 0}
+  .list-tools{top:56px}
+  .page-head .actions{width:100%}
+  .page-head .actions .btn,.page-head .actions button{flex:1;justify-content:center}
+}
+
+/* bulk actions appear only once something is selected */
+.bulk-bar:not(.active) .bulk-actions{display:none}
+.bulk-bar{padding:8px 12px}
+/* phones: compact list rows — checkbox beside the name, details underneath */
+@media (max-width:640px){
+  table.resp tbody tr[data-row]{display:grid;grid-template-columns:34px 1fr;column-gap:8px;padding:8px 0}
+  table.resp tbody tr[data-row] td{padding:2px 0}
+  table.resp tbody tr[data-row] td.chk{grid-row:1 / span 3;align-self:start;padding-top:4px}
+  table.resp tbody tr[data-row] td:not(.chk){grid-column:2}
+  table.resp tbody tr[data-row] td.act{display:none}
+  table.resp tbody tr[data-row] .code{font-size:14px;padding:1px 6px}
+  .filters{gap:8px}
+  .filters>*{min-width:0;flex-basis:100%}
+  .bulk-bar{gap:6px}
+  .bulk-actions{margin-inline-start:0;width:100%}
+  h1{font-size:20px}
+}
+@media (max-width:640px){ .list-tools{position:static;margin-top:0;padding-top:0} }
+td input[type=checkbox],th input[type=checkbox]{min-width:0}

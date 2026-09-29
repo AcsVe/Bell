@@ -8,24 +8,40 @@
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
 <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+<script>
+// Arabic-aware search text (used by page scripts): أ/إ/آ→ا, ة→ه, ى→ي, no diacritics or bidi marks.
+window.normText = (v) => String(v || '').toLowerCase()
+  .replace(/[\u064B-\u0652\u0640\u2066-\u2069]/g, '')
+  .replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/\s+/g, ' ').trim();
+</script>
 </head>
 <body>
 <header class="top">
-  <span class="brand">🔔 {{ L('جرس الحصص', 'School Bell') }}</span>
+  <a class="brand" href="{{ url_for('admin.dashboard') if session.admin_logged_in else '#' }}">🔔 {{ L('جرس الحصص', 'School Bell') }}</a>
   {% if session.admin_logged_in %}
-  <nav>
-    {% set ep = request.endpoint or '' %}
-    <a href="{{ url_for('admin.dashboard') }}" class="{{ 'on' if ep in ['admin.dashboard','admin.stage_view','admin.grade_view','admin.section_view'] }}">{{ L('المراحل والصفوف', 'Stages & grades') }}</a>
-    <a href="{{ url_for('admin.programs') }}" class="{{ 'on' if ep.startswith('admin.program') }}">{{ L('برامج الجرس', 'Bell programs') }}</a>
-    <a href="{{ url_for('admin.teachers') }}" class="{{ 'on' if ep in ['admin.teachers','admin.teacher_view'] }}">{{ L('المعلمون', 'Teachers') }}</a>
-    <a href="{{ url_for('admin.codes') }}" class="{{ 'on' if ep == 'admin.codes' }}">{{ L('الأكواد', 'Codes') }}</a>
-    <a href="{{ url_for('admin.settings') }}" class="{{ 'on' if ep == 'admin.settings' }}">{{ L('النغمة والأجهزة', 'Tone & devices') }}</a>
+  {% set ep = request.endpoint or '' %}
+  {% set nav = [
+      ('admin.dashboard', ['admin.dashboard','admin.stage_view','admin.grade_view','admin.section_view'], 'المراحل والصفوف', 'Stages & grades'),
+      ('admin.programs', ['admin.programs','admin.program_view','admin.programs_assign'], 'برامج الجرس', 'Bell programs'),
+      ('admin.teachers', ['admin.teachers','admin.teacher_view'], 'المعلمون', 'Teachers'),
+      ('admin.codes', ['admin.codes'], 'الأكواد', 'Codes'),
+      ('admin.settings', ['admin.settings'], 'النغمة والأجهزة', 'Tone & devices')] %}
+  {% set ns = namespace(cur=None) %}{% for item in nav if ep in item[1] %}{% set ns.cur = item %}{% endfor %}{% set current = ns.cur %}
+  <button type="button" class="menu-btn" aria-expanded="false" aria-controls="mainnav">
+    <span class="menu-current">{{ L(current[2], current[3]) if current else L('القائمة', 'Menu') }}</span> <span aria-hidden="true">☰</span>
+  </button>
+  <nav id="mainnav">
+    {% for endpoint, eps, ar, en in nav %}
+    <a href="{{ url_for(endpoint) }}" class="{{ 'on' if ep in eps }}"><span class="step">{{ loop.index }}</span>{{ L(ar, en) }}</a>
+    {% endfor %}
+    <span class="side">
+      <a href="{{ url_for('set_lang', code='en' if lang == 'ar' else 'ar', next=request.full_path) }}">{{ 'English' if lang == 'ar' else 'العربية' }}</a>
+      <a href="{{ url_for('admin.logout') }}">{{ L('خروج', 'Log out') }}</a>
+    </span>
   </nav>
+  {% else %}
+  <span class="side" style="margin-inline-start:auto"><a href="{{ url_for('set_lang', code='en' if lang == 'ar' else 'ar', next=request.full_path) }}">{{ 'English' if lang == 'ar' else 'العربية' }}</a></span>
   {% endif %}
-  <div class="side">
-    <a href="{{ url_for('set_lang', code='en' if lang == 'ar' else 'ar', next=request.full_path) }}">{{ 'English' if lang == 'ar' else 'العربية' }}</a>
-    {% if session.admin_logged_in %}<a href="{{ url_for('admin.logout') }}">{{ L('خروج', 'Log out') }}</a>{% endif %}
-  </div>
 </header>
 <main>
   {% with msgs = get_flashed_messages(with_categories=true) %}
@@ -34,6 +50,48 @@
   {% block content %}{% endblock %}
 </main>
 <script>
+// Phone menu
+(function () {
+  const b = document.querySelector('.menu-btn'), n = document.getElementById('mainnav');
+  if (!b || !n) return;
+  b.addEventListener('click', () => { const o = n.classList.toggle('open'); b.setAttribute('aria-expanded', o); });
+})();
+
+// Tabs inside a page: <nav class="tabbar"><a data-tab="x">…</a></nav> … <section class="tabpane" data-pane="x">.
+// The URL hash picks the tab (#x, or the id of anything inside a pane), so links and redirects land on the right tab.
+(function () {
+  const bar = document.querySelector('.tabbar[data-tabs]');
+  if (!bar) return;
+  const tabs = [...bar.querySelectorAll('[data-tab]')];
+  const panes = [...document.querySelectorAll('.tabpane[data-pane]')];
+  function show(name, push) {
+    if (!panes.some((p) => p.dataset.pane === name)) name = tabs[0].dataset.tab;
+    tabs.forEach((t) => t.classList.toggle('on', t.dataset.tab === name));
+    panes.forEach((p) => { p.hidden = p.dataset.pane !== name; });
+    if (push) history.replaceState(null, '', '#' + name);
+    const f = document.querySelector(`.tabpane[data-pane="${name}"] [data-autofocus]`);
+    if (f && window.matchMedia('(min-width: 700px)').matches) f.focus();
+  }
+  function fromHash() {
+    const h = decodeURIComponent(location.hash.slice(1));
+    if (!h) return tabs[0].dataset.tab;
+    if (panes.some((p) => p.dataset.pane === h)) return h;
+    const el = document.getElementById(h);
+    const pane = el && el.closest('.tabpane[data-pane]');
+    return pane ? pane.dataset.pane : tabs[0].dataset.tab;
+  }
+  tabs.forEach((t) => t.addEventListener('click', (e) => { e.preventDefault(); show(t.dataset.tab, true); }));
+  document.addEventListener('click', (e) => {            // any link to #tab-name switches tabs
+    const a = e.target.closest('a[href^="#"]');
+    if (a && panes.some((p) => p.dataset.pane === a.getAttribute('href').slice(1))) {
+      e.preventDefault(); show(a.getAttribute('href').slice(1), true); window.scrollTo({ top: 0 });
+    }
+  });
+  window.addEventListener('hashchange', () => show(fromHash()));
+  show(fromHash());
+})();
+
+
 // Copy-to-clipboard for any element with data-copy.
 document.addEventListener('click', async (e) => {
   const el = e.target.closest('[data-copy]');
