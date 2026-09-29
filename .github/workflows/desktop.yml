@@ -12,6 +12,7 @@ permissions:
 jobs:
   build:
     strategy:
+      fail-fast: false           # one OS failing doesn't cancel the other
       matrix:
         include:
           - os: windows-latest
@@ -30,9 +31,11 @@ jobs:
         env:
           BELL_SERVER: ${{ vars.BELL_SERVER }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # unsigned build
+        shell: bash
         run: |
-          npm ci
-          npm run ${{ matrix.script }}
+          # downloads (Electron, NSIS) occasionally time out on the runners: retry
+          for i in 1 2 3; do npm ci && npm run ${{ matrix.script }} && exit 0; echo "retry $i"; sleep 20; done
+          exit 1
       - uses: actions/upload-artifact@v4
         with:
           name: school-bell-${{ matrix.os }}
