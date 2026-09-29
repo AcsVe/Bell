@@ -393,7 +393,7 @@ def test_teacher_template_import_by_stage(admin, app):
 CSV_SAMPLE = ('\ufeff"Name","PrimarySmtpAddress","RecipientType"\n'
               '"amira.test","Amira.Test@school.example","UserMailbox"\n'
               '"esra\'a.thyab","esraa.t@school.example","UserMailbox"\n'
-              '"22eacba1-2740-4d98-a273-3332c7d9fb8b","Rasha.Ayyad@school.example","UserMailbox"\n'
+              '"22eacba1-2740-4d98-a273-3332c7d9fb8b","Rasha.AlAyyad@school.example","UserMailbox"\n'
               '"staff-group","staff@school.example","MailUniversalDistributionGroup"\n'
               '"shared.one","Shared.One@school.example","UserMailbox"\n')
 CSV_SAMPLE_2 = ('"Name","PrimarySmtpAddress","RecipientType"\n'
@@ -416,7 +416,7 @@ def test_members_csv_import_creates_stage_and_links(admin, app):
     with app.app_context():
         st1 = Stage.query.filter_by(name_ar='المرحلة الأساسية 1-3').one()
         names = sorted(l.teacher.name_ar for l in st1.teacher_links)
-        assert names == ["Amira Test", "Esra'a Thyab", 'Rasha Ayyad', 'Shared One']
+        assert names == ["Amira Test", "Esra'a Thyab", 'Rasha AlAyyad', 'Shared One']
         t = Teacher.query.filter_by(email='amira.test@school.example').one()
         assert len(t.code) == 6 and t.stages[0].id == st1.id
         sid1 = st1.id
@@ -428,6 +428,7 @@ def test_members_csv_import_creates_stage_and_links(admin, app):
         shared = Teacher.query.filter_by(email='shared.one@school.example').one()
         assert sorted(st.name_ar for st in shared.stages) == ['المرحلة الأساسية 1-3', 'المرحلة الثانوية']
         assert Teacher.query.filter_by(email='hebakhaled_sec@school.example').one().name_ar == 'Hebakhaled Sec'
+        assert Teacher.query.filter_by(email='rasha.alayyad@school.example').one().name_ar == 'Rasha AlAyyad'
         sid2 = Stage.query.filter_by(name_ar='المرحلة الثانوية').one().id
     # re-import is idempotent
     html = _csv_upload(admin, {'stage_id': sid1, 'file': (io.BytesIO(CSV_SAMPLE.encode()), 'g.csv')})

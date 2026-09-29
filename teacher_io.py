@@ -333,7 +333,7 @@ def import_members_csv(stage, fileobj, sync=False):
         alias = r[c_name] if c_name is not None and c_name < len(r) else ''
         t = by_email.get(email)
         if t is None:
-            name = display_name_from(alias, email)
+            name = display_name_from(alias, str(r[c_email]).strip())   # keep original casing
             t = Teacher(name_ar=name, name_en=name, email=email, code=generate_code())
             db.session.add(t)
             db.session.flush()
