@@ -6,6 +6,9 @@ on:
     branches: [main]
     paths: ['desktop/**', 'native/**', 'static/js/**', 'static/css/**', 'templates/display.html', '.github/workflows/desktop.yml']
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -34,3 +37,14 @@ jobs:
         with:
           name: school-bell-${{ matrix.os }}
           path: ${{ matrix.artifact }}
+      - name: Publish to the fixed download link
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          f=$(ls ${{ matrix.artifact }} | head -1)
+          ext="${f##*.}"
+          cp "$f" "school-bell-setup.$ext"
+          gh release view apps >/dev/null 2>&1 || gh release create apps --title "تطبيقات جرس الحصص" --notes "آخر نسخة من التطبيقات، تتحدث تلقائياً مع كل بناء." || true
+          gh release upload apps "school-bell-setup.$ext" --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

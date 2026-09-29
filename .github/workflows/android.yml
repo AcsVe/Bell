@@ -6,6 +6,9 @@ on:
     branches: [main]
     paths: ['mobile/**', 'native/**', 'static/js/**', 'static/css/**', 'templates/display.html', '.github/workflows/android.yml']
 
+permissions:
+  contents: write          # publish the APK to the "latest" release
+
 jobs:
   apk:
     runs-on: ubuntu-latest
@@ -32,3 +35,11 @@ jobs:
         with:
           name: school-bell-android
           path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Publish to the fixed download link
+        if: github.ref == 'refs/heads/main'
+        run: |
+          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk school-bell.apk
+          gh release view apps >/dev/null 2>&1 || gh release create apps --title "تطبيقات جرس الحصص" --notes "آخر نسخة من التطبيقات، تتحدث تلقائياً مع كل بناء."
+          gh release upload apps school-bell.apk --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
