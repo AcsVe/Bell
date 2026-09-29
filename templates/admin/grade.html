@@ -1,6 +1,7 @@
 {% extends 'admin/base.html' %}
 {% block title %}{{ L(g.name_ar, g.name_en or g.name_ar) }}{% endblock %}
 {% block content %}
+{% from 'admin/_bulk.html' import bulk_bar, bulk_all, bulk_item with context %}
 <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">{{ L('المراحل', 'Stages') }}</a> ›
   <a href="{{ url_for('admin.stage_view', stage_id=st.id) }}">{{ L(st.name_ar, st.name_en or st.name_ar) }}</a></div>
 <h1>{{ L(g.name_ar, g.name_en or g.name_ar) }}</h1>
@@ -17,11 +18,13 @@
 <div class="card" id="sections">
   <h2>{{ L('الشعب وأكوادها', 'Sections & codes') }}</h2>
   {% if g.sections %}
+  {{ bulk_bar('sections', [('regen', 'أكواد جديدة', 'New codes', true), ('delete', 'حذف', 'Delete', true)]) }}
   <table class="resp">
-    <thead><tr><th>{{ L('الشعبة', 'Section') }}</th><th>{{ L('كود الصف', 'Section code') }}</th><th>{{ L('المعلمون', 'Teachers') }}</th><th></th></tr></thead>
+    <thead><tr><th class="chk">{{ bulk_all('sections') }}</th><th>{{ L('الشعبة', 'Section') }}</th><th>{{ L('كود الصف', 'Section code') }}</th><th>{{ L('المعلمون', 'Teachers') }}</th><th></th></tr></thead>
     <tbody>
     {% for s in g.sections %}
-    <tr>
+    <tr data-row>
+      <td class="chk">{{ bulk_item('sections', s.id) }}</td>
       <td><a href="{{ url_for('admin.section_view', section_id=s.id) }}">{{ L(s.name_ar, s.name_en or s.name_ar) }}</a></td>
       <td><span class="code copy" data-copy="{{ s.code }}" title="{{ L('انسخ', 'Copy') }}">{{ s.code }}</span></td>
       <td class="small">{{ s.teacher_links|length }}</td>

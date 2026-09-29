@@ -76,10 +76,11 @@ def test_teacher_dropdown_inactive_after_link(admin, app):
         t = Teacher.query.filter_by(name_ar='أحمد').one().id
     admin.post(f'/admin/sections/{s1}/teachers/add', data={'teacher_id': t})
     admin.post(f'/admin/sections/{s1}/teachers/add', data={'teacher_id': t})   # duplicate ignored
+    pick = f'name="teacher_id" value="{t}"'
     html = admin.get(f'/admin/sections/{s1}').get_data(as_text=True)
-    assert f'value="{t}" disabled' in html
+    assert pick not in html and 'name="ids"' in html        # linked: listed for removal, not for adding
     html2 = admin.get(f'/admin/sections/{s2}').get_data(as_text=True)
-    assert f'value="{t}" disabled' not in html2 and f'value="{t}"' in html2
+    assert pick in html2
     with app.app_context():
         assert TeacherSection.query.count() == 1
 
@@ -660,3 +661,101 @@ def test_bidi_isolates_number_ranges(admin, app):
     admin.post(f'/admin/stages/{sid}/update', data={'name_ar': 'المرحلة الأساسية \u20661-3\u2069', 'active': '1'})
     with app.app_context():
         assert db.session.get(Stage, sid).name_ar == 'المرحلة الأساسية 1-3'
+
+
+def test_bulk_select_actions(admin, app):
+    from models import BellProgram, Device, TeacherStage
+    sid, gid = _setup_school(admin, app)
+    admin.post('/admin/teachers/add', data={'names': 'م1\nم2\nم3\nم4\nم5'})
+    with app.app_context():
+        tids = [t.id for t in Teacher.query.order_by(Teacher.id)]
+        secs = [x.id for x in Section.query.order_by(Section.id)]
+        old_codes = {t.id: t.code for t in Teacher.query.all()}
+    assert len(tids) == 7
+
+    # every list page shows select-all + per-row checkboxes
+    admin.post(f'/admin/teachers/{tids[0]}/sections/add', data={'section_id': secs[:1]})
+    admin.post(f'/admin/teachers/{tids[0]}/stages/add', data={'stage_id': [sid]})
+    admin.post(f'/admin/sections/{secs[0]}/teachers/add', data={'teacher_id': [tids[1]]})
+    for url in ['/admin/teachers', f'/admin/grades/{gid}', f'/admin/stages/{sid}', '/admin/',
+                f'/admin/sections/{secs[0]}', f'/admin/teachers/{tids[0]}']:
+        html = admin.get(url).get_data(as_text=True)
+        assert 'class="bulk-all"' in html and 'class="bulk-item"' in html, url
+
+    with app.app_context():
+        TeacherSection.query.delete(); TeacherStage.query.delete(); db.session.commit()
+    # link 3 teachers to a stage, then remove 2 of them
+    admin.post('/admin/bulk/teachers', data={'action': 'link_stage', 'stage_id': sid, 'ids': tids[:3]})
+    with app.app_context():
+        assert TeacherStage.query.filter_by(stage_id=sid).count() == 3
+    admin.post('/admin/bulk/teachers', data={'action': 'unlink_stage', 'stage_id': sid, 'ids': tids[:2]})
+    with app.app_context():
+        assert [l.teacher_id for l in TeacherStage.query.filter_by(stage_id=sid)] == [tids[2]]
+    # link_stage without choosing a stage does nothing
+    html = admin.post('/admin/bulk/teachers', data={'action': 'link_stage', 'ids': tids},
+                      follow_redirects=True).get_data(as_text=True)
+    assert 'اختر المرحلة' in html
+    # disable / enable / new codes
+    admin.post('/admin/bulk/teachers', data={'action': 'deactivate', 'ids': tids[3:5]})
+    with app.app_context():
+        assert [t.active for t in Teacher.query.order_by(Teacher.id)] == [True] * 3 + [False] * 2 + [True] * 2
+    admin.post('/admin/bulk/teachers', data={'action': 'activate', 'ids': tids[3:5]})
+    admin.post('/admin/bulk/teachers', data={'action': 'regen', 'ids': tids[:2]})
+    with app.app_context():
+        new = {t.id: t.code for t in Teacher.query.all()}
+        assert new[tids[0]] != old_codes[tids[0]] and new[tids[2]] == old_codes[tids[2]]
+        assert len(set(new.values())) == 7
+    # add many teachers to a section at once, remove many at once
+    admin.post(f'/admin/sections/{secs[0]}/teachers/add', data={'teacher_id': tids[:4]})
+    with app.app_context():
+        links = [l.id for l in TeacherSection.query.filter_by(section_id=secs[0])]
+        assert len(links) == 4
+    admin.post('/admin/bulk/section_links', data={'action': 'unlink', 'ids': links[:3]})
+    with app.app_context():
+        assert TeacherSection.query.filter_by(section_id=secs[0]).count() == 1
+    # add many sections to a teacher at once
+    admin.post(f'/admin/teachers/{tids[5]}/sections/add', data={'section_id': secs})
+    with app.app_context():
+        assert TeacherSection.query.filter_by(teacher_id=tids[5]).count() == 2
+    # delete selected teachers (with their links and devices)
+    with app.app_context():
+        db.session.add(Device(device_uid='d-t', code_type='teacher', owner_id=tids[5]))
+        db.session.commit()
+    html = admin.post('/admin/bulk/teachers', data={'action': 'delete', 'ids': tids[4:]},
+                      follow_redirects=True).get_data(as_text=True)
+    assert 'تم حذف 3' in html
+    with app.app_context():
+        assert Teacher.query.count() == 4 and Device.query.count() == 0
+        assert TeacherSection.query.filter(TeacherSection.teacher_id.in_(tids[4:])).count() == 0
+    # sections: new codes + delete
+    admin.post('/admin/bulk/sections', data={'action': 'delete', 'ids': secs})
+    with app.app_context():
+        assert Section.query.count() == 0
+    # grades, stages, programs, devices
+    admin.post('/admin/programs/add', data={'name': 'X'})
+    admin.post('/admin/programs/add', data={'name': 'Y'})
+    with app.app_context():
+        pids = [p.id for p in BellProgram.query.all()]
+        g2 = [g.id for g in Grade.query.all()]
+    admin.post('/admin/bulk/programs', data={'action': 'delete', 'ids': pids})
+    admin.post('/admin/bulk/grades', data={'action': 'delete', 'ids': g2})
+    with app.app_context():
+        assert BellProgram.query.count() == 0 and Grade.query.count() == 0
+        db.session.add_all([Device(device_uid='a'), Device(device_uid='b')]); db.session.commit()
+        dids = [d.id for d in Device.query.all()]
+    admin.post('/admin/programs/add', data={'name': 'Z'})
+    for url in ['/admin/programs', '/admin/settings']:
+        html = admin.get(url).get_data(as_text=True)
+        assert 'class="bulk-all"' in html and 'class="bulk-item"' in html, url
+    admin.post('/admin/bulk/devices', data={'action': 'delete', 'ids': dids})
+    r = admin.post('/admin/bulk/stages', data={'action': 'delete', 'ids': [sid]})
+    with app.app_context():
+        assert Device.query.count() == 0 and Stage.query.count() == 0
+        assert Teacher.query.count() == 4          # teachers survive a stage delete
+    # unknown entity / action / empty selection are harmless
+    assert admin.post('/admin/bulk/nope', data={'action': 'delete', 'ids': [1]}).status_code == 302
+    assert admin.post('/admin/bulk/teachers', data={'action': 'drop_db', 'ids': tids[:1]}).status_code == 302
+    html = admin.post('/admin/bulk/teachers', data={'action': 'delete'}, follow_redirects=True).get_data(as_text=True)
+    assert 'لم يُحدَّد شيء' in html
+    with app.app_context():
+        assert Teacher.query.count() == 4

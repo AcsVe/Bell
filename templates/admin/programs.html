@@ -1,6 +1,7 @@
 {% extends 'admin/base.html' %}
 {% block title %}{{ L('برامج الجرس', 'Bell programs') }}{% endblock %}
 {% block content %}
+{% from 'admin/_bulk.html' import bulk_bar, bulk_all, bulk_item with context %}
 <div class="row" style="align-items:center;margin-bottom:6px">
   <h1 style="margin:0">{{ L('برامج الجرس', 'Bell programs') }}</h1>
   <div class="shrink"><a class="btn" href="{{ url_for('admin.programs_assign') }}">{{ L('توزيع البرامج على الصفوف والأيام', 'Assign to grades & days') }}</a></div>
@@ -10,11 +11,13 @@
 
 <div class="card">
   {% if progs %}
+  {{ bulk_bar('programs', [('delete', 'حذف', 'Delete', true)]) }}
   <table class="resp">
-    <thead><tr><th>{{ L('البرنامج', 'Program') }}</th><th>{{ L('الدوام', 'Day') }}</th><th>{{ L('الحصص والفرص', 'Periods & breaks') }}</th><th>{{ L('مستخدم في', 'Used by') }}</th></tr></thead>
+    <thead><tr><th class="chk">{{ bulk_all('programs') }}</th><th>{{ L('البرنامج', 'Program') }}</th><th>{{ L('الدوام', 'Day') }}</th><th>{{ L('الحصص والفرص', 'Periods & breaks') }}</th><th>{{ L('مستخدم في', 'Used by') }}</th></tr></thead>
     <tbody>
     {% for p in progs %}
-    <tr>
+    <tr data-row>
+      <td class="chk">{{ bulk_item('programs', p.id) }}</td>
       <td><a href="{{ url_for('admin.program_view', program_id=p.id) }}"><b>{{ p.name }}</b></a></td>
       <td class="small" dir="ltr">{{ p.day_start }} – {{ p.day_end }}</td>
       <td class="small" style="white-space:nowrap">{% set ns = namespace(i=0) %}{% for q in p.periods %}{% if q.kind == 'class' %}{% set ns.i = ns.i + 1 %}{% endif %}<span class="chip {{ 'break' if q.kind=='break' }}" title="{{ q.start_time }} – {{ q.end_time }}">{{ L('فرصة', 'B') if q.kind=='break' else ns.i }}</span>{% endfor %}</td>

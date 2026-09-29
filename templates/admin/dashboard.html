@@ -1,5 +1,6 @@
 {% extends 'admin/base.html' %}
 {% block content %}
+{% from 'admin/_bulk.html' import bulk_bar, bulk_all, bulk_item with context %}
 <h1>{{ L('المراحل والصفوف', 'Stages & grades') }}</h1>
 
 <div class="grid" style="margin-bottom:18px">
@@ -8,9 +9,11 @@
   <div class="card"><div class="muted small">{{ L('الأجهزة المسجلة', 'Registered devices') }}</div><div class="stat">{{ stats.devices }}</div></div>
 </div>
 
+{% if stages %}{{ bulk_bar('stages', [('delete', 'حذف المراحل المحددة', 'Delete selected stages', true)]) }}{% endif %}
 <div class="grid">
 {% for st in stages %}
-  <div class="card">
+  <div class="card" data-row>
+    <span class="card-sel">{{ bulk_item('stages', st.id) }}</span>
     <div class="row" style="align-items:center">
       {% if st.logo %}<img class="thumb shrink" style="height:44px" src="{{ st.logo.url }}" alt="">{% endif %}
       <div>

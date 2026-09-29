@@ -1,6 +1,7 @@
 {% extends 'admin/base.html' %}
 {% block title %}{{ L('النغمة والأجهزة', 'Tone & devices') }}{% endblock %}
 {% block content %}
+{% from 'admin/_bulk.html' import bulk_bar, bulk_all, bulk_item with context %}
 <h1>{{ L('النغمة والأجهزة', 'Tone & devices') }}</h1>
 
 <div class="card">
@@ -20,18 +21,20 @@
 <div class="card">
   <h2>{{ L('الأجهزة المسجلة', 'Registered devices') }}</h2>
   <p class="muted small">{{ L('آخر مزامنة لكل جهاز. الشاشة الشغالة تتزامن كل 5 دقائق تقريباً عند توفر الإنترنت.', 'Last sync per device. A running screen syncs about every 5 minutes when online.') }}</p>
+  {% if devices %}{{ bulk_bar('devices', [('delete', 'حذف', 'Delete', true)]) }}{% endif %}
   <table class="resp">
-    <thead><tr><th>{{ L('مرتبط بـ', 'Linked to') }}</th><th>{{ L('النوع', 'Type') }}</th><th>{{ L('آخر مزامنة (UTC)', 'Last sync (UTC)') }}</th><th>{{ L('المتصفح', 'Browser') }}</th><th></th></tr></thead>
+    <thead><tr><th class="chk">{{ bulk_all('devices') }}</th><th>{{ L('مرتبط بـ', 'Linked to') }}</th><th>{{ L('النوع', 'Type') }}</th><th>{{ L('آخر مزامنة (UTC)', 'Last sync (UTC)') }}</th><th>{{ L('المتصفح', 'Browser') }}</th><th></th></tr></thead>
     <tbody>
     {% for d in devices %}
-    <tr>
+    <tr data-row>
+      <td class="chk">{{ bulk_item('devices', d.id) }}</td>
       <td>{{ owners[d.id] }}</td>
       <td>{{ L('شاشة صف', 'Classroom') if d.code_type == 'section' else L('معلم', 'Teacher') }}</td>
       <td class="small" dir="ltr">{{ d.last_sync.strftime('%Y-%m-%d %H:%M') if d.last_sync }}</td>
       <td class="small muted" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ d.user_agent }}</td>
       <td><form method="post" action="{{ url_for('admin.device_delete', device_id=d.id) }}" class="inline"><button class="danger sm">✕</button></form></td>
     </tr>
-    {% else %}<tr><td class="muted" colspan="5">{{ L('لا توجد أجهزة بعد.', 'No devices yet.') }}</td></tr>{% endfor %}
+    {% else %}<tr><td class="muted" colspan="6">{{ L('لا توجد أجهزة بعد.', 'No devices yet.') }}</td></tr>{% endfor %}
     </tbody>
   </table>
 </div>

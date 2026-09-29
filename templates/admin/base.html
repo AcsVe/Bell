@@ -47,8 +47,64 @@ document.addEventListener('click', async (e) => {
 // Confirm destructive actions.
 document.addEventListener('submit', (e) => {
   const msg = e.target.dataset.confirm;
-  if (msg && !confirm(msg)) e.preventDefault();
+  if (msg && !confirm(msg)) { e.preventDefault(); return; }
+  const btn = e.submitter;
+  if (btn && btn.dataset.confirmBulk) {
+    const n = document.querySelectorAll(`.bulk-item[data-bulk="${e.target.dataset.bulk}"]:checked`).length;
+    if (!confirm(btn.dataset.confirmBulk.replace('{n}', n))) e.preventDefault();
+  }
 });
+
+// Bulk selection: "select all" acts on visible rows only (after search/filter).
+(function () {
+  const rowOf = (el) => el.closest('[data-row]') || el.closest('tr') || el;
+  const visible = (el) => !rowOf(el).hidden && rowOf(el).offsetParent !== null;
+  function refresh(key) {
+    const items = [...document.querySelectorAll(`.bulk-item[data-bulk="${key}"]`)];
+    const vis = items.filter(visible);
+    const sel = items.filter((i) => i.checked);
+    document.querySelectorAll(`.bulk-all[data-bulk="${key}"]`).forEach((a) => {
+      const vsel = vis.filter((i) => i.checked).length;
+      a.checked = vis.length > 0 && vsel === vis.length;
+      a.indeterminate = vsel > 0 && vsel < vis.length;
+    });
+    document.querySelectorAll(`.bulk-count[data-bulk="${key}"]`).forEach((c) => {
+      c.textContent = sel.length ? `{{ L('محدد', 'Selected') }}: ${sel.length}` : `{{ L('لم يُحدَّد شيء', 'Nothing selected') }}`;
+    });
+    const bar = document.querySelector(`.bulk-bar[data-bulk="${key}"]`);
+    if (bar) {
+      bar.classList.toggle('active', sel.length > 0);
+      bar.querySelectorAll('button[name=action]').forEach((b) => { b.disabled = sel.length === 0; });
+    }
+    items.forEach((i) => rowOf(i).classList.toggle('selected', i.checked));
+  }
+  document.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.classList.contains('bulk-all')) {
+      document.querySelectorAll(`.bulk-item[data-bulk="${t.dataset.bulk}"]`).forEach((i) => {
+        if (visible(i)) i.checked = t.checked;
+      });
+      refresh(t.dataset.bulk);
+    } else if (t.classList.contains('bulk-item')) {
+      refresh(t.dataset.bulk);
+    }
+  });
+  // Shift-click selects a range.
+  let last = null;
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+    if (!t.classList || !t.classList.contains('bulk-item')) return;
+    if (e.shiftKey && last && last.dataset.bulk === t.dataset.bulk) {
+      const items = [...document.querySelectorAll(`.bulk-item[data-bulk="${t.dataset.bulk}"]`)].filter(visible);
+      const [a, b] = [items.indexOf(last), items.indexOf(t)].sort((x, y) => x - y);
+      items.slice(a, b + 1).forEach((i) => { i.checked = t.checked; });
+      refresh(t.dataset.bulk);
+    }
+    last = t;
+  });
+  window.bulkRefresh = refresh;
+  document.querySelectorAll('.bulk-bar').forEach((b) => refresh(b.dataset.bulk));
+})();
 </script>
 </body>
 </html>

@@ -1,0 +1,66 @@
+{#
+  Bulk selection for any list.
+    {% from 'admin/_bulk.html' import bulk_bar, bulk_all, bulk_item %}
+    {{ bulk_all('teachers') }}                  ← header "select all" (visible rows only)
+    {{ bulk_item('teachers', t.id) }}            ← one per row; the row element has data-row
+    {{ bulk_bar('teachers', [('delete', 'حذف', 'Delete', true), …]) }}
+  Checkboxes point at the bar's form with the HTML `form` attribute, so rows
+  may contain their own forms (no nesting).
+#}
+{% macro bulk_all(key) -%}
+<input type="checkbox" class="bulk-all" data-bulk="{{ key }}" title="{{ L('تحديد الكل', 'Select all') }}" aria-label="{{ L('تحديد الكل', 'Select all') }}">
+{%- endmacro %}
+
+{% macro bulk_item(key, id) -%}
+<input type="checkbox" class="bulk-item" data-bulk="{{ key }}" name="ids" value="{{ id }}" form="bulk-{{ key }}" aria-label="{{ L('تحديد', 'Select') }}">
+{%- endmacro %}
+
+{#- actions: list of (value, label_ar, label_en, danger[, extra_html]) -#}
+{% macro bulk_bar(key, actions, entity=None) -%}
+<form id="bulk-{{ key }}" class="bulk-bar" data-bulk="{{ key }}" method="post" action="{{ url_for('admin.bulk', entity=entity or key) }}">
+  <label class="bulk-sel"><input type="checkbox" class="bulk-all" data-bulk="{{ key }}"> {{ L('تحديد الكل', 'Select all') }}</label>
+  <span class="bulk-count" data-bulk="{{ key }}">{{ L('لم يُحدَّد شيء', 'Nothing selected') }}</span>
+  <span class="bulk-actions">
+  {% for a in actions %}
+    {% if a|length > 4 and a[4] %}{{ a[4]|safe }}{% endif %}
+    <button type="submit" name="action" value="{{ a[0] }}" class="sm {{ 'danger' if a[3] else 'ghost' }}" disabled
+            data-confirm-bulk="{{ L(a[1] ~ ' {n} عنصر؟', a[2] ~ ' {n} item(s)?') if a[3] else '' }}">{{ L(a[1], a[2]) }}</button>
+  {% endfor %}
+  </span>
+</form>
+{%- endmacro %}
+
+{#- Checkbox picker to ADD many items at once, with search, filter and select-all.
+    items: list of dicts {id, label, sub, tags}; filters: list of (tag, label) -#}
+{% macro picker(key, action_url, field, items, button_ar, button_en, filters=[]) -%}
+<form id="bulk-{{ key }}" class="bulk-bar" data-bulk="{{ key }}" method="post" action="{{ action_url }}" style="position:static">
+  <label class="bulk-sel"><input type="checkbox" class="bulk-all" data-bulk="{{ key }}"> {{ L('تحديد الكل', 'Select all') }}</label>
+  <span class="bulk-count" data-bulk="{{ key }}"></span>
+  <span class="bulk-actions"><button type="submit" name="action" value="add" class="sm" disabled>{{ L(button_ar, button_en) }}</button></span>
+</form>
+<div class="filters">
+  <input type="search" data-pick-q="{{ key }}" placeholder="{{ L('بحث…', 'Search…') }}">
+  {% if filters %}<select data-pick-f="{{ key }}"><option value="">{{ L('الكل', 'All') }}</option>{% for v, lab in filters %}<option value="{{ v }}">{{ lab }}</option>{% endfor %}</select>{% endif %}
+</div>
+<div class="pick-list" data-pick="{{ key }}">
+  {% for it in items %}
+  <label class="pick-item" data-row data-tags=" {{ it.tags|join(' ') }} " data-q="{{ (it.label ~ ' ' ~ (it.sub or ''))|lower }}">
+    <input type="checkbox" class="bulk-item" data-bulk="{{ key }}" name="{{ field }}" value="{{ it.id }}" form="bulk-{{ key }}">
+    <span>{{ it.label }}{% if it.sub %} <span class="muted small">{{ it.sub }}</span>{% endif %}</span>
+  </label>
+  {% else %}<p class="muted small">{{ L('لا يوجد ما يمكن إضافته.', 'Nothing left to add.') }}</p>{% endfor %}
+</div>
+<script>
+(function () {
+  const key = {{ key|tojson }};
+  const q = document.querySelector(`[data-pick-q="${key}"]`), f = document.querySelector(`[data-pick-f="${key}"]`);
+  const rows = [...document.querySelectorAll(`[data-pick="${key}"] [data-row]`)];
+  function apply() {
+    const text = q.value.trim().toLowerCase(), tag = f ? f.value : '';
+    rows.forEach((r) => { r.hidden = !((!text || r.dataset.q.includes(text)) && (!tag || r.dataset.tags.includes(' ' + tag + ' '))); });
+    window.bulkRefresh && window.bulkRefresh(key);
+  }
+  q.addEventListener('input', apply); if (f) f.addEventListener('change', apply);
+})();
+</script>
+{%- endmacro %}

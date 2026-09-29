@@ -384,7 +384,8 @@ def section_view(section_id):
     linked_ids = {l.teacher_id for l in s.teacher_links}
     teachers = Teacher.query.order_by(Teacher.name_ar).all()
     devices = Device.query.filter_by(code_type='section', owner_id=s.id).all()
-    return render_template('admin/section.html', s=s, teachers=teachers,
+    all_stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
+    return render_template('admin/section.html', s=s, teachers=teachers, all_stages=all_stages,
                            linked_ids=linked_ids, devices=devices)
 
 
@@ -427,11 +428,13 @@ def section_delete(section_id):
 @login_required
 def section_teacher_add(section_id):
     s = db.get_or_404(Section, section_id)
-    tid = request.form.get('teacher_id', type=int)
-    if tid and db.session.get(Teacher, tid) and not TeacherSection.query.filter_by(
-            teacher_id=tid, section_id=s.id).first():
-        db.session.add(TeacherSection(teacher_id=tid, section_id=s.id))
-        db.session.commit()
+    have = {l.teacher_id for l in s.teacher_links}
+    ids = {int(i) for i in request.form.getlist('teacher_id') if str(i).isdigit()} - have
+    for t in Teacher.query.filter(Teacher.id.in_(ids)).all() if ids else []:
+        db.session.add(TeacherSection(teacher_id=t.id, section_id=s.id))
+    db.session.commit()
+    if ids:
+        flash(_msg(f'تم ربط {len(ids)} معلم', f'{len(ids)} teacher(s) linked'), 'ok')
     return redirect(url_for('admin.section_view', section_id=s.id))
 
 
@@ -522,11 +525,11 @@ def teachers_import_members():
 @login_required
 def teacher_stage_add(teacher_id):
     t = db.get_or_404(Teacher, teacher_id)
-    sid = request.form.get('stage_id', type=int)
-    if sid and db.session.get(Stage, sid) and not TeacherStage.query.filter_by(
-            teacher_id=t.id, stage_id=sid).first():
-        db.session.add(TeacherStage(teacher_id=t.id, stage_id=sid))
-        db.session.commit()
+    have = {l.stage_id for l in t.stage_links}
+    ids = {int(i) for i in request.form.getlist('stage_id') if str(i).isdigit()} - have
+    for st in Stage.query.filter(Stage.id.in_(ids)).all() if ids else []:
+        db.session.add(TeacherStage(teacher_id=t.id, stage_id=st.id))
+    db.session.commit()
     return redirect(url_for('admin.teacher_view', teacher_id=t.id))
 
 
@@ -615,11 +618,13 @@ def teacher_update(teacher_id):
 @login_required
 def teacher_section_add(teacher_id):
     t = db.get_or_404(Teacher, teacher_id)
-    sid = request.form.get('section_id', type=int)
-    if sid and db.session.get(Section, sid) and not TeacherSection.query.filter_by(
-            teacher_id=t.id, section_id=sid).first():
-        db.session.add(TeacherSection(teacher_id=t.id, section_id=sid))
-        db.session.commit()
+    have = {l.section_id for l in t.section_links}
+    ids = {int(i) for i in request.form.getlist('section_id') if str(i).isdigit()} - have
+    for sec in Section.query.filter(Section.id.in_(ids)).all() if ids else []:
+        db.session.add(TeacherSection(teacher_id=t.id, section_id=sec.id))
+    db.session.commit()
+    if ids:
+        flash(_msg(f'تم ربط {len(ids)} شعبة', f'{len(ids)} section(s) linked'), 'ok')
     return redirect(url_for('admin.teacher_view', teacher_id=t.id))
 
 
@@ -824,6 +829,101 @@ def programs_import():
     for w in r['warnings'][:5]:
         flash(w, 'error')
     return redirect(url_for('admin.programs'))
+
+
+# ── Bulk actions (checkbox selection on every list) ───────────────────────
+def _delete_stage(st):
+    for m in (st.logo, st.background):
+        if m:
+            db.session.delete(m)
+    for g in st.grades:
+        _delete_grade_children(g)
+    db.session.delete(st)
+
+
+def _delete_grade(g):
+    _delete_grade_children(g)
+    db.session.delete(g)
+
+
+def _delete_section(sec):
+    Device.query.filter_by(code_type='section', owner_id=sec.id).delete()
+    db.session.delete(sec)
+
+
+def _delete_teacher(t):
+    Device.query.filter_by(code_type='teacher', owner_id=t.id).delete()
+    db.session.delete(t)
+
+
+BULK = {
+    # entity: (model, {action: handler(obj)})
+    'teachers': (Teacher, {
+        'delete': _delete_teacher,
+        'deactivate': lambda t: setattr(t, 'active', False),
+        'activate': lambda t: setattr(t, 'active', True),
+        'regen': lambda t: (setattr(t, 'code', generate_code()),
+                            Device.query.filter_by(code_type='teacher', owner_id=t.id).delete(),
+                            db.session.flush()),
+    }),
+    'sections': (Section, {
+        'delete': _delete_section,
+        'regen': lambda sec: (setattr(sec, 'code', generate_code()),
+                              Device.query.filter_by(code_type='section', owner_id=sec.id).delete(),
+                              db.session.flush()),
+    }),
+    'grades': (Grade, {'delete': _delete_grade}),
+    'stages': (Stage, {'delete': _delete_stage}),
+    'programs': (BellProgram, {'delete': db.session.delete}),
+    'devices': (Device, {'delete': db.session.delete}),
+    'section_links': (TeacherSection, {'unlink': db.session.delete}),
+    'stage_links': (TeacherStage, {'unlink': db.session.delete}),
+}
+BULK_DONE = {
+    'delete': ('تم حذف {n}', '{n} deleted'), 'unlink': ('تمت إزالة {n}', '{n} removed'), 'deactivate': ('تم إيقاف {n}', '{n} disabled'),
+    'activate': ('تم تفعيل {n}', '{n} enabled'), 'regen': ('تم توليد أكواد جديدة لـ {n}', 'New codes for {n}'),
+    'link_stage': ('تم ربط {n} بالمرحلة', '{n} linked to the stage'),
+    'unlink_stage': ('تمت إزالة {n} من المرحلة', '{n} removed from the stage'),
+}
+
+
+@admin_bp.route('/bulk/<entity>', methods=['POST'])
+@login_required
+def bulk(entity):
+    back = request.referrer or url_for('admin.dashboard')
+    if entity not in BULK:
+        return redirect(back)
+    model, actions = BULK[entity]
+    action = request.form.get('action', '')
+    ids = {int(i) for i in request.form.getlist('ids') if str(i).isdigit()}
+    objs = model.query.filter(model.id.in_(ids)).all() if ids else []
+    if not objs:
+        flash(_msg('لم يُحدَّد شيء', 'Nothing selected'), 'error')
+        return redirect(back)
+    if entity == 'teachers' and action in ('link_stage', 'unlink_stage'):
+        st = db.session.get(Stage, request.form.get('stage_id', type=int) or 0)
+        if st is None:
+            flash(_msg('اختر المرحلة', 'Choose the stage'), 'error')
+            return redirect(back)
+        for t in objs:
+            link = next((l for l in t.stage_links if l.stage_id == st.id), None)
+            if action == 'link_stage' and link is None:
+                db.session.add(TeacherStage(teacher_id=t.id, stage_id=st.id))
+            elif action == 'unlink_stage' and link is not None:
+                db.session.delete(link)
+    elif action in actions:
+        for o in objs:
+            actions[action](o)
+    else:
+        return redirect(back)
+    db.session.commit()
+    ar, en = BULK_DONE.get(action, ('تم ({n})', 'Done ({n})'))
+    flash(_msg(ar.format(n=len(objs)), en.format(n=len(objs))), 'ok')
+    # A deleted object's own page no longer exists.
+    if action == 'delete' and entity in ('stages', 'grades') and '/admin/' in back:
+        if entity == 'stages' and '/stages/' in back:
+            back = url_for('admin.dashboard')
+    return redirect(back)
 
 
 # ── Codes overview ────────────────────────────────────────────────────────

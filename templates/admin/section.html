@@ -1,6 +1,7 @@
 {% extends 'admin/base.html' %}
 {% block title %}{{ s.full_name(lang) }}{% endblock %}
 {% block content %}
+{% from 'admin/_bulk.html' import bulk_bar, bulk_all, bulk_item, picker with context %}
 {% set g = s.grade %}{% set st = g.stage %}
 <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">{{ L('المراحل', 'Stages') }}</a> ›
   <a href="{{ url_for('admin.stage_view', stage_id=st.id) }}">{{ L(st.name_ar, st.name_en or st.name_ar) }}</a> ›
@@ -20,28 +21,33 @@
 </div>
 
 <div class="card">
-  <h2>{{ L('المعلمون المرتبطون بهذه الشعبة', 'Teachers linked to this section') }}</h2>
-  <form method="post" action="{{ url_for('admin.section_teacher_add', section_id=s.id) }}" class="row">
-    <div>
-      <select name="teacher_id" required>
-        <option value="">{{ L('— اختر معلماً —', '— choose a teacher —') }}</option>
-        {% for t in teachers %}
-        <option value="{{ t.id }}" {{ 'disabled' if t.id in linked_ids }}>{{ L(t.name_ar, t.name_en or t.name_ar) }}{{ L(' (مضاف)', ' (added)') if t.id in linked_ids }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="shrink"><button>{{ L('ربط', 'Link') }}</button></div>
-  </form>
-  {% if not teachers %}<p class="muted small">{{ L('أضف المعلمين من صفحة', 'Add teachers from the') }} <a href="{{ url_for('admin.teachers') }}">{{ L('المعلمون', 'Teachers page') }}</a>.</p>{% endif %}
-  <table style="margin-top:12px">
-    {% for l in s.teacher_links %}
-    <tr>
+  <h2>{{ L('المعلمون المرتبطون بهذه الشعبة', 'Teachers linked to this section') }} <span class="muted small">({{ s.teacher_links|length }})</span></h2>
+  {% set st_links = s.grade.stage.teacher_links %}
+  {% if st_links %}<p class="muted small">{{ L('إضافة إلى ذلك، يستقبل تنبيهات هذه الشعبة كل معلمي المرحلة كاملة', 'In addition, all whole-stage teachers receive this section’s alerts') }}: {{ st_links|length }}</p>{% endif %}
+  {% if s.teacher_links %}
+  {{ bulk_bar('section_links', [('unlink', 'إزالة من الشعبة', 'Remove from section', true)]) }}
+  <table>
+    <thead><tr><th class="chk">{{ bulk_all('section_links') }}</th><th>{{ L('المعلم', 'Teacher') }}</th><th>{{ L('الكود', 'Code') }}</th></tr></thead>
+    <tbody>
+    {% for l in s.teacher_links|sort(attribute='teacher.name_ar') %}
+    <tr data-row><td class="chk">{{ bulk_item('section_links', l.id) }}</td>
       <td><a href="{{ url_for('admin.teacher_view', teacher_id=l.teacher.id) }}">{{ L(l.teacher.name_ar, l.teacher.name_en or l.teacher.name_ar) }}</a></td>
-      <td><span class="code" style="font-size:14px">{{ l.teacher.code }}</span></td>
-      <td style="text-align:end"><form method="post" action="{{ url_for('admin.link_delete', link_id=l.id) }}" class="inline"><button class="danger sm">{{ L('إزالة', 'Remove') }}</button></form></td>
-    </tr>
-    {% else %}<tr><td class="muted">{{ L('لا يوجد معلمون مرتبطون بعد.', 'No teachers linked yet.') }}</td></tr>{% endfor %}
+      <td><span class="code" style="font-size:14px">{{ l.teacher.code }}</span></td></tr>
+    {% endfor %}
+    </tbody>
   </table>
+  {% else %}<p class="muted">{{ L('لا يوجد معلمون مرتبطون بهذه الشعبة تحديداً.', 'No teachers linked to this section specifically.') }}</p>{% endif %}
+</div>
+
+<div class="card">
+  <h2>{{ L('إضافة معلمين للشعبة', 'Add teachers to the section') }}</h2>
+  {% set items = [] %}
+  {% for t in teachers if t.id not in linked_ids %}
+    {% set tags = [] %}{% for st in t.stages %}{% set _ = tags.append('s' ~ st.id) %}{% endfor %}
+    {% set _ = items.append({'id': t.id, 'label': L(t.name_ar, t.name_en or t.name_ar), 'sub': t.email or '', 'tags': tags}) %}
+  {% endfor %}
+  {% set fl = [] %}{% for st in all_stages %}{% set _ = fl.append(('s' ~ st.id, st.name_ar)) %}{% endfor %}
+  {{ picker('pick-teachers', url_for('admin.section_teacher_add', section_id=s.id), 'teacher_id', items, 'ربط المحددين', 'Link selected', fl) }}
 </div>
 
 <div class="card">

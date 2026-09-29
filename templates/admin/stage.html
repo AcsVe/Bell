@@ -1,6 +1,7 @@
 {% extends 'admin/base.html' %}
 {% block title %}{{ L(st.name_ar, st.name_en or st.name_ar) }}{% endblock %}
 {% block content %}
+{% from 'admin/_bulk.html' import bulk_bar, bulk_all, bulk_item with context %}
 <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">{{ L('المراحل', 'Stages') }}</a></div>
 <h1>{{ L(st.name_ar, st.name_en or st.name_ar) }}</h1>
 
@@ -136,12 +137,19 @@
 
 <div class="card" id="grades">
   <h2>{{ L('الصفوف', 'Grades') }}</h2>
-  <div class="list-links">
+  {% if st.grades %}
+  {{ bulk_bar('grades', [('delete', 'حذف', 'Delete', true)]) }}
+  <table>
+    <thead><tr><th class="chk">{{ bulk_all('grades') }}</th><th>{{ L('الصف', 'Grade') }}</th><th>{{ L('الشعب', 'Sections') }}</th></tr></thead>
+    <tbody>
     {% for g in st.grades %}
-    <a href="{{ url_for('admin.grade_view', grade_id=g.id) }}">{{ L(g.name_ar, g.name_en or g.name_ar) }}
-      <span class="muted small">· {{ g.sections|length }} {{ L('شعبة', 'sections') }}</span></a>
-    {% else %}<p class="muted">{{ L('لا توجد صفوف بعد.', 'No grades yet.') }}</p>{% endfor %}
-  </div>
+    <tr data-row><td class="chk">{{ bulk_item('grades', g.id) }}</td>
+      <td><a href="{{ url_for('admin.grade_view', grade_id=g.id) }}">{{ L(g.name_ar, g.name_en or g.name_ar) }}</a></td>
+      <td class="small">{% for sec in g.sections %}<span class="chip">{{ sec.name_ar }}</span>{% else %}<span class="muted">—</span>{% endfor %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">{{ L('لا توجد صفوف بعد.', 'No grades yet.') }}</p>{% endif %}
   <form method="post" action="{{ url_for('admin.grade_add', stage_id=st.id) }}" class="row" style="margin-top:12px">
     <div><label>{{ L('أسماء الصفوف (افصل بفاصلة لإضافة عدة صفوف)', 'Grade names (comma-separate to add several)') }}</label>
       <input type="text" name="names" placeholder="الصف الأول، الصف الثاني، الصف الثالث" required></div>
