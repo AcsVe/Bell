@@ -4,7 +4,8 @@ from flask import (Blueprint, current_app, flash, redirect, render_template, req
                    send_file, session, url_for)
 
 from models import (db, AppSetting, Device, Grade, GradePeriodTime, MediaFile, Period,
-                    Section, Stage, StageDayPeriodTime, StageWeekday, Teacher, TeacherSection)
+                    Section, Stage, StageDayPeriodTime, StageWeekday, Teacher, TeacherSection,
+                    TeacherStage)
 from services import (WEEK_ORDER, bump_schedule_version, chain_times, default_period_labels,
                       generate_code, minutes_between, parse_duration, rechain_stage,
                       resolve_grade_day, valid_time, weekday_names)
@@ -92,6 +93,15 @@ def dashboard():
     return render_template('admin/dashboard.html', stages=stages, stats=stats)
 
 
+def _create_stage(name_ar, name_en=None):
+    st = Stage(name_ar=name_ar, name_en=name_en, sort_order=Stage.query.count())
+    db.session.add(st)
+    db.session.flush()
+    for wd in (6, 0, 1, 2, 3):   # default week: Sunday → Thursday
+        db.session.add(StageWeekday(stage_id=st.id, weekday=wd))
+    return st
+
+
 @admin_bp.route('/stages/add', methods=['POST'])
 @login_required
 def stage_add():
@@ -99,12 +109,7 @@ def stage_add():
     if not name_ar:
         flash(_msg('اسم المرحلة مطلوب', 'Stage name is required'), 'error')
         return redirect(url_for('admin.dashboard'))
-    st = Stage(name_ar=name_ar, name_en=_form_text('name_en') or None,
-               sort_order=Stage.query.count())
-    db.session.add(st)
-    db.session.flush()
-    for wd in (6, 0, 1, 2, 3):   # default week: Sunday → Thursday
-        db.session.add(StageWeekday(stage_id=st.id, weekday=wd))
+    st = _create_stage(name_ar, _form_text('name_en') or None)
     db.session.commit()
     return redirect(url_for('admin.stage_view', stage_id=st.id))
 
@@ -466,6 +471,71 @@ def teachers_codes_export(stage_id):
                      download_name=f'أكواد {st.name_ar}.xlsx')
 
 
+@admin_bp.route('/teachers/import-members', methods=['POST'])
+@login_required
+def teachers_import_members():
+    """Microsoft 365 group member export (CSV) → teachers linked to the whole stage."""
+    from teacher_io import import_members_csv
+    back = url_for('admin.teachers') + '#members'
+    f = request.files.get('file')
+    if not f or not f.filename:
+        flash(_msg('اختر ملف CSV أولاً', 'Choose the CSV file first'), 'error')
+        return redirect(back)
+    choice = request.form.get('stage_id', '')
+    if choice == 'new':
+        name = _form_text('new_stage')
+        if not name:
+            flash(_msg('اكتب اسم المرحلة الجديدة', 'Enter the new stage name'), 'error')
+            return redirect(back)
+        st = Stage.query.filter_by(name_ar=name).first()
+        if st is None:
+            st = _create_stage(name)
+            db.session.commit()          # the stage stays even if the file turns out empty
+            flash(_msg(f'تم إنشاء {name}', f'Created {name}'), 'ok')
+    else:
+        st = db.session.get(Stage, int(choice)) if choice.isdigit() else None
+        if st is None:
+            flash(_msg('اختر المرحلة', 'Choose the stage'), 'error')
+            return redirect(back)
+    try:
+        r = import_members_csv(st, f.stream, sync=bool(request.form.get('sync')))
+    except ValueError as e:
+        db.session.rollback()
+        flash(str(e), 'error')
+        return redirect(back)
+    parts = [_msg(f'{st.name_ar}: {len(r["teachers"])} معلم في الملف',
+                  f'{st.name_en or st.name_ar}: {len(r["teachers"])} teachers in file'),
+             _msg(f'جديد {r["created"]}', f'{r["created"]} new'),
+             _msg(f'ربط بالمرحلة {r["linked"]}', f'{r["linked"]} linked to stage')]
+    if r['unlinked']:
+        parts.append(_msg(f'إزالة {r["unlinked"]} لم يعودوا في المجموعة', f'{r["unlinked"]} no longer in group removed'))
+    if r['skipped']:
+        parts.append(_msg(f'تجاهل {r["skipped"]} (ليس بريد مستخدم)', f'{r["skipped"]} skipped (not a user mailbox)'))
+    flash(' · '.join(parts), 'ok')
+    return redirect(back)
+
+
+@admin_bp.route('/teachers/<int:teacher_id>/stages/add', methods=['POST'])
+@login_required
+def teacher_stage_add(teacher_id):
+    t = db.get_or_404(Teacher, teacher_id)
+    sid = request.form.get('stage_id', type=int)
+    if sid and db.session.get(Stage, sid) and not TeacherStage.query.filter_by(
+            teacher_id=t.id, stage_id=sid).first():
+        db.session.add(TeacherStage(teacher_id=t.id, stage_id=sid))
+        db.session.commit()
+    return redirect(url_for('admin.teacher_view', teacher_id=t.id))
+
+
+@admin_bp.route('/stage-links/<int:link_id>/delete', methods=['POST'])
+@login_required
+def stage_link_delete(link_id):
+    l = db.get_or_404(TeacherStage, link_id)
+    db.session.delete(l)
+    db.session.commit()
+    return redirect(request.referrer or url_for('admin.teachers'))
+
+
 @admin_bp.route('/teachers/import', methods=['POST'])
 @login_required
 def teachers_import():
@@ -516,8 +586,9 @@ def teacher_view(teacher_id):
     linked = {l.section_id: l for l in t.section_links}
     stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
     devices = Device.query.filter_by(code_type='teacher', owner_id=t.id).all()
+    stage_linked = {l.stage_id: l for l in t.stage_links}
     return render_template('admin/teacher.html', t=t, linked=linked, stages=stages,
-                           devices=devices)
+                           devices=devices, stage_linked=stage_linked)
 
 
 @admin_bp.route('/teachers/<int:teacher_id>/update', methods=['POST'])
@@ -527,6 +598,11 @@ def teacher_update(teacher_id):
     t.name_ar = _form_text('name_ar') or t.name_ar
     t.name_en = _form_text('name_en') or None
     t.active = bool(request.form.get('active'))
+    email = _form_text('email').lower() or None
+    if email and Teacher.query.filter(Teacher.email == email, Teacher.id != t.id).first():
+        flash(_msg('هذا البريد مستخدم لمعلم آخر', 'This email belongs to another teacher'), 'error')
+        return redirect(url_for('admin.teacher_view', teacher_id=t.id))
+    t.email = email
     db.session.commit()
     flash(_msg('تم الحفظ', 'Saved'), 'ok')
     return redirect(url_for('admin.teacher_view', teacher_id=t.id))

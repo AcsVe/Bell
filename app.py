@@ -4,7 +4,7 @@ from datetime import timedelta
 from flask import (Flask, Response, abort, redirect, request, send_from_directory,
                    session, url_for)
 
-from models import db, MediaFile
+from models import db, MediaFile, ensure_schema
 
 
 def normalize_db_url(url):
@@ -50,6 +50,7 @@ def create_app(test_config=None):
 
     with app.app_context():
         db.create_all()
+        ensure_schema()
 
     @app.context_processor
     def inject_lang():

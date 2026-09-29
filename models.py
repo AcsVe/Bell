@@ -51,6 +51,7 @@ class Stage(db.Model):
     day_times  = db.relationship('StageDayPeriodTime', backref='stage', cascade='all, delete-orphan')
     grades     = db.relationship('Grade', backref='stage', cascade='all, delete-orphan',
                                  order_by='Grade.sort_order')
+    teacher_links = db.relationship('TeacherStage', backref='stage', cascade='all, delete-orphan')
 
     @property
     def weekday_list(self):
@@ -153,13 +154,30 @@ class Teacher(db.Model):
     name_en = db.Column(db.String(200))
     active  = db.Column(db.Boolean, default=True)
     code    = db.Column(db.String(12), unique=True, nullable=False)
+    # School email (lower-case). Matches the same person across imports and stages.
+    email   = db.Column(db.String(255), unique=True)
 
     section_links = db.relationship('TeacherSection', backref='teacher', cascade='all, delete-orphan')
+    stage_links   = db.relationship('TeacherStage', backref='teacher', cascade='all, delete-orphan')
 
     @property
     def sections(self):
         return sorted((l.section for l in self.section_links),
                       key=lambda s: (s.grade.stage.sort_order, s.grade.sort_order, s.sort_order))
+
+    @property
+    def stages(self):
+        return sorted((l.stage for l in self.stage_links), key=lambda st: (st.sort_order, st.id))
+
+
+class TeacherStage(db.Model):
+    """Whole-stage link: the teacher gets the alerts of every grade in the
+    stage (used for staff lists that aren't broken down by section)."""
+    __tablename__ = 'teacher_stages'
+    id         = db.Column(db.Integer, primary_key=True)
+    teacher_id = db.Column(db.Integer, db.ForeignKey('teachers.id'), nullable=False)
+    stage_id   = db.Column(db.Integer, db.ForeignKey('stages.id'), nullable=False)
+    __table_args__ = (db.UniqueConstraint('teacher_id', 'stage_id', name='uq_teacher_stage'),)
 
 
 class TeacherSection(db.Model):
@@ -201,3 +219,16 @@ class AppSetting(db.Model):
             row.value = str(value)
         else:
             db.session.add(AppSetting(key=key, value=str(value)))
+
+
+def ensure_schema():
+    """create_all() adds new tables but never new columns on existing ones.
+    Add the columns introduced after the first deploy (idempotent)."""
+    from sqlalchemy import inspect, text
+    insp = inspect(db.engine)
+    if 'teachers' in insp.get_table_names():
+        cols = {c['name'] for c in insp.get_columns('teachers')}
+        if 'email' not in cols:
+            with db.engine.begin() as conn:
+                conn.execute(text('ALTER TABLE teachers ADD COLUMN email VARCHAR(255)'))
+                conn.execute(text('CREATE UNIQUE INDEX IF NOT EXISTS uq_teachers_email ON teachers (email)'))

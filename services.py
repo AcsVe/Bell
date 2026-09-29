@@ -169,29 +169,65 @@ def resolve_grade_day(grade, weekday):
     return out
 
 
+def resolve_stage_day(stage, weekday):
+    """Stage timing for a day with no grade overrides (stage with no grades yet)."""
+    stage_ovr = {s.period_number: s for s in StageDayPeriodTime.query.filter_by(
+        stage_id=stage.id, weekday=weekday)}
+    out = []
+    for p in stage.periods:
+        o = stage_ovr.get(p.number)
+        start, end = (o.start_time, o.end_time) if o else (p.start_time, p.end_time)
+        out.append({'n': p.number, 'kind': p.kind, 'ar': p.label_ar, 'en': p.label_en or p.label_ar,
+                    'start': start, 'end': end, 'source': 'stage' if o else 'default',
+                    'dur': minutes_between(start, end)})
+    return out
+
+
 def build_schedule_payload(code_type, owner):
     """Everything a device needs to run fully offline."""
-    sections = [owner] if code_type == 'section' else owner.sections
-    stages, grades_done, targets = {}, {}, []
-    for sec in sections:
-        grade = sec.grade
-        stage = grade.stage
-        if not stage.active:
-            continue
+    stages, days, targets, seen = {}, {}, [], set()
+
+    def add_stage(stage):
         if stage.id not in stages:
             stages[stage.id] = {
                 'id': stage.id, 'ar': stage.name_ar, 'en': stage.name_en or stage.name_ar,
                 'logo': stage.logo.url if stage.logo else None,
                 'background': stage.background.url if stage.background else None,
             }
-        if grade.id not in grades_done:
-            grades_done[grade.id] = {
-                str(wd): resolve_grade_day(grade, wd) for wd in stage.weekday_list
-            }
-        targets.append({
-            'sectionId': sec.id, 'stageId': stage.id, 'gradeId': grade.id,
-            'ar': sec.full_name('ar'), 'en': sec.full_name('en'),
-        })
+
+    def add_grade(grade):
+        if str(grade.id) not in days:
+            days[str(grade.id)] = {str(wd): resolve_grade_day(grade, wd) for wd in grade.stage.weekday_list}
+
+    sections = [owner] if code_type == 'section' else owner.sections
+    for sec in sections:
+        grade, stage = sec.grade, sec.grade.stage
+        if not stage.active:
+            continue
+        add_stage(stage)
+        add_grade(grade)
+        seen.add(('g', grade.id))
+        targets.append({'sectionId': sec.id, 'stageId': stage.id, 'gradeId': grade.id,
+                        'ar': sec.full_name('ar'), 'en': sec.full_name('en')})
+
+    # Whole-stage links: one target per grade (grades may run different times).
+    for stage in (owner.stages if code_type == 'teacher' else []):
+        if not stage.active:
+            continue
+        add_stage(stage)
+        name = {'ar': stage.name_ar, 'en': stage.name_en or stage.name_ar}
+        if stage.grades:
+            for grade in stage.grades:
+                if ('g', grade.id) in seen:
+                    continue
+                seen.add(('g', grade.id))
+                add_grade(grade)
+                targets.append({'sectionId': None, 'stageId': stage.id, 'gradeId': grade.id, **name})
+        else:
+            key = f'stage-{stage.id}'
+            days[key] = {str(wd): resolve_stage_day(stage, wd) for wd in stage.weekday_list}
+            targets.append({'sectionId': None, 'stageId': stage.id, 'gradeId': key, **name})
+
     tone_id = AppSetting.get('tone_id')
     tone_url = None
     if tone_id:
@@ -207,7 +243,7 @@ def build_schedule_payload(code_type, owner):
         'who': who,
         'stages': stages,
         'targets': targets,
-        'days': {str(gid): days for gid, days in grades_done.items()},
+        'days': days,
         'tone': tone_url or '/static/sounds/chime.wav',
     }
 

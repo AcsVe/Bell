@@ -319,7 +319,7 @@ def test_teacher_template_import_by_stage(admin, app):
     assert r.status_code == 200 and r.mimetype.endswith('sheet')
     ws = openpyxl.load_workbook(io.BytesIO(r.data))['المعلمون']
     assert ws['A1'].value == f'stage:{sid}' and ws.row_dimensions[1].hidden
-    assert [c.value for c in ws[2]][3:] == ['الصف الأول - أ', 'الصف الأول - ب']
+    assert [c.value for c in ws[2]][5:] == ['الصف الأول - أ', 'الصف الأول - ب']
 
     data = _fill(r.data, [('منى  الخطيب', 'Muna', ['الصف الأول - أ', 'الصف الأول - ب']),
                           ('رامي عودة', '', ['الصف الأول - ب']),
@@ -335,7 +335,7 @@ def test_teacher_template_import_by_stage(admin, app):
 
     # re-download is pre-filled with current links and codes
     ws = openpyxl.load_workbook(io.BytesIO(admin.get(f'/admin/teachers/template/{sid}').data))['المعلمون']
-    rows = {ws.cell(row=r, column=1).value: [ws.cell(row=r, column=c).value for c in range(3, 6)]
+    rows = {ws.cell(row=r, column=1).value: [ws.cell(row=r, column=c).value for c in (4, 6, 7)]
             for r in range(3, ws.max_row + 1) if ws.cell(row=r, column=1).value}
     assert rows['منى الخطيب'] == [muna_code, '✓', '✓'] and rows['رامي عودة'][1:] == [None, '✓']
 
@@ -388,3 +388,122 @@ def test_teacher_template_import_by_stage(admin, app):
     ws = openpyxl.load_workbook(io.BytesIO(r.data))['أكواد المعلمين']
     assert any(row[1] == muna_code for row in ws.iter_rows(values_only=True))
     assert 'تحميل القالب' in admin.get('/admin/teachers').get_data(as_text=True)
+
+
+CSV_SAMPLE = ('\ufeff"Name","PrimarySmtpAddress","RecipientType"\n'
+              '"amira.test","Amira.Test@school.example","UserMailbox"\n'
+              '"esra\'a.thyab","esraa.t@school.example","UserMailbox"\n'
+              '"22eacba1-2740-4d98-a273-3332c7d9fb8b","Rasha.Ayyad@school.example","UserMailbox"\n'
+              '"staff-group","staff@school.example","MailUniversalDistributionGroup"\n'
+              '"shared.one","Shared.One@school.example","UserMailbox"\n')
+CSV_SAMPLE_2 = ('"Name","PrimarySmtpAddress","RecipientType"\n'
+                '"shared.one","shared.one@SCHOOL.example","UserMailbox"\n'
+                '"hebakhaled_sec","hebakhaled_sec@school.example","UserMailbox"\n')
+
+
+def _csv_upload(admin, form):
+    return admin.post('/admin/teachers/import-members', data=form, content_type='multipart/form-data',
+                      follow_redirects=True).get_data(as_text=True)
+
+
+def test_members_csv_import_creates_stage_and_links(admin, app):
+    from models import TeacherStage
+    from services import build_schedule_payload
+    # new stage created from the form, from a UTF-8-BOM export
+    html = _csv_upload(admin, {'stage_id': 'new', 'new_stage': 'المرحلة الأساسية 1-3',
+                               'file': (io.BytesIO(CSV_SAMPLE.encode('utf-8')), 'g.csv')})
+    assert 'جديد 4' in html and 'تجاهل 1' in html
+    with app.app_context():
+        st1 = Stage.query.filter_by(name_ar='المرحلة الأساسية 1-3').one()
+        names = sorted(l.teacher.name_ar for l in st1.teacher_links)
+        assert names == ["Amira Test", "Esra'a Thyab", 'Rasha Ayyad', 'Shared One']
+        t = Teacher.query.filter_by(email='amira.test@school.example').one()
+        assert len(t.code) == 6 and t.stages[0].id == st1.id
+        sid1 = st1.id
+    # second stage, UTF-16 export, shared teacher matched by email (case-insensitive)
+    html = _csv_upload(admin, {'stage_id': 'new', 'new_stage': 'المرحلة الثانوية',
+                               'file': (io.BytesIO(CSV_SAMPLE_2.encode('utf-16')), 'g.csv')})
+    assert 'جديد 1' in html
+    with app.app_context():
+        shared = Teacher.query.filter_by(email='shared.one@school.example').one()
+        assert sorted(st.name_ar for st in shared.stages) == ['المرحلة الأساسية 1-3', 'المرحلة الثانوية']
+        assert Teacher.query.filter_by(email='hebakhaled_sec@school.example').one().name_ar == 'Hebakhaled Sec'
+        sid2 = Stage.query.filter_by(name_ar='المرحلة الثانوية').one().id
+    # re-import is idempotent
+    html = _csv_upload(admin, {'stage_id': sid1, 'file': (io.BytesIO(CSV_SAMPLE.encode()), 'g.csv')})
+    assert 'جديد 0' in html
+    with app.app_context():
+        assert TeacherStage.query.filter_by(stage_id=sid1).count() == 4
+    # sync removes members no longer in the group
+    html = _csv_upload(admin, {'stage_id': sid1, 'sync': '1',
+                               'file': (io.BytesIO(CSV_SAMPLE_2.encode()), 'g.csv')})
+    with app.app_context():
+        assert sorted(l.teacher.email for l in TeacherStage.query.filter_by(stage_id=sid1)) == \
+            ['hebakhaled_sec@school.example', 'shared.one@school.example']
+    # empty export (BOM only) and missing stage name are refused
+    html = _csv_upload(admin, {'stage_id': sid1, 'file': (io.BytesIO(b'\xef\xbb\xbf'), 'g.csv')})
+    assert 'الملف فارغ' in html
+    html = _csv_upload(admin, {'stage_id': 'new', 'new_stage': '', 'file': (io.BytesIO(CSV_SAMPLE.encode()), 'g.csv')})
+    assert 'اسم المرحلة' in html
+    # a new stage with an empty export is still created (import its teachers later)
+    html = _csv_upload(admin, {'stage_id': 'new', 'new_stage': 'المرحلة الأساسية 4-6',
+                               'file': (io.BytesIO(b'\xef\xbb\xbf'), 'g.csv')})
+    assert 'تم إنشاء المرحلة الأساسية 4-6' in html and 'الملف فارغ' in html
+    with app.app_context():
+        assert Stage.query.filter_by(name_ar='المرحلة الأساسية 4-6').count() == 1
+
+    # schedule payload for a stage-linked teacher: one target per grade, stage name as label
+    for kind, dur in [('class', 45), ('class', 45)]:
+        admin.post(f'/admin/stages/{sid2}/periods/add', data={'kind': kind, 'duration': dur})
+    with app.app_context():
+        shared = Teacher.query.filter_by(email='shared.one@school.example').one()
+        p = build_schedule_payload('teacher', shared)
+        t2 = [t for t in p['targets'] if t['stageId'] == sid2]
+        assert len(t2) == 1 and t2[0]['ar'] == 'المرحلة الثانوية'
+        assert [x['end'] for x in p['days'][t2[0]['gradeId']]['6']] == ['08:45', '09:30']
+    admin.post(f'/admin/stages/{sid2}/grades/add', data={'names': 'العاشر، الحادي عشر'})
+    with app.app_context():
+        shared = Teacher.query.filter_by(email='shared.one@school.example').one()
+        p = build_schedule_payload('teacher', shared)
+        assert len([t for t in p['targets'] if t['stageId'] == sid2]) == 2
+        tid = shared.id
+    # teacher page: stage link can be removed and added
+    html = admin.get(f'/admin/teachers/{tid}').get_data(as_text=True)
+    assert 'المرحلة الثانوية' in html and 'shared.one@school.example' in html
+    with app.app_context():
+        link = TeacherStage.query.filter_by(teacher_id=tid, stage_id=sid2).one().id
+    admin.post(f'/admin/stage-links/{link}/delete')
+    admin.post(f'/admin/teachers/{tid}/stages/add', data={'stage_id': sid2})
+    with app.app_context():
+        assert TeacherStage.query.filter_by(teacher_id=tid, stage_id=sid2).count() == 1
+    # the Excel template of that stage lists the stage-linked teacher with ✓ in "كل المرحلة"
+    import openpyxl
+    ws = openpyxl.load_workbook(io.BytesIO(admin.get(f'/admin/teachers/template/{sid2}').data))['المعلمون']
+    row = next(r for r in ws.iter_rows(min_row=3, values_only=True) if r[2] == 'shared.one@school.example')
+    assert row[4] == '✓'
+    # renaming to Arabic through the template keeps the same teacher (matched by email)
+    data = _fill(admin.get(f'/admin/teachers/template/{sid2}').data, [])
+    wb = openpyxl.load_workbook(io.BytesIO(data)); w = wb['المعلمون']
+    w['A3'], w['C3'], w['E3'] = 'منار أبو زيد', 'shared.one@school.example', '✓'
+    buf = io.BytesIO(); wb.save(buf)
+    _upload(admin, sid2, buf.getvalue())
+    with app.app_context():
+        t = db.session.get(Teacher, tid)
+        assert t.name_ar == 'منار أبو زيد' and t.email == 'shared.one@school.example'
+
+
+def test_schema_migration_adds_email_column(tmp_path):
+    import sqlite3
+    dbfile = tmp_path / 'old.db'
+    con = sqlite3.connect(dbfile)
+    con.execute('CREATE TABLE teachers (id INTEGER PRIMARY KEY, name_ar VARCHAR(200) NOT NULL, '
+                'name_en VARCHAR(200), active BOOLEAN, code VARCHAR(12) NOT NULL UNIQUE)')
+    con.execute("INSERT INTO teachers (name_ar, active, code) VALUES ('قديم', 1, 'ABC234')")
+    con.commit(); con.close()
+    app = create_app({'TESTING': True, 'SQLALCHEMY_DATABASE_URI': f'sqlite:///{dbfile}'})
+    with app.app_context():
+        t = Teacher.query.one()
+        assert t.name_ar == 'قديم' and t.email is None
+        t.email = 'x@y.example'
+        db.session.commit()
+    create_app({'TESTING': True, 'SQLALCHEMY_DATABASE_URI': f'sqlite:///{dbfile}'})   # idempotent

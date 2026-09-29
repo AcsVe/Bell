@@ -5,14 +5,15 @@
 <div class="card">
   {% if teachers %}
   <table class="resp">
-    <thead><tr><th>{{ L('المعلم', 'Teacher') }}</th><th>{{ L('كود المعلم', 'Teacher code') }}</th><th>{{ L('الشعب', 'Sections') }}</th><th></th></tr></thead>
+    <thead><tr><th>{{ L('المعلم', 'Teacher') }}</th><th>{{ L('كود المعلم', 'Teacher code') }}</th><th>{{ L('مرتبط بـ', 'Linked to') }}</th><th></th></tr></thead>
     <tbody>
     {% for t in teachers %}
     <tr>
       <td><a href="{{ url_for('admin.teacher_view', teacher_id=t.id) }}">{{ L(t.name_ar, t.name_en or t.name_ar) }}</a>
-        {% if not t.active %}<span class="chip">{{ L('موقوف', 'Disabled') }}</span>{% endif %}</td>
+        {% if not t.active %}<span class="chip">{{ L('موقوف', 'Disabled') }}</span>{% endif %}
+        {% if t.email %}<div class="muted small" dir="ltr" style="text-align:start">{{ t.email }}</div>{% endif %}</td>
       <td><span class="code copy" data-copy="{{ t.code }}">{{ t.code }}</span></td>
-      <td class="small">{% for s in t.sections %}<span class="chip">{{ s.full_name(lang) }}</span>{% else %}<span class="muted">—</span>{% endfor %}</td>
+      <td class="small">{% for st in t.stages %}<span class="chip break">{{ L(st.name_ar, st.name_en or st.name_ar) }}</span>{% endfor %}{% for s in t.sections %}<span class="chip">{{ s.full_name(lang) }}</span>{% endfor %}{% if not t.stages and not t.sections %}<span class="muted">—</span>{% endif %}</td>
       <td><a class="btn ghost sm" href="{{ url_for('admin.teacher_view', teacher_id=t.id) }}">{{ L('إدارة', 'Manage') }}</a></td>
     </tr>
     {% endfor %}
@@ -20,6 +21,44 @@
   </table>
   {% else %}<p class="muted">{{ L('لا يوجد معلمون بعد.', 'No teachers yet.') }}</p>{% endif %}
 </div>
+<div class="card" id="members">
+  <h2>{{ L('استيراد قوائم المعلمين من Microsoft 365 (CSV)', 'Import staff lists from Microsoft 365 (CSV)') }}</h2>
+  <p class="hint">{{ L('ارفع ملف أعضاء مجموعة المرحلة (Name, PrimarySmtpAddress). يُنشأ كل معلم بكود ويُربط بالمرحلة كاملة، فيستقبل تنبيهات كل صفوفها. المعلم الموجود في أكثر من مجموعة يُعرَف ببريده ويبقى له كود واحد. الأسماء تُؤخذ من الحساب ويمكن تعريبها لاحقاً من قالب Excel.',
+    'Upload the stage group’s member export (Name, PrimarySmtpAddress). Each teacher gets a code and is linked to the whole stage, receiving alerts for all its grades. A teacher in several groups is matched by email and keeps one code. Names come from the account and can be changed later via the Excel template.') }}</p>
+  <form method="post" action="{{ url_for('admin.teachers_import_members') }}" enctype="multipart/form-data">
+    <div class="row">
+      <div>
+        <label>{{ L('المرحلة', 'Stage') }}</label>
+        <select name="stage_id" id="csvStage" required>
+          {% for st in stages %}<option value="{{ st.id }}">{{ L(st.name_ar, st.name_en or st.name_ar) }}</option>{% endfor %}
+          <option value="new" {{ 'selected' if not stages }}>{{ L('+ مرحلة جديدة…', '+ New stage…') }}</option>
+        </select>
+      </div>
+      <div id="newStageBox">
+        <label>{{ L('اسم المرحلة الجديدة', 'New stage name') }}</label>
+        <input type="text" name="new_stage" list="stageNames" placeholder="المرحلة الأساسية 1-3">
+        <datalist id="stageNames">
+          <option value="المرحلة الأساسية 1-3"><option value="المرحلة الأساسية 4-6">
+          <option value="المرحلة الأساسية العليا 7-9"><option value="المرحلة الثانوية">
+        </datalist>
+      </div>
+      <div><label>{{ L('ملف الأعضاء (CSV)', 'Members file (CSV)') }}</label><input type="file" name="file" accept=".csv,text/csv" required></div>
+    </div>
+    <div class="row" style="margin-top:10px;align-items:center">
+      <label style="display:inline-flex;gap:6px;align-items:center;margin:0;color:var(--ink);flex:0 0 auto;min-width:0">
+        <input type="checkbox" name="sync" value="1"> {{ L('مزامنة: إزالة من لم يعد في المجموعة', 'Sync: remove teachers no longer in the group') }}</label>
+      <div class="shrink"><button>{{ L('استيراد', 'Import') }}</button></div>
+    </div>
+  </form>
+  <script>
+    (function () {
+      const sel = document.getElementById('csvStage'), box = document.getElementById('newStageBox');
+      const upd = () => { box.hidden = sel.value !== 'new'; box.querySelector('input').required = sel.value === 'new'; };
+      sel.addEventListener('change', upd); upd();
+    })();
+  </script>
+</div>
+
 <div class="card" id="import">
   <h2>{{ L('استيراد المعلمين حسب المرحلة (Excel)', 'Import teachers by stage (Excel)') }}</h2>
   <p class="hint">{{ L('نزّل قالب المرحلة، اكتب أسماء المعلمين وضع ✓ تحت شعب كل معلم، ثم ارفعه. يُنشأ المعلم الجديد بكوده تلقائياً، والمعلم المشترك بين مراحل يُكتب بنفس الاسم في قالب كل مرحلة فيبقى له كود واحد. القالب يُنزَّل معبأً بالمعلمين الحاليين لتعدّله وتعيد رفعه.',

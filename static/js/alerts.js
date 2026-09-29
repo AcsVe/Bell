@@ -54,7 +54,8 @@
         const items = byMin.get(e.min);
         const key = e.ar;   // identical text at the same minute is shown once
         if (!items.has(key)) items.set(key, { ar: e.ar, en: e.en, kind: e.kind, stageId: t.stageId, targets: [] });
-        items.get(key).targets.push({ ar: t.ar, en: t.en });
+        const its = items.get(key);
+        if (!its.targets.some((x) => x.ar === t.ar)) its.targets.push({ ar: t.ar, en: t.en });
       });
     });
     return [...byMin.entries()].sort((a, b) => a[0] - b[0]).map(([min, items]) => ({
