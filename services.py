@@ -16,7 +16,8 @@ AR_ORDINALS = ['الأولى', 'الثانية', 'الثالثة', 'الرابع
 
 
 def normalize_code(code):
-    return re.sub(r'[\s-]', '', (code or '')).upper()
+    # Also drop invisible direction marks a copy/paste may carry along.
+    return re.sub(r'[\s\-\u200e\u200f\u2066-\u2069\u202a-\u202e]', '', (code or '')).upper()
 
 
 def generate_code():

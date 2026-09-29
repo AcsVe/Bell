@@ -715,7 +715,11 @@ def programs():
     progs = BellProgram.query.order_by(BellProgram.sort_order, BellProgram.id).all()
     usage = {p.id: sorted({(a.grade.stage.sort_order, a.grade.sort_order, a.grade.name_ar)
                            for a in p.assignments}) for p in progs}
-    return render_template('admin/programs.html', progs=progs, usage=usage)
+    import seed_programs as sp
+    stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
+    seed = [(g, label, default, sp.guess_stage(g, stages)) for g, (label, default, _) in sp.GROUPS.items()]
+    return render_template('admin/programs.html', progs=progs, usage=usage, stages=stages,
+                           seed=seed, seed_title=sp.TITLE)
 
 
 @admin_bp.route('/programs/add', methods=['POST'])
@@ -857,6 +861,31 @@ def programs_assign():
                            week_order=WEEK_ORDER, wd_names=weekday_names(session.get('lang', 'ar')))
 
 
+@admin_bp.route('/programs/seed', methods=['POST'])
+@login_required
+def programs_seed():
+    """Load the built-in 2026/2027 programs (from the school's Word document).
+    Each grade group goes to the stage chosen in the form (pre-matched by name)."""
+    import seed_programs as sp
+    from programs_io import import_programs
+    names = {}
+    for group, (_, default_name, _) in sp.GROUPS.items():
+        choice = request.form.get(group, '')
+        st = db.session.get(Stage, int(choice)) if choice.isdigit() else None
+        names[group] = st.name_ar if st else (_form_text(group + '_new') or default_name)
+    try:
+        r = import_programs(sp.build_workbook(names))
+    except ValueError as e:
+        db.session.rollback()
+        flash(str(e), 'error')
+        return redirect(url_for('admin.programs') + '#import-tab')
+    flash(_msg(f'تم تحميل {sp.TITLE}: {r["programs"]} برامج، و{r["assigned"]} تعيين صف/يوم'
+               + (f'، صفوف جديدة {r["grades"]}' if r['grades'] else '')
+               + (f'، مراحل جديدة {r["stages"]}' if r['stages'] else ''),
+               f'Loaded {r["programs"]} programs and {r["assigned"]} grade/day assignments'), 'ok')
+    return redirect(url_for('admin.programs'))
+
+
 @admin_bp.route('/programs/export')
 @login_required
 def programs_export():
@@ -994,9 +1023,23 @@ def bulk(entity):
 @admin_bp.route('/codes')
 @login_required
 def codes():
+    from teacher_io import _stage_teachers
     stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
-    teachers_ = Teacher.query.order_by(Teacher.name_ar).all()
-    return render_template('admin/codes.html', stages=stages, teachers=teachers_)
+    by_stage = {st.id: _stage_teachers(st) for st in stages}
+    linked = {t.id for ts in by_stage.values() for t in ts}
+    unlinked = [t for t in Teacher.query.order_by(Teacher.name_ar) if t.id not in linked]
+    return render_template('admin/codes.html', stages=stages, by_stage=by_stage, unlinked=unlinked)
+
+
+@admin_bp.route('/codes/export')
+@login_required
+def codes_export_all():
+    from teacher_io import _stage_teachers, build_codes_export_all
+    stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
+    linked = {t.id for st in stages for t in _stage_teachers(st)}
+    unlinked = [t for t in Teacher.query.order_by(Teacher.name_ar) if t.id not in linked]
+    return send_file(build_codes_export_all(stages, unlinked), mimetype=XLSX, as_attachment=True,
+                     download_name='أكواد جرس الحصص.xlsx')
 
 
 # ── Settings: tone + devices ──────────────────────────────────────────────

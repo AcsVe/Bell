@@ -53,7 +53,12 @@
   const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   // RTL shows "1-3" as "3-1": isolate number ranges left-to-right.
   // (no lookbehind: older iOS Safari rejects it)
-  const bd = (v) => String(v).replace(/(^|[^\d:.\/\-\u2066])(\d+\s*[-+–]\s*\d+)(?![\d:.\/\-\u2069])/g, '$1\u2066$2\u2069');
+  const bd = (v) => {
+    const t = String(v);
+    if (!/\d+\s*[-+–]\s*\d+/.test(t)) return t;
+    if (!/[\u0600-\u06FF]/.test(t)) return '\u2066' + t + '\u2069';      // Latin name: keep whole
+    return t.replace(/(^|[^\d:.\/\-\u2066])(\d+\s*[-+–]\s*\d+)(?![\d:.\/\-\u2069])/g, '$1\u2066$2\u2069');
+  };
   const ph = (o) => esc(bd(pick(o)));   // for innerHTML
 
   function deviceId() {

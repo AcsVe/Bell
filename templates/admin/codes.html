@@ -1,56 +1,95 @@
 {% extends 'admin/base.html' %}
-{% block title %}{{ L('الأكواد', 'Codes') }}<script>
-(function () {
-  const q = document.getElementById('cq');
-  const rows = [...document.querySelectorAll('main table tr')];
-  rows.forEach((r) => { r.dataset.n = normText(r.textContent); });
-  q.addEventListener('input', () => {
-    const w = normText(q.value).split(' ').filter(Boolean);
-    rows.forEach((r) => { r.hidden = !w.every((x) => r.dataset.n.includes(x)); });
-    document.querySelectorAll('main .card').forEach((c) => { c.hidden = w.length > 0 && !c.querySelector('tr:not([hidden])'); });
-  });
-})();
-</script>
-{% endblock %}
+{% block title %}{{ L('الأكواد', 'Codes') }}{% endblock %}
 {% block content %}
 <div class="page-head noprint">
-  <h1>{{ L('كل الأكواد', 'All codes') }}</h1>
-  <div class="actions"><button class="ghost" onclick="window.print()">🖨 {{ L('طباعة', 'Print') }}</button></div>
+  <h1>{{ L('الأكواد', 'Codes') }}</h1>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('admin.codes_export_all') }}">⬇ {{ L('تصدير Excel', 'Export Excel') }}</a>
+    <button type="button" class="ghost" onclick="window.print()">🖨 {{ L('طباعة المعروض', 'Print shown') }}</button>
+  </div>
 </div>
-<div class="list-tools noprint" style="background:var(--bg)"><div class="search"><input type="search" id="cq" autocomplete="off" placeholder="{{ L('ابحث عن صف أو معلم أو كود…', 'Search a section, teacher or code…') }}"></div></div>
-<p class="muted small noprint">{{ L('اضغط أي كود لنسخه. رابط الدخول:', 'Tap any code to copy it. Sign-in link:') }}
+<p class="muted small noprint">{{ L('التصدير: ملف واحد فيه ورقة لكل مرحلة. اضغط أي كود لنسخه. رابط الدخول:', 'Export: one file with a sheet per stage. Tap any code to copy it. Sign-in link:') }}
   <span class="code copy" style="font-size:13px;letter-spacing:0" data-copy="{{ request.host_url }}login">{{ request.host_url }}login</span></p>
 
-<h2>{{ L('أكواد الصفوف (للشاشات الثابتة)', 'Section codes (fixed screens)') }}</h2>
+<div class="list-tools noprint" style="background:var(--bg)">
+  <div class="filters">
+    <div class="search"><input type="search" id="cq" autocomplete="off" placeholder="{{ L('ابحث عن معلم أو شعبة أو كود…', 'Search a teacher, section or code…') }}"></div>
+    <select id="cstage">
+      <option value="">{{ L('كل المراحل', 'All stages') }}</option>
+      {% for st in stages %}<option value="st{{ st.id }}">{{ L(st.name_ar, st.name_en or st.name_ar) }}</option>{% endfor %}
+      {% if unlinked %}<option value="none">{{ L('غير مرتبطين بمرحلة', 'Not linked to a stage') }}</option>{% endif %}
+    </select>
+  </div>
+</div>
+
 {% for st in stages %}
-<div class="card">
-  <h2>{{ L(st.name_ar, st.name_en or st.name_ar) }}</h2>
-  <table>
-    {% for g in st.grades %}{% for s in g.sections %}
-    <tr><td>{{ s.full_name(lang) }}</td><td style="text-align:end"><span class="code copy" data-copy="{{ s.code }}">{{ s.code }}</span></td></tr>
-    {% endfor %}{% endfor %}
-  </table>
+{% set ts = by_stage[st.id] %}{% set secs = st.grades|map(attribute='sections')|sum(start=[]) %}
+<div class="card code-card" data-group="st{{ st.id }}">
+  <div class="page-head" style="margin-bottom:6px">
+    <h2 style="margin:0">{{ L(st.name_ar, st.name_en or st.name_ar) }}
+      <span class="muted small">· {{ ts|length }} {{ L('معلم', 'teachers') }} · {{ secs|length }} {{ L('شعبة', 'sections') }}</span></h2>
+    <div class="actions noprint">
+      <a class="btn ghost sm" href="{{ url_for('admin.teachers_codes_export', stage_id=st.id) }}">⬇ Excel</a>
+      <button type="button" class="ghost sm" data-print="st{{ st.id }}">🖨 {{ L('طباعة', 'Print') }}</button>
+    </div>
+  </div>
+  <div class="code-cols">
+    <div>
+      <h3>{{ L('أكواد المعلمين', 'Teacher codes') }}</h3>
+      <table>
+        {% for t in ts %}
+        <tr><td>{{ L(t.name_ar, t.name_en or t.name_ar) }}{% if not t.active %} <span class="chip">{{ L('موقوف', 'Disabled') }}</span>{% endif %}</td>
+          <td style="text-align:end"><span class="code copy" data-copy="{{ t.code }}">{{ t.code }}</span></td></tr>
+        {% else %}<tr><td class="muted small">{{ L('لا يوجد معلمون مرتبطون بهذه المرحلة.', 'No teachers linked to this stage.') }}</td></tr>{% endfor %}
+      </table>
+    </div>
+    <div>
+      <h3>{{ L('أكواد الصفوف (الشاشات الثابتة)', 'Section codes (fixed screens)') }}</h3>
+      <table>
+        {% for sec in secs %}
+        <tr><td>{{ sec.full_name(lang) }}</td><td style="text-align:end"><span class="code copy" data-copy="{{ sec.code }}">{{ sec.code }}</span></td></tr>
+        {% else %}<tr><td class="muted small">{{ L('لا توجد شعب بعد — أضفها من صفحة كل صف.', 'No sections yet — add them on each grade page.') }}
+          <a class="noprint" href="{{ url_for('admin.stage_view', stage_id=st.id) }}#grades">{{ L('الصفوف', 'Grades') }}</a></td></tr>{% endfor %}
+      </table>
+    </div>
+  </div>
 </div>
 {% endfor %}
 
-<h2>{{ L('أكواد المعلمين', 'Teacher codes') }}</h2>
-<div class="card">
+{% if unlinked %}
+<div class="card code-card" data-group="none">
+  <h2>{{ L('معلمون غير مرتبطين بمرحلة', 'Teachers not linked to a stage') }} <span class="muted small">· {{ unlinked|length }}</span></h2>
   <table>
-    {% for t in teachers %}
-    <tr><td>{{ L(t.name_ar, t.name_en or t.name_ar) }} <span class="muted small">· {{ t.section_links|length }} {{ L('شعبة', 'sections') }}</span></td>
+    {% for t in unlinked %}
+    <tr><td><a href="{{ url_for('admin.teacher_view', teacher_id=t.id) }}">{{ L(t.name_ar, t.name_en or t.name_ar) }}</a></td>
       <td style="text-align:end"><span class="code copy" data-copy="{{ t.code }}">{{ t.code }}</span></td></tr>
-    {% else %}<tr><td class="muted">{{ L('لا يوجد معلمون.', 'No teachers.') }}</td></tr>{% endfor %}
+    {% endfor %}
   </table>
 </div>
+{% endif %}
+{% if not stages and not unlinked %}<div class="card muted">{{ L('لا توجد أكواد بعد.', 'No codes yet.') }}</div>{% endif %}
+
 <script>
 (function () {
-  const q = document.getElementById('cq');
-  const rows = [...document.querySelectorAll('main table tr')];
+  const q = document.getElementById('cq'), f = document.getElementById('cstage');
+  const cards = [...document.querySelectorAll('.code-card')];
+  const rows = [...document.querySelectorAll('.code-card tr')];
   rows.forEach((r) => { r.dataset.n = normText(r.textContent); });
-  q.addEventListener('input', () => {
-    const w = normText(q.value).split(' ').filter(Boolean);
-    rows.forEach((r) => { r.hidden = !w.every((x) => r.dataset.n.includes(x)); });
-    document.querySelectorAll('main .card').forEach((c) => { c.hidden = w.length > 0 && !c.querySelector('tr:not([hidden])'); });
+  function apply() {
+    const w = normText(q.value).split(' ').filter(Boolean), g = f.value;
+    rows.forEach((r) => { r.hidden = w.length > 0 && !w.every((x) => r.dataset.n.includes(x)); });
+    cards.forEach((c) => {
+      c.hidden = (g && c.dataset.group !== g) || (w.length > 0 && !c.querySelector('tr:not([hidden])'));
+    });
+  }
+  q.addEventListener('input', apply); f.addEventListener('change', apply);
+  // Print one stage: show only that card, print, restore.
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-print]');
+    if (!b) return;
+    const prev = f.value; f.value = b.dataset.print; q.value = ''; apply();
+    window.print();
+    f.value = prev; apply();
   });
 })();
 </script>

@@ -838,3 +838,50 @@ def test_manual_add_teachers_emails_duplicates_and_new_on_top(admin, app):
         h = admin.get(url).get_data(as_text=True)
         assert 'class="page-head' in h, url
         assert 'id="mainnav"' in h and 'class="step"' in h, url
+
+
+def test_seed_programs_into_english_named_stages_and_codes_export(admin, app):
+    import openpyxl
+    from models import BellProgram, GradeDayProgram
+    from services import resolve_grade_day
+    for n in ('Primary1-3', 'Primary 4-6', 'Secondary teachers'):
+        admin.post('/admin/stages/add', data={'name_ar': n})
+    html = admin.get('/admin/programs').get_data(as_text=True)
+    assert 'programs/seed' in html                           # offered when there are no programs
+    with app.app_context():
+        ids = {s.name_ar: s.id for s in Stage.query.all()}
+    # the form pre-selects the matching stages
+    for g, name in (('g13', 'Primary1-3'), ('g46', 'Primary 4-6'), ('g712', 'Secondary teachers')):
+        assert f'name="{g}"' in html
+        seg = html[html.index(f'name="{g}"'):]
+        seg = seg[:seg.index('</select>')]
+        assert f'value="{ids[name]}" selected' in seg, g
+    r = admin.post('/admin/programs/seed', data={'g13': ids['Primary1-3'], 'g46': ids['Primary 4-6'],
+                                                 'g712': ids['Secondary teachers']}, follow_redirects=True)
+    assert 'تم تحميل' in r.get_data(as_text=True)
+    with app.app_context():
+        assert Stage.query.count() == 3 and BellProgram.query.count() == 10
+        assert GradeDayProgram.query.count() == 60
+        g3 = Grade.query.filter_by(name_ar='الصف الثالث').one()
+        assert g3.stage.name_ar == 'Primary1-3'
+        assert [r['end'] for r in resolve_grade_day(g3, 1)][-1] == '13:20'
+        assert Grade.query.filter_by(name_ar='الصف الحادي عشر').one().stage.name_ar == 'Secondary teachers'
+    # loading again changes nothing
+    admin.post('/admin/programs/seed', data={'g13': ids['Primary1-3'], 'g46': ids['Primary 4-6'],
+                                             'g712': ids['Secondary teachers']})
+    with app.app_context():
+        assert Grade.query.count() == 12 and GradeDayProgram.query.count() == 60
+    # codes page groups by stage; export has a sheet per stage
+    admin.post('/admin/teachers/add', data={'names': 'منى', 'stage_id': ids['Primary 4-6']})
+    admin.post('/admin/teachers/add', data={'names': 'بلا مرحلة'})
+    with app.app_context():
+        gid = Grade.query.filter_by(name_ar='الصف الرابع').one().id
+    admin.post(f'/admin/grades/{gid}/sections/add', data={'names': 'أ، ب'})
+    html = admin.get('/admin/codes').get_data(as_text=True)
+    assert 'data-group="st' in html and 'data-group="none"' in html and 'بلا مرحلة' in html
+    wb = openpyxl.load_workbook(io.BytesIO(admin.get('/admin/codes/export').data))
+    assert wb.sheetnames == ['Primary1-3', 'Primary 4-6', 'Secondary teachers', 'غير مرتبطين']
+    rows = list(wb['Primary 4-6'].iter_rows(values_only=True))
+    assert rows[1][0] == 'منى' and rows[1][4] == 'الصف الرابع - أ' and rows[2][4] == 'الصف الرابع - ب'
+    # stylesheet URL carries a version so phones don't keep an old copy
+    assert 'css/admin.css?v=' in html

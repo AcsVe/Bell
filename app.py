@@ -14,10 +14,18 @@ import re as _re
 _NUM_RANGE = _re.compile(r'(?<![\u2066\d:./\-])(\d+\s*[-+–]\s*\d+)(?![\d\u2069:./\-])')
 
 
+_ARABIC = _re.compile('[\u0600-\u06FF]')
+
+
 def bidi_fix(value):
-    if isinstance(value, str) and _NUM_RANGE.search(value):
+    if isinstance(value, str) and _NUM_RANGE.search(value) and '\u2066' not in value:
         from markupsafe import Markup
-        fixed = _NUM_RANGE.sub('\u2066\\1\u2069', str(value))
+        if _ARABIC.search(value) or '<' in value:
+            fixed = _NUM_RANGE.sub('\u2066\\1\u2069', str(value))
+        else:
+            # A Latin name like "Primary1-3": keep it whole, left-to-right, so an
+            # Arabic page shows it as written instead of "1-3Primary".
+            fixed = '\u2066' + str(value) + '\u2069'
         return Markup(fixed) if isinstance(value, Markup) else fixed
     return value
 
@@ -67,6 +75,18 @@ def create_app(test_config=None):
     with app.app_context():
         db.create_all()
         ensure_schema()
+
+    @app.context_processor
+    def inject_asset():
+        """asset('css/admin.css') → /static/css/admin.css?v=<mtime>: a new URL after every
+        deploy, so phones never keep an old stylesheet from their 7-day cache."""
+        def asset(filename):
+            try:
+                v = int(os.path.getmtime(os.path.join(app.static_folder, filename)))
+            except OSError:
+                v = 0
+            return url_for('static', filename=filename, v=v)
+        return {'asset': asset}
 
     @app.context_processor
     def inject_lang():

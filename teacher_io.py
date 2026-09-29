@@ -399,3 +399,48 @@ def build_codes_export(stage):
     wb.save(buf)
     buf.seek(0)
     return buf
+
+
+def build_codes_export_all(stages, unlinked):
+    """One workbook: a sheet per stage (teacher codes + section codes side by side)
+    and a sheet for teachers not linked to any stage."""
+    wb = Workbook()
+    wb.remove(wb.active)
+    head_fill = PatternFill('solid', fgColor='12305E')
+
+    def style(ws, widths):
+        ws.sheet_view.rightToLeft = True
+        for cell in ws[1]:
+            cell.font = Font(bold=True, color='FFFFFF')
+            cell.fill = head_fill
+        for col, w in widths.items():
+            ws.column_dimensions[col].width = w
+
+    used = set()
+    for st in stages:
+        title = re.sub(r'[\\/*?:\[\]]', '-', st.name_ar)[:28]
+        while title in used:
+            title = title[:26] + '_' + str(len(used))
+        used.add(title)
+        ws = wb.create_sheet(title)
+        ws.append(['المعلم', 'كود المعلم', 'البريد', '', 'الشعبة', 'كود الصف'])
+        teachers = _stage_teachers(st)
+        sections = _stage_sections(st)
+        for i in range(max(len(teachers), len(sections))):
+            t = teachers[i] if i < len(teachers) else None
+            sec = sections[i] if i < len(sections) else None
+            ws.append([t.name_ar if t else '', t.code if t else '', (t.email or '') if t else '', '',
+                       sec.full_name('ar') if sec else '', sec.code if sec else ''])
+        style(ws, {'A': 30, 'B': 12, 'C': 32, 'D': 3, 'E': 26, 'F': 12})
+    if unlinked:
+        ws = wb.create_sheet('غير مرتبطين')
+        ws.append(['المعلم', 'كود المعلم', 'البريد'])
+        for t in unlinked:
+            ws.append([t.name_ar, t.code, t.email or ''])
+        style(ws, {'A': 30, 'B': 12, 'C': 32})
+    if not wb.sheetnames:
+        wb.create_sheet('الأكواد').append(['لا توجد بيانات'])
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf

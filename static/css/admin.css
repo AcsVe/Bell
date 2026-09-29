@@ -141,3 +141,7 @@ tr.is-new td{background:#fff8e1}
 }
 @media (max-width:640px){ .list-tools{position:static;margin-top:0;padding-top:0} }
 td input[type=checkbox],th input[type=checkbox]{min-width:0}
+.code-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.code-cols h3{font-size:14px;color:var(--muted);margin:6px 0}
+@media (max-width:760px){ .code-cols{grid-template-columns:1fr} }
+@media print{ .code-card{page-break-inside:auto} .code .copy{border:0} }

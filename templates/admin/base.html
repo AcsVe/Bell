@@ -6,7 +6,7 @@
 <title>{% block title %}{{ L('لوحة الإدارة', 'Admin') }}{% endblock %} · {{ L('جرس الحصص', 'School Bell') }}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+<link rel="stylesheet" href="{{ asset('css/admin.css') }}">
 <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
 <script>
 // Arabic-aware search text (used by page scripts): أ/إ/آ→ا, ة→ه, ى→ي, no diacritics or bidi marks.

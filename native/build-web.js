@@ -39,6 +39,7 @@ fs.writeFileSync(path.join(OUT, 'config.js'),
 let html = fs.readFileSync(path.join(ROOT, 'templates/display.html'), 'utf8');
 html = html
   .replace(/\{\{ lang \}\}/g, 'ar').replace(/\{\{ dir \}\}/g, 'rtl')
+  .replace(/\{\{ asset\('([^']+)'\) \}\}/g, '$1')
   .replace(/^.*rel="manifest".*\n/m, '')
   .replace(/\/static\/css\//g, 'css/').replace(/\/static\/js\//g, 'js/').replace(/\/static\/icons\//g, 'icons/')
   .replace('<script src="js/store.js"></script>',

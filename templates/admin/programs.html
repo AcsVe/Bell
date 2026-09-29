@@ -1,24 +1,44 @@
 {% extends 'admin/base.html' %}
 {% block title %}{{ L('برامج الجرس', 'Bell programs') }}{% endblock %}
 {% block content %}
+{% macro seed_card(open_first) %}
+<div class="card" id="seed" style="border-color:#b9c8e4">
+  <h2>📄 {{ L('تحميل', 'Load') }} «{{ seed_title }}»</h2>
+  <p class="muted small">{{ L('البرامج العشرة من مستند المدرسة (1+2، 3+4، 5+6، 7-9، 10-12 — عادي والثلاثاء) تُحمَّل بضغطة واحدة وتُوزَّع على الصفوف تلقائياً. اختر مرحلة كل مجموعة صفوف (اختيرت تلقائياً حسب الاسم). التحميل مرة ثانية يحدّث البرامج دون تكرار.',
+    'The ten programs from the school document (1+2, 3+4, 5+6, 7-9, 10-12 — normal and Tuesday) load in one click and are assigned to the grades. Choose the stage for each grade group (pre-selected by name). Loading again updates without duplicates.') }}</p>
+  <form method="post" action="{{ url_for('admin.programs_seed') }}">
+    <div class="row">
+    {% for g, label, default, guess in seed %}
+      <div>
+        <label>{{ label }} ←</label>
+        <select name="{{ g }}" data-seed="{{ g }}">
+          {% for st in stages %}<option value="{{ st.id }}" {{ 'selected' if guess and guess.id == st.id }}>{{ L(st.name_ar, st.name_en or st.name_ar) }}</option>{% endfor %}
+          <option value="new" {{ 'selected' if not guess }}>{{ L('+ مرحلة جديدة', '+ New stage') }}: {{ default }}</option>
+        </select>
+        <input type="hidden" name="{{ g }}_new" value="{{ default }}">
+      </div>
+    {% endfor %}
+    </div>
+    <button style="margin-top:12px">{{ L('تحميل البرامج وتوزيعها', 'Load and assign programs') }}</button>
+  </form>
+</div>
+{% endmacro %}
 {% from 'admin/_bulk.html' import bulk_bar, bulk_all, bulk_item with context %}
 <div class="page-head">
   <h1>{{ L('برامج الجرس', 'Bell programs') }}</h1>
   <div class="actions">
-    <a class="btn" href="{{ url_for('admin.programs_assign') }}">{{ L('توزيع البرامج على الصفوف والأيام', 'Assign to grades & days') }}</a>
-    <a class="btn ghost" href="#import-tab">⬆ {{ L('استيراد / تصدير', 'Import / export') }}</a>
-    <a class="btn ghost" href="#new-tab">+ {{ L('برنامج جديد', 'New program') }}</a>
+    <a class="btn" href="{{ url_for('admin.programs_assign') }}">{{ L('التوزيع على الصفوف والأيام', 'Grades & days') }}</a>
   </div>
 </div>
-<p class="hint">{{ L('برنامج الجرس قائمة كاملة بالحصص والفرص وتوقيتها. يُسند لكل صف برنامج لكل يوم (مثلاً «الصفوف 3+4» في الأيام العادية و«الصفوف 3+4 — الثلاثاء» يوم الثلاثاء)، وله الأولوية على توقيت المرحلة.',
-  'A bell program is a full list of periods and breaks with times. Each grade is assigned a program per day (e.g. “Grades 3+4” on normal days and “Grades 3+4 — Tuesday” on Tuesday); it takes priority over the stage timing.') }}</p>
 <nav class="tabbar" data-tabs>
   <a href="#list-tab" data-tab="list-tab">{{ L('البرامج', 'Programs') }}<span class="count">{{ progs|length }}</span></a>
   <a href="#import-tab" data-tab="import-tab">{{ L('استيراد وتصدير Excel', 'Excel import / export') }}</a>
   <a href="#new-tab" data-tab="new-tab">{{ L('برنامج جديد', 'New program') }}</a>
 </nav>
 <section class="tabpane" data-pane="list-tab">
-<div class="card">
+{% if not progs %}{{ seed_card(true) }}{% endif %}
+<p class="hint">{{ L('برنامج الجرس = قائمة الحصص والفرص بتوقيتها. لكل صف برنامج لكل يوم، وله الأولوية على توقيت المرحلة.', 'A bell program = the periods and breaks with times. Each grade has a program per day; it overrides the stage timing.') }}</p>
+{% if progs %}<div class="card">
   {% if progs %}
   {{ bulk_bar('programs', [('delete', 'حذف', 'Delete', true)]) }}
   <table class="resp">
@@ -35,10 +55,11 @@
     {% endfor %}
     </tbody>
   </table>
-  {% else %}<p class="muted">{{ L('لا توجد برامج بعد. ارفع ملف Excel أو أنشئ برنامجاً.', 'No programs yet. Upload an Excel file or create one.') }}</p>{% endif %}
-</div>
+  {% endif %}
+</div>{% endif %}
 </section>
 <section class="tabpane" data-pane="import-tab">
+  {% if progs %}{{ seed_card(false) }}{% endif %}
   <div class="card">
     <h2>{{ L('استيراد / تصدير (Excel)', 'Import / export (Excel)') }}</h2>
     <p class="muted small">{{ L('الملف يحتوي البرامج وتوزيعها على الصفوف والأيام. صدّر الحالي، عدّل عليه، ثم ارفعه.', 'The file holds the programs and their grade/day assignment. Export, edit, re-upload.') }}</p>
