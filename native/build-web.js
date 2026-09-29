@@ -14,7 +14,7 @@ if (!['mobile', 'desktop'].includes(target)) {
 }
 const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, target, 'www');
-const server = (process.env.BELL_SERVER || 'https://school-bell.onrender.com').replace(/\/+$/, '');
+const server = (process.env.BELL_SERVER || 'https://bell-zrv4.onrender.com').replace(/\/+$/, '');
 
 fs.rmSync(OUT, { recursive: true, force: true });
 for (const d of ['js', 'css', 'icons', 'sounds']) fs.mkdirSync(path.join(OUT, d), { recursive: true });
