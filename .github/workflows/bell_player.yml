@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['bell_player/bell_player.py', 'bell_player/bell.ico', '.github/workflows/bell_player.yml']
+    paths: ['bell_player/bell_player.py', 'bell_player/bell.ico', 'install_bell.bat', '.github/workflows/bell_player.yml']
 
 permissions:
   contents: write          # publish the EXE to the "apps" release
@@ -31,6 +31,6 @@ jobs:
         shell: bash
         run: |
           gh release view apps >/dev/null 2>&1 || gh release create apps --title "تطبيقات جرس الحصص" --notes "آخر نسخة من التطبيقات، تتحدث تلقائياً مع كل بناء."
-          gh release upload apps dist/BellPlayer.exe --clobber
+          gh release upload apps dist/BellPlayer.exe install_bell.bat --clobber
         env:
           GH_TOKEN: ${{ github.token }}
