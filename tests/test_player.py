@@ -16,6 +16,23 @@ from app import create_app  # noqa: E402
 from tests.test_central import _seed  # noqa: E402
 
 
+def _keys():
+    """A throw-away ECDSA P-256 pair; returns (public PEM, sign(fingerprint, exp) → license key) like the generator."""
+    ec = pytest.importorskip('cryptography.hazmat.primitives.asymmetric.ec')
+    from cryptography.hazmat.primitives import hashes, serialization
+    import base64
+    priv = ec.generate_private_key(ec.SECP256R1())
+    pem = priv.public_key().public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+
+    def sign(fp, exp='PERMANENT'):
+        sig = priv.sign(f'{fp}|{exp}'.encode(), ec.ECDSA(hashes.SHA256()))
+        return f'{exp}:' + base64.urlsafe_b64encode(sig).decode().rstrip('=')
+    return pem, sign
+
+
+FP = '0123456789ABCDEF'
+
+
 @pytest.fixture
 def env(tmp_path, monkeypatch):
     app = create_app({'TESTING': True, 'SQLALCHEMY_DATABASE_URI': f'sqlite:///{tmp_path}/t.db'})
@@ -33,6 +50,12 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setattr(bp, 'BASE', str(tmp_path / 'player'))
     monkeypatch.setattr(bp, 'CACHE', str(tmp_path / 'player' / 'player_cache'))
     monkeypatch.setattr(bp, 'INI', str(tmp_path / 'player' / 'bell_player.ini'))
+    pem, sign = _keys()
+    monkeypatch.setattr(bp, 'LICENSE_PUBLIC_KEY_PEM', pem)
+    monkeypatch.setattr(bp, 'machine_fingerprint', lambda: FP)
+    bp.CLOCK.clear()
+    bp.CLOCK.update({'offset': 0.0, 'tz_min': None, 'synced': None, 'lan': []})
+    bp.sign = sign
     played = []
     monkeypatch.setattr(bp, 'play_file', lambda p, v=100: played.append((os.path.basename(p), v)))
     os.makedirs(bp.BASE)
@@ -42,10 +65,13 @@ def env(tmp_path, monkeypatch):
 
 def test_player_end_to_end(env, monkeypatch):
     bp, admin, key, server, played = env
-    answers = iter([server, key])
+    answers = iter([server, key, 'PERMANENT:bad', bp.sign('FFFFFFFFFFFFFFFF'), bp.sign(FP, '20000101'), bp.sign(FP)])
     monkeypatch.setattr('builtins.input', lambda *_: next(answers))
     assert bp.setup()
-    assert bp.load_ini() == {'server': server, 'key': key}
+    ini = bp.load_ini()
+    assert (ini['server'], ini['key']) == (server, key)
+    assert bp.check_license(bp.load_ini()['license'], FP, datetime(2030, 1, 1).date())[:2] == (True, False)
+    assert bp.CLOCK['tz_min'] is not None and bp.CLOCK['synced']        # setup synced with the server clock
     p = bp.Player(bp.load_ini())
     assert p.cached_ok() and p.schedule['days']['6']
     # Sunday at the first ring time → due once, then never again
@@ -95,7 +121,7 @@ def test_player_end_to_end(env, monkeypatch):
 
 def test_ring_loop_plays_due_slot(env, monkeypatch):
     bp, admin, key, server, played = env
-    bp.save_ini(server, key)
+    bp.save_ini(server, key, bp.sign(FP))
     p = bp.Player(bp.load_ini())
     p.refresh()
     first = p.schedule['days']['6'][0]
@@ -116,3 +142,72 @@ def test_ring_loop_plays_due_slot(env, monkeypatch):
     assert what == f"2026-10-25 {first['t']}" and len(paths) == len(first['rings'])
     assert p.audio.empty()
     assert json.loads(json.dumps(p.next_ring_text()))
+
+
+def test_server_clock_lan_fallback_and_license(env, monkeypatch):
+    import time as _t
+    bp, admin, key, server, played = env
+    bp.save_ini('http://127.0.0.1:9', key, bp.sign(FP, '20991231'))      # public address unreachable
+    p = bp.Player(bp.load_ini())
+    with pytest.raises(Exception):
+        p.poll()
+    bp.CLOCK['lan'] = [server]                                           # …but the school-network address works
+    p.poll()
+    assert p.server == server and p.schedule
+    assert bp.CLOCK['tz_min'] == 180 and abs(bp.CLOCK['offset']) < 2
+    # rings follow the server clock, not this PC: pretend the server is 1 h ahead
+    before = bp.amman_now()
+    p.sync_clock({'server_ms': (_t.time() + 3600) * 1000, 'tz_offset_min': 180}, _t.time(), _t.time())
+    assert 3590 < (bp.amman_now() - before).total_seconds() < 3610 and p.clock_drift == -3600
+    # the offset is kept for offline use
+    bp.CLOCK['offset'] = 0
+    bp.load_clock()
+    assert abs(bp.CLOCK['offset'] - 3600) < 2
+    # license reported to the admin page
+    p.sync_clock({'server_ms': _t.time() * 1000, 'tz_offset_min': 180}, _t.time(), _t.time())
+    p.poll()
+    html = admin.get('/admin/central').get_data(as_text=True)
+    assert '2099-12-31' in html and FP in html
+    # no / wrong license → rings are skipped, and the admin page says so
+    bp.save_ini(server, key, 'PERMANENT:AAAA')
+    q = bp.Player(bp.load_ini())
+    assert not q.licensed() and q.license_text() == 'invalid'
+    first = q.schedule['days']['6'][0]
+    h, m = map(int, first['t'].split(':'))
+    clock = [datetime(2026, 10, 25, h, m, 1)]
+    monkeypatch.setattr(bp, 'amman_now', lambda: clock[0])
+    q.lic_day = None
+    n = {'i': 0}
+
+    def stop(_s):
+        n['i'] += 1
+        if n['i'] > 3:
+            raise KeyboardInterrupt
+    monkeypatch.setattr(bp.time, 'sleep', stop)
+    with pytest.raises(KeyboardInterrupt):
+        q.ring_loop()
+    assert q.audio.empty()
+    q.poll()
+    assert 'غير مفعّل' in admin.get('/admin/central').get_data(as_text=True)
+    # entering a valid key later is picked up without a restart
+    bp.save_ini(server, key, bp.sign(FP))
+    q._lic_t = 0
+    assert q.licensed()
+
+
+def test_ecdsa_matches_the_generator_format():
+    import importlib.util as iu
+    spec = iu.spec_from_file_location('bpx', os.path.join(ROOT, 'bell_player', 'bell_player.py'))
+    bp = iu.module_from_spec(spec)
+    spec.loader.exec_module(bp)
+    import base64
+    pem, sign = _keys()
+    for i in range(30):
+        fp = f'{i:016X}'
+        sig = sign(fp, '20301231').split(':')[1]
+        raw = base64.urlsafe_b64decode(sig + '=' * (-len(sig) % 4))
+        assert bp.ecdsa_verify(f'{fp}|20301231'.encode(), raw, pem)
+        assert not bp.ecdsa_verify(f'{fp}|20311231'.encode(), raw, pem)          # edited date → rejected
+        assert not bp.ecdsa_verify(f'{fp}|20301231'.encode(), raw)              # other key pair → rejected
+    # the real public key is the one shared with the desktop analysis program
+    assert 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE9hskm3ufgTN' in bp.LICENSE_PUBLIC_KEY_PEM

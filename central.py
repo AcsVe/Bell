@@ -208,7 +208,8 @@ def has_key():
 
 
 def record_status(data, ip):
-    st = {k: data.get(k) for k in ('host', 'version', 'last_ring', 'next_ring', 'player', 'clock_drift', 'cached', 'error')}
+    st = {k: data.get(k) for k in ('host', 'version', 'last_ring', 'next_ring', 'player', 'clock_drift', 'cached', 'error',
+                                   'license', 'fingerprint', 'via')}
     st['seen'] = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
     st['ip'] = ip
     AppSetting.set('central_player', json.dumps(st, ensure_ascii=False))
@@ -224,6 +225,28 @@ def status():
         st['age_s'] = int(age)
         st['online'] = age <= ONLINE_SECONDS
     return st
+
+
+def lan_urls():
+    """This server's addresses on the school network (http://<ip>:<port>) — the office player falls back to them
+    when the internet (and so 5.iajaward.org) is down, so it still gets changes and the server time."""
+    import os
+    import socket
+    port = os.environ.get('PORT') or '8005'
+    ips = set()
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('10.255.255.255', 1))          # no packet is sent; picks the LAN interface
+        ips.add(s.getsockname()[0])
+        s.close()
+    except OSError:
+        pass
+    try:
+        ips.update(socket.gethostbyname_ex(socket.gethostname())[2])
+    except OSError:
+        pass
+    good = sorted(ip for ip in ips if not ip.startswith(('127.', '169.254.', '0.')))
+    return [f'http://{ip}:{port}' for ip in good][:4]
 
 
 def request_test(tone):

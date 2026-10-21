@@ -207,3 +207,17 @@ def test_export_all_then_import(tmp_path):
     con = sqlite3.connect(tmp_path / 'data' / 'bell.db')
     assert sorted(x for (x,) in con.execute('select code from teachers')) == codes
     assert con.execute('select count(*) from bell_programs').fetchone()[0] == 10
+
+
+def test_page_shield(tmp_path):
+    """Full HTML pages are sent encoded with the F12 / view-source guard; JSON and files are untouched."""
+    a = create_app({'TESTING': True, 'PAGE_SHIELD': True, 'SQLALCHEMY_DATABASE_URI': f'sqlite:///{tmp_path}/s.db'})
+    c = a.test_client()
+    r = c.get('/admin/login')
+    body = r.get_data(as_text=True)
+    assert r.status_code == 200 and 'admin' not in body.split('<script>')[0] and 'debugger' in body
+    assert 'كلمة' not in body and r.headers['Cache-Control'] == 'no-store'
+    app_page = c.get('/login').get_data(as_text=True)
+    assert 'TextDecoder' in app_page and 'debugger' not in app_page          # no devtools wipe on classroom screens
+    assert c.get('/healthz').get_data(as_text=True) == 'ok'
+    assert c.get('/api/central/schedule').is_json

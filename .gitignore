@@ -16,3 +16,7 @@ pyexe.txt
 bell_player/player_cache/
 bell_player/bell_player.ini
 bell_player/*.log
+
+# license tooling must never be committed
+*.pem
+*license_key_generator*.py

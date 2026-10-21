@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['bell_player/bell_player.py', '.github/workflows/bell_player.yml']
+    paths: ['bell_player/bell_player.py', 'bell_player/bell.ico', '.github/workflows/bell_player.yml']
 
 permissions:
   contents: write          # publish the EXE to the "apps" release
@@ -19,9 +19,11 @@ jobs:
       - name: Build
         run: |
           pip install pyinstaller==6.11.1 tzdata
-          pyinstaller --onefile --console --name BellPlayer --collect-data tzdata bell_player/bell_player.py
+          pyinstaller --onefile --console --name BellPlayer --icon bell_player/bell.ico --collect-data tzdata bell_player/bell_player.py
       - name: Smoke test
-        run: dist\BellPlayer.exe --status
+        run: |
+          dist\BellPlayer.exe --status
+          dist\BellPlayer.exe --fingerprint
       - uses: actions/upload-artifact@v4
         with: { name: BellPlayer, path: dist/BellPlayer.exe }
       - name: Publish to the fixed download link

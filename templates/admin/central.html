@@ -121,7 +121,9 @@
     <tr><td>{{ L('الجدول', 'Schedule') }}</td><td>{{ L('محدّث', 'Up to date') if st.version == week_version else L('يُحدَّث…', 'Updating…') }} {% if st.cached %}— {{ L('النغمات محفوظة على الجهاز', 'tones cached on the PC') }}{% endif %}</td></tr>
     <tr><td>{{ L('آخر رنين', 'Last ring') }}</td><td dir="ltr">{{ st.last_ring or '—' }}</td></tr>
     <tr><td>{{ L('الرنين التالي', 'Next ring') }}</td><td dir="ltr">{{ st.next_ring or '—' }}</td></tr>
-    <tr><td>{{ L('ساعة الجهاز', 'PC clock') }}</td><td>{% if st.clock_drift is not none and (st.clock_drift|abs) > 30 %}<b style="color:#9b1c1c">{{ L('مختلفة عن الخادم بـ', 'differs from the server by') }} {{ st.clock_drift }} {{ L('ثانية — فعّل «ضبط الوقت تلقائياً» في ويندوز', 's — turn on “Set time automatically” in Windows') }}</b>{% else %}{{ L('مضبوطة', 'OK') }}{% endif %}</td></tr>
+    <tr><td>{{ L('ساعة الجهاز', 'PC clock') }}</td><td>{% if st.clock_drift is not none and (st.clock_drift|abs) > 30 %}<b style="color:#9b1c1c">{{ L('مختلفة عن الخادم بـ', 'differs from the server by') }} {{ st.clock_drift }} {{ L('ثانية (لا يؤثر: الرنين بتوقيت الخادم)', 's (no effect: it rings by the server clock)') }}</b>{% else %}{{ L('مضبوطة', 'OK') }}{% endif %}</td></tr>
+    <tr><td>{{ L('الترخيص', 'License') }}</td><td>{% if not st.license %}—{% elif st.license == 'PERMANENT' %}<b style="color:#14632d">{{ L('دائم', 'Permanent') }}</b>{% elif st.license.startswith('invalid') or st.license.startswith('expired') %}<b style="color:#9b1c1c">{{ L('غير مفعّل — الجرس متوقف على جهاز المكتب', 'Not activated — the office player is NOT ringing') }}</b> <span dir="ltr" class="small">({{ st.license }})</span>{% else %}{{ L('ساري حتى', 'Valid until') }} <span dir="ltr">{{ st.license }}</span>{% endif %}{% if st.fingerprint %} <span class="muted small" dir="ltr">— {{ L('بصمة الجهاز', 'fingerprint') }} {{ st.fingerprint }}</span>{% endif %}</td></tr>
+    <tr><td>{{ L('الوقت', 'Time') }}</td><td>{{ L('يرنّ بتوقيت الخادم', 'Rings by the server clock') }}{% if st.via %} <span class="muted small" dir="ltr">— {{ st.via }}</span>{% endif %}</td></tr>
     {% if st.error %}<tr><td>{{ L('آخر خطأ', 'Last error') }}</td><td class="small" dir="ltr">{{ st.error }}</td></tr>{% endif %}
   </tbody></table>
   {% else %}<p class="muted">{{ L('لم يتصل أي جهاز مكتب بعد.', 'No office player has connected yet.') }}</p>{% endif %}
@@ -140,11 +142,11 @@
   <h2>{{ L('تثبيت جهاز المكتب (الكمبيوتر الموصول بالسمّاعات)', 'Install the office player (the PC connected to the speakers)') }}</h2>
   <ol class="small" style="line-height:2">
     <li>{{ L('نزّل', 'Download') }} <a href="https://github.com/AcsVe/Bell/releases/download/apps/BellPlayer.exe"><b>BellPlayer.exe</b></a> {{ L('وضعه في مجلد ثابت، مثل', 'and put it in a fixed folder, e.g.') }} <code dir="ltr">C:\BellPlayer</code>.</li>
-    <li>{{ L('شغّله مرة واحدة: يسأل عن عنوان الخادم', 'Run it once: it asks for the server address') }} (<code dir="ltr">{{ server_url }}</code>) {{ L('والمفتاح، ثم يضيف نفسه لبدء التشغيل مع ويندوز.', 'and the key, then adds itself to Windows start-up.') }}</li>
+    <li>{{ L('شغّله مرة واحدة: يسأل عن عنوان الخادم', 'Run it once: it asks for the server address') }} (<code dir="ltr">{{ server_url }}</code>) {{ L('والمفتاح، ثم يعرض «بصمة الجهاز» ويطلب مفتاح الترخيص (يُولَّد من البصمة لدى المطوّر)، ثم يضيف نفسه لبدء التشغيل مع ويندوز.', 'and the key, then shows the “device fingerprint” and asks for the license key (made from that fingerprint by the developer), then adds itself to Windows start-up.') }}</li>
     <li>{{ L('اضغط «رنّ الآن» في تبويب التجربة للتأكد من خروج الصوت من السمّاعات.', 'Press “Ring now” on the test tab to check the speakers.') }}</li>
   </ol>
-  <p class="muted small">{{ L('مهم: يجب أن يبقى مستخدم ويندوز مسجّل الدخول على جهاز المكتب (الصوت لا يعمل على شاشة القفل قبل الدخول)، وأن يكون «ضبط الوقت تلقائياً» مفعّلاً، والمنطقة الزمنية عمّان، ومنع السكون.',
-    'Important: a Windows user must stay signed in on the office PC (no sound before sign-in), “Set time automatically” on, time zone Amman, and sleep off.') }}</p>
+  <p class="muted small">{{ L('مهم: يجب أن يبقى مستخدم ويندوز مسجّل الدخول على جهاز المكتب (الصوت لا يعمل قبل الدخول)، ومنع السكون. الرنين بتوقيت الخادم لا بساعة جهاز المكتب، ويصله عبر الإنترنت أو عبر شبكة المدرسة عند انقطاع الإنترنت.',
+    'Important: a Windows user must stay signed in on the office PC (no sound before sign-in) and sleep off. It rings by the server clock, not the PC clock — reached over the internet, or over the school network when the internet is down.') }}</p>
 </div>
 </section>
 

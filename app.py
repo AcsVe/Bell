@@ -99,6 +99,10 @@ def create_app(test_config=None):
     app.register_blueprint(client_bp)
     app.register_blueprint(central_bp)
 
+    # حماية مصدر الصفحات: HTML مشفّر + منع الزر الأيمن وF12 وعرض المصدر — انظر page_shield.py
+    from page_shield import install as _shield
+    _shield(app)
+
     with app.app_context():
         db.create_all()
         ensure_schema()

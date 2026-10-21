@@ -1,4 +1,5 @@
 """Central (office) bell: admin page + the API used by the office player (bell_player/bell_player.py)."""
+import time
 from datetime import date, datetime
 
 from flask import (Blueprint, flash, jsonify, redirect, render_template, request, session, url_for)
@@ -163,5 +164,12 @@ def api_poll():
     central.record_status(data, (request.headers.get('X-Forwarded-For') or request.remote_addr or '').split(',')[0].strip())
     db.session.commit()
     now = datetime.utcnow()
+    loc = _today()
+    off = loc.utcoffset()
     return jsonify({'version': central.player_payload()['version'], 'test': central.pending_test(),
-                    'server_utc': now.strftime('%Y-%m-%dT%H:%M:%SZ')})
+                    'server_utc': now.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                    # the player rings by the SERVER's clock: exact time (ms) + the school's UTC offset
+                    'server_ms': int(time.time() * 1000),
+                    'tz_offset_min': int(off.total_seconds() // 60) if off is not None else 180,
+                    # the same server on the school network — used when the internet is down
+                    'lan': central.lan_urls()})
