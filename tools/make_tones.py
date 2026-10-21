@@ -86,6 +86,69 @@ def wood(dur=0.12, freq=900):
     return [math.tanh(2.0 * (0.7 * math.sin(2 * math.pi * freq * i / RATE) + 0.3 * (rnd.random() * 2 - 1)) * math.exp(-i / RATE * 30)) for i in range(n)]
 
 
+def musicbox(freq, dur=0.9):
+    """Music-box tine: pure tone + a bright, fast-dying overtone."""
+    n = int(RATE * dur)
+    return [(math.sin(2 * math.pi * freq * i / RATE) * math.exp(-i / RATE * 3.2)
+             + 0.35 * math.sin(2 * math.pi * freq * 3.0 * i / RATE) * math.exp(-i / RATE * 14)
+             + 0.12 * math.sin(2 * math.pi * freq * 5.9 * i / RATE) * math.exp(-i / RATE * 30)) * env(i, n, 0.001, 0.05)
+            for i in range(n)]
+
+
+def toypiano(freq, dur=0.5):
+    """Toy piano: metal rods — slightly detuned partials, plinky."""
+    n = int(RATE * dur)
+    return [(math.sin(2 * math.pi * freq * i / RATE) + 0.6 * math.sin(2 * math.pi * freq * 1.005 * i / RATE)
+             + 0.4 * math.sin(2 * math.pi * freq * 3.92 * i / RATE) * math.exp(-i / RATE * 18)) * math.exp(-i / RATE * 5)
+            * env(i, n, 0.001, 0.04) for i in range(n)]
+
+
+def flute(freq, dur, vib=5.5):
+    """Soft flute-like whistle with vibrato (cuckoo)."""
+    n = int(RATE * dur)
+    out, ph = [], 0.0
+    for i in range(n):
+        tt = i / RATE
+        ph += 2 * math.pi * freq * (1 + 0.006 * math.sin(2 * math.pi * vib * tt)) / RATE
+        out.append((math.sin(ph) + 0.15 * math.sin(2 * ph)) * env(i, n, 0.03, 0.08))
+    return out
+
+
+def bubble(f0, dur=0.11):
+    """Bubble 'blip': a sine that glides upward quickly."""
+    n = int(RATE * dur)
+    out, ph = [], 0.0
+    for i in range(n):
+        x = i / n
+        ph += 2 * math.pi * f0 * (1 + 1.6 * x * x) / RATE
+        out.append(math.sin(ph) * math.sin(math.pi * x) ** 0.7)
+    return out
+
+
+def tweet(f0, f1, dur, wobble=38):
+    """Bird tweet: fast frequency wobble inside a glide."""
+    n = int(RATE * dur)
+    out, ph = [], 0.0
+    for i in range(n):
+        x = i / n
+        f = f0 + (f1 - f0) * x + 260 * math.sin(2 * math.pi * wobble * i / RATE)
+        ph += 2 * math.pi * f / RATE
+        out.append(math.sin(ph) * math.sin(math.pi * x))
+    return out
+
+
+def boing(f0=420, f1=150, dur=0.55):
+    """Cartoon spring 'boing': pitch falls with a wobble."""
+    n = int(RATE * dur)
+    out, ph = [], 0.0
+    for i in range(n):
+        x = i / n
+        f = f1 + (f0 - f1) * math.exp(-x * 4) * (1 + 0.25 * math.sin(2 * math.pi * 14 * i / RATE))
+        ph += 2 * math.pi * f / RATE
+        out.append((math.sin(ph) + 0.3 * math.sin(3 * ph)) * math.exp(-x * 2.5) * env(i, n, 0.003, 0.05))
+    return out
+
+
 def mix_seq(parts):
     out = []
     for p in parts:
@@ -135,6 +198,23 @@ def main():
     write('break-4', mix_seq([marimba(NOTE[n], 0.2) for n in ('C5', 'E5', 'G5', 'C6', 'G5', 'E5')] + [marimba(NOTE['C5'], 0.9)]))
     write('break-5', mix_seq([wood(), silence(0.1), wood(), silence(0.1), wood(0.12, 700), silence(0.3)] * 3))
     write('break-6', mix_seq([electric(1.8, 1100, 26), silence(0.5), electric(1.8, 1100, 26)]))
+    # ── children (kindergarten / primary) — soft and playful, no electric ringing ──
+    N = NOTE
+    write('kids-1', overlap([(i * 0.3, musicbox(N[n], 1.2)) for i, n in
+                             enumerate(('C6', 'G5', 'E5', 'G5', 'C6', 'E6'))]))                          # music box
+    write('kids-2', mix_seq([marimba(N[n], 0.16) for n in ('C5', 'E5', 'G5', 'E5', 'C5', 'E5', 'G5', 'C6')]
+                            + [marimba(N['C6'], 0.9)]))                                                    # happy xylophone
+    write('kids-3', mix_seq([flute(N['G5'], 0.32), silence(0.06), flute(N['E5'], 0.5), silence(0.45),
+                             flute(N['G5'], 0.32), silence(0.06), flute(N['E5'], 0.5)]))   # cuckoo
+    write('kids-4', mix_seq([p for f in (500, 640, 560, 760, 680, 900, 820, 1050) for p in (bubble(f), silence(0.07))]))  # bubbles
+    write('kids-5', mix_seq([tweet(2600, 3400, 0.12), silence(0.05), tweet(3000, 2400, 0.1), silence(0.18),
+                             tweet(2800, 3600, 0.09), silence(0.04), tweet(2800, 3600, 0.09), silence(0.04),
+                             tweet(3400, 2600, 0.16), silence(0.3), tweet(2600, 3400, 0.12), silence(0.05), tweet(3200, 2500, 0.18)]))  # birds
+    write('kids-6', mix_seq([toypiano(N[n], 0.28) for n in ('C5', 'D5', 'E5', 'F5', 'G5', 'A5', 'B5')]
+                            + [toypiano(N['C6'], 1.0)]))                                                   # toy piano scale
+    write('kids-7', mix_seq([musicbox(N[n], d) for n, d in (('C5', .38), ('C5', .38), ('G5', .38), ('G5', .38),
+                                                             ('A5', .38), ('A5', .38), ('G5', .9))]))      # little-star folk tune
+    write('kids-8', mix_seq([boing(), silence(0.12), boing(520, 180, 0.5), silence(0.12), boing(640, 220, 0.6)]))  # bouncy
 
 
 if __name__ == '__main__':

@@ -24,8 +24,9 @@ def _today():
 @central_bp.route('/admin/central')
 @login_required
 def page():
-    if central.persist_defaults():
-        db.session.commit()
+    central.persist_defaults()
+    devs = central.devices()             # also moves an old single «office player» into the device list
+    db.session.commit()
     cfg = central.config()
     group_list = central.groups()
     tones = central.effective_tones(cfg, group_list)
@@ -36,13 +37,14 @@ def page():
     next_ring = next((s for s in today_rings if s['t'] > now.strftime('%H:%M')), None)
     lib = [(k, central.tone_name(k, session.get('lang', 'ar')), central.tone_url(k)) for k in central.all_tone_keys()]
     new_key = session.pop('central_new_key', None)
+    new_key_for = session.pop('central_new_key_for', None)
     return render_template('admin/central.html', cfg=cfg, groups=group_list, tones=tones, week=week, lib=lib,
                            uploads=central.uploaded_tones(), st=central.status(), has_key=central.has_key(),
-                           new_key=new_key, today_rings=today_rings, today_off=today_off, next_ring=next_ring,
+                           new_key=new_key, new_key_for=new_key_for, devices=devs, today_rings=today_rings, today_off=today_off, next_ring=next_ring,
                            now=now, week_order=WEEK_ORDER, wd_names=weekday_names(session.get('lang', 'ar')),
                            tone_name=lambda k: central.tone_name(k, session.get('lang', 'ar')),
                            tone_url=central.tone_url, silent=central.SILENT, server_url=request.host_url.rstrip('/'),
-                           lib_urls={k: url for k, _n, url in lib}, week_version=central.player_payload()['version'])
+                           lib_urls={k: url for k, _n, url in lib}, dev_versions={d['id']: central.player_payload(d['id'])['version'] for d in devs})
 
 
 @central_bp.route('/admin/central/save', methods=['POST'])
@@ -84,8 +86,51 @@ def save():
 @central_bp.route('/admin/central/key', methods=['POST'])
 @login_required
 def key():
-    session['central_new_key'] = central.new_player_key()
+    """New key for one device (form field «player»; default: the first device, created if there is none)."""
+    pid = request.form.get('player') or None
+    session['central_new_key'] = central.new_player_key(pid)
+    session['central_new_key_for'] = pid or (sorted(central.players()) or [None])[0]
     db.session.commit()
+    return redirect(url_for('central.page') + '#player-tab')
+
+
+@central_bp.route('/admin/central/players/add', methods=['POST'])
+@login_required
+def player_add():
+    pid, k = central.add_player(request.form.get('name'))
+    session['central_new_key'], session['central_new_key_for'] = k, pid
+    db.session.commit()
+    flash(_msg('أُضيف الجهاز — انسخ مفتاحه الآن وأدخله عند تثبيت BellPlayer عليه',
+               'Device added — copy its key now and enter it when installing BellPlayer on it'), 'ok')
+    return redirect(url_for('central.page') + '#player-tab')
+
+
+@central_bp.route('/admin/central/players/<pid>/save', methods=['POST'])
+@login_required
+def player_save(pid):
+    valid = {g['key'] for g in central.groups()}
+    if request.form.get('all_groups'):
+        groups = None
+    else:
+        groups = [g for g in request.form.getlist('groups') if g in valid]
+    try:
+        vol = int(request.form.get('volume') or 0)
+        vol = max(10, min(100, vol)) if vol else None
+    except ValueError:
+        vol = None
+    if central.update_player(pid, request.form.get('name'), groups, vol):
+        db.session.commit()
+        flash(_msg('حُفظ الجهاز — يصله التغيير خلال 15 ثانية' + ('' if groups is None or groups else ' (تنبيه: لم تختر أي توقيت، فلن يرنّ)'),
+                   'Device saved — it picks up the change within 15 seconds' + ('' if groups is None or groups else ' (note: no timing chosen, it will not ring)')), 'ok')
+    return redirect(url_for('central.page') + '#player-tab')
+
+
+@central_bp.route('/admin/central/players/<pid>/delete', methods=['POST'])
+@login_required
+def player_delete(pid):
+    central.delete_player(pid)
+    db.session.commit()
+    flash(_msg('حُذف الجهاز — توقف مفتاحه', 'Device removed — its key no longer works'), 'ok')
     return redirect(url_for('central.page') + '#player-tab')
 
 
@@ -96,9 +141,10 @@ def test():
     if tone not in central.all_tone_keys():
         flash(_msg('اختر نغمة', 'Choose a tone'), 'error')
     else:
-        central.request_test(tone)
+        target = request.form.get('player') or 'all'
+        central.request_test(tone, target)
         db.session.commit()
-        st = central.status()
+        st = central.status(None if target == 'all' else target)
         flash(_msg('أُرسل طلب التجربة — يرنّ جهاز المكتب خلال 15 ثانية' if st.get('online') else
                    'أُرسل طلب التجربة، لكن جهاز المكتب غير متصل الآن — يرنّ إن اتصل خلال دقيقتين',
                    'Test sent — the office player rings within 15 seconds' if st.get('online') else
@@ -139,14 +185,18 @@ def tone_delete(media_id):
 
 # ── office player API (X-Bell-Key header) ───────────────────────────────────
 def _authorized():
-    return central.check_key(request.headers.get('X-Bell-Key') or '')
+    """→ the device id of the X-Bell-Key header, or None."""
+    pid = central.check_key(request.headers.get('X-Bell-Key') or '')
+    db.session.commit()                  # players() may have moved the old single key into the device list
+    return pid
 
 
 @central_bp.route('/api/central/schedule')
 def api_schedule():
-    if not _authorized():
+    pid = _authorized()
+    if not pid:
         return jsonify({'error': 'key_invalid'}), 401
-    body = central.player_payload()
+    body = central.player_payload(pid)
     if request.args.get('v') == body['version']:
         return jsonify({'unchanged': True, 'version': body['version']})
     resp = jsonify(body)
@@ -158,15 +208,16 @@ def api_schedule():
 def api_poll():
     """Every ~15 s: the player reports its state; the reply says whether the schedule changed and carries a
     pending test ring."""
-    if not _authorized():
+    pid = _authorized()
+    if not pid:
         return jsonify({'error': 'key_invalid'}), 401
     data = request.get_json(silent=True) or {}
-    central.record_status(data, (request.headers.get('X-Forwarded-For') or request.remote_addr or '').split(',')[0].strip())
+    central.record_status(pid, data, (request.headers.get('X-Forwarded-For') or request.remote_addr or '').split(',')[0].strip())
     db.session.commit()
     now = datetime.utcnow()
     loc = _today()
     off = loc.utcoffset()
-    return jsonify({'version': central.player_payload()['version'], 'test': central.pending_test(),
+    return jsonify({'version': central.player_payload(pid)['version'], 'test': central.pending_test(pid),
                     'server_utc': now.strftime('%Y-%m-%dT%H:%M:%SZ'),
                     # the player rings by the SERVER's clock: exact time (ms) + the school's UTC offset
                     'server_ms': int(time.time() * 1000),

@@ -4,9 +4,11 @@
 <div class="page-head">
   <h1>📢 {{ L('الجرس المركزي (السمّاعات)', 'Central bell (speakers)') }}</h1>
   <div class="actions">
-    {% if st.online %}<span class="chip" style="background:#e3f6e8;color:#14632d">● {{ L('جهاز المكتب متصل', 'Office player online') }}</span>
-    {% elif st.seen %}<span class="chip" style="background:#fde8e8;color:#9b1c1c">● {{ L('جهاز المكتب غير متصل', 'Office player offline') }}</span>
-    {% else %}<span class="chip">{{ L('لم يُثبَّت جهاز المكتب بعد', 'Office player not installed yet') }}</span>{% endif %}
+    {% for d in devices %}
+    {% if d.st.online %}<span class="chip" style="background:#e3f6e8;color:#14632d">● {{ d.name }} {{ L('متصل', 'online') }}</span>
+    {% elif d.st.seen %}<span class="chip" style="background:#fde8e8;color:#9b1c1c">● {{ d.name }} {{ L('غير متصل', 'offline') }}</span>
+    {% else %}<span class="chip">{{ d.name }}: {{ L('لم يُثبَّت بعد', 'not installed yet') }}</span>{% endif %}
+    {% else %}<span class="chip">{{ L('لم يُثبَّت أي جهاز جرس بعد', 'No bell device installed yet') }}</span>{% endfor %}
   </div>
 </div>
 <p class="hint">{{ L('جرس للمدرسة كلها عبر سمّاعات المكتب، مستقل عن التطبيقات وأكواد المعلمين. يرنّ عند بداية كل حصة وكل استراحة، ولكل توقيت (برنامج جرس أو مرحلة) نغمتان: للحصة وللاستراحة، فيميّز الطلاب جرسهم. جهاز المكتب يحفظ الجدول والنغمات ويرنّ حتى لو انقطع الإنترنت أو توقف الخادم.',
@@ -16,7 +18,7 @@
   <a href="#ring-tab" data-tab="ring-tab">🔔 {{ L('النغمات لكل توقيت', 'Tones per timing') }}<span class="count">{{ groups|length }}</span></a>
   <a href="#today-tab" data-tab="today-tab">🕘 {{ L('اليوم والأسبوع', 'Today & week') }}</a>
   <a href="#tones-tab" data-tab="tones-tab">🎵 {{ L('مكتبة النغمات والتجربة', 'Tone library & test') }}</a>
-  <a href="#player-tab" data-tab="player-tab">💻 {{ L('جهاز المكتب', 'Office player') }}</a>
+  <a href="#player-tab" data-tab="player-tab">💻 {{ L('أجهزة الجرس', 'Bell devices') }}<span class="count">{{ devices|length }}</span></a>
 </nav>
 
 <section class="tabpane" data-pane="ring-tab">
@@ -87,10 +89,11 @@
 
 <section class="tabpane" data-pane="tones-tab">
 <div class="card">
-  <h2>{{ L('تجربة على سمّاعات المكتب', 'Test on the office speakers') }}</h2>
+  <h2>{{ L('تجربة على السمّاعات', 'Test on the speakers') }}</h2>
   <form method="post" action="{{ url_for('central.test') }}" class="row">
     <div><select name="tone">{% for k, name, url in lib %}<option value="{{ k }}">{{ name }}</option>{% endfor %}</select></div>
-    <div class="shrink"><button>{{ L('رنّ الآن على جهاز المكتب', 'Ring now on the office player') }}</button></div>
+    {% if devices|length > 1 %}<div class="shrink"><select name="player"><option value="all">{{ L('كل الأجهزة', 'All devices') }}</option>{% for d in devices %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select></div>{% endif %}
+    <div class="shrink"><button>{{ L('رنّ الآن', 'Ring now') }}</button></div>
   </form>
 </div>
 <div class="card">
@@ -112,34 +115,61 @@
 </section>
 
 <section class="tabpane" data-pane="player-tab">
+<p class="hint">{{ L('جهاز جرس = كمبيوتر موصول بجهاز صوت (مضخّم) في مبنى. خادم واحد فقط للمدرسة كلها؛ كل مبنى يحتاج جهاز جرس صغيراً عليه BellPlayer فقط. لكل جهاز مفتاحه وترخيصه، وتختار له التوقيتات التي يرنّ لها.',
+  'A bell device = a computer connected to a PA amplifier in one building. ONE server for the whole school; each building needs only a small bell device running BellPlayer. Each device has its own key and license, and you choose which timings it rings for.') }}</p>
+{% for d in devices %}{% set st = d.st %}
 <div class="card">
-  <h2>{{ L('حالة جهاز المكتب', 'Office player status') }}</h2>
+  <h2>🔊 {{ d.name }} <span class="muted small" dir="ltr">({{ d.id }})</span>
+    {% if st.online %}<span class="chip" style="background:#e3f6e8;color:#14632d">● {{ L('متصل', 'Online') }}</span>{% elif st.seen %}<span class="chip" style="background:#fde8e8;color:#9b1c1c">● {{ L('غير متصل', 'Offline') }}</span>{% else %}<span class="chip">{{ L('لم يتصل بعد', 'Not connected yet') }}</span>{% endif %}</h2>
+  {% if new_key and new_key_for == d.id %}
+  <div class="flash ok" style="margin:8px 0"><b>{{ L('مفتاح هذا الجهاز (يظهر مرة واحدة — انسخه الآن):', 'This device\'s key (shown once — copy it now):') }}</b>
+    <code dir="ltr" style="font-size:16px;user-select:all">{{ new_key }}</code> <button type="button" class="ghost sm" data-copy="{{ new_key }}">{{ L('نسخ', 'Copy') }}</button></div>
+  {% endif %}
   {% if st.seen %}
   <table class="resp"><tbody>
     <tr><td>{{ L('الحالة', 'State') }}</td><td>{% if st.online %}<b style="color:#14632d">● {{ L('متصل', 'Online') }}</b>{% else %}<b style="color:#9b1c1c">● {{ L('غير متصل', 'Offline') }}</b> — {{ L('آخر اتصال قبل', 'last seen') }} {{ (st.age_s // 60) }} {{ L('دقيقة', 'min ago') }}{% endif %}</td></tr>
     <tr><td>{{ L('الجهاز', 'Computer') }}</td><td dir="ltr">{{ st.host }} — {{ st.ip }} — v{{ st.player }}</td></tr>
-    <tr><td>{{ L('الجدول', 'Schedule') }}</td><td>{{ L('محدّث', 'Up to date') if st.version == week_version else L('يُحدَّث…', 'Updating…') }} {% if st.cached %}— {{ L('النغمات محفوظة على الجهاز', 'tones cached on the PC') }}{% endif %}</td></tr>
+    <tr><td>{{ L('الجدول', 'Schedule') }}</td><td>{{ L('محدّث', 'Up to date') if st.version == dev_versions[d.id] else L('يُحدَّث…', 'Updating…') }} {% if st.cached %}— {{ L('النغمات محفوظة على الجهاز', 'tones cached on the PC') }}{% endif %}</td></tr>
     <tr><td>{{ L('آخر رنين', 'Last ring') }}</td><td dir="ltr">{{ st.last_ring or '—' }}</td></tr>
     <tr><td>{{ L('الرنين التالي', 'Next ring') }}</td><td dir="ltr">{{ st.next_ring or '—' }}</td></tr>
     <tr><td>{{ L('ساعة الجهاز', 'PC clock') }}</td><td>{% if st.clock_drift is not none and (st.clock_drift|abs) > 30 %}<b style="color:#9b1c1c">{{ L('مختلفة عن الخادم بـ', 'differs from the server by') }} {{ st.clock_drift }} {{ L('ثانية (لا يؤثر: الرنين بتوقيت الخادم)', 's (no effect: it rings by the server clock)') }}</b>{% else %}{{ L('مضبوطة', 'OK') }}{% endif %}</td></tr>
-    <tr><td>{{ L('الترخيص', 'License') }}</td><td>{% if not st.license %}—{% elif st.license == 'PERMANENT' %}<b style="color:#14632d">{{ L('دائم', 'Permanent') }}</b>{% elif st.license.startswith('invalid') or st.license.startswith('expired') %}<b style="color:#9b1c1c">{{ L('غير مفعّل — الجرس متوقف على جهاز المكتب', 'Not activated — the office player is NOT ringing') }}</b> <span dir="ltr" class="small">({{ st.license }})</span>{% else %}{{ L('ساري حتى', 'Valid until') }} <span dir="ltr">{{ st.license }}</span>{% endif %}{% if st.fingerprint %} <span class="muted small" dir="ltr">— {{ L('بصمة الجهاز', 'fingerprint') }} {{ st.fingerprint }}</span>{% endif %}</td></tr>
+    <tr><td>{{ L('الترخيص', 'License') }}</td><td>{% if not st.license %}—{% elif st.license == 'PERMANENT' %}<b style="color:#14632d">{{ L('دائم', 'Permanent') }}</b>{% elif st.license.startswith('invalid') or st.license.startswith('expired') %}<b style="color:#9b1c1c">{{ L('غير مفعّل — هذا الجهاز لا يرنّ', 'Not activated — this device is NOT ringing') }}</b> <span dir="ltr" class="small">({{ st.license }})</span>{% else %}{{ L('ساري حتى', 'Valid until') }} <span dir="ltr">{{ st.license }}</span>{% endif %}{% if st.fingerprint %} <span class="muted small" dir="ltr">— {{ L('بصمة الجهاز', 'fingerprint') }} {{ st.fingerprint }}</span>{% endif %}</td></tr>
     <tr><td>{{ L('الوقت', 'Time') }}</td><td>{{ L('يرنّ بتوقيت الخادم', 'Rings by the server clock') }}{% if st.via %} <span class="muted small" dir="ltr">— {{ st.via }}</span>{% endif %}</td></tr>
     {% if st.error %}<tr><td>{{ L('آخر خطأ', 'Last error') }}</td><td class="small" dir="ltr">{{ st.error }}</td></tr>{% endif %}
   </tbody></table>
-  {% else %}<p class="muted">{{ L('لم يتصل أي جهاز مكتب بعد.', 'No office player has connected yet.') }}</p>{% endif %}
+  {% endif %}
+  <form method="post" action="{{ url_for('central.player_save', pid=d.id) }}" style="margin-top:10px">
+    <div class="row">
+      <div><label>{{ L('الاسم (المبنى أو المكان)', 'Name (building or place)') }}</label><input type="text" name="name" value="{{ d.name }}" maxlength="60"></div>
+      <div class="shrink" style="width:170px"><label>{{ L('مستوى الصوت', 'Volume') }}</label>
+        <select name="volume"><option value="">{{ L('العام', 'School volume') }} ({{ cfg.volume }}%)</option>{% for v in range(100, 5, -10) %}<option value="{{ v }}" {{ 'selected' if d.volume == v }}>{{ v }}%</option>{% endfor %}</select></div>
+    </div>
+    <label style="margin-top:8px">{{ L('يرنّ لـ', 'Rings for') }}</label>
+    <label style="font-weight:700;display:flex;gap:6px;align-items:center"><input type="checkbox" name="all_groups" value="1" {{ 'checked' if d.groups is none }} data-all-groups> {{ L('كل التوقيتات (المدرسة كلها)', 'Every timing (the whole school)') }}</label>
+    <div class="row" style="gap:4px 14px;flex-wrap:wrap" data-group-list>
+      {% for g in groups %}<label class="shrink" style="display:flex;gap:6px;align-items:center;font-weight:normal"><input type="checkbox" name="groups" value="{{ g.key }}" {{ 'checked' if d.groups is none or g.key in d.groups }}> <bdi>{{ L(g.ar, g.en) }}</bdi> <span class="muted small">({{ g.uses|join('، ') }})</span></label>{% endfor %}
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div class="shrink"><button>{{ L('حفظ', 'Save') }}</button></div>
+    </div>
+  </form>
+  <div class="row" style="margin-top:6px">
+    <form method="post" action="{{ url_for('central.key') }}" class="shrink" data-confirm="{{ L('مفتاح جديد يوقف هذا الجهاز حتى تُدخله فيه (BellPlayer.exe --setup). متابعة؟', 'A new key stops this device until you enter it there (BellPlayer.exe --setup). Continue?') }}">
+      <input type="hidden" name="player" value="{{ d.id }}"><button class="ghost sm">{{ L('مفتاح جديد', 'New key') }}</button></form>
+    <form method="post" action="{{ url_for('central.player_delete', pid=d.id) }}" class="shrink" data-confirm="{{ L('حذف هذا الجهاز؟ يتوقف عن الرنين فوراً.', 'Remove this device? It stops ringing at once.') }}">
+      <button class="danger sm">{{ L('حذف الجهاز', 'Remove device') }}</button></form>
+  </div>
+</div>
+{% endfor %}
+<div class="card">
+  <h2>➕ {{ L('إضافة جهاز جرس (مبنى آخر / جهاز صوت آخر)', 'Add a bell device (another building / PA amplifier)') }}</h2>
+  <form method="post" action="{{ url_for('central.player_add') }}" class="row">
+    <div><label>{{ L('الاسم', 'Name') }}</label><input type="text" name="name" placeholder="{{ L('مثلاً: المبنى الثاني', 'e.g. Building 2') }}" maxlength="60" required></div>
+    <div class="shrink"><button>{{ L('إضافة وإنشاء مفتاح', 'Add and create a key') }}</button></div>
+  </form>
 </div>
 <div class="card">
-  <h2>{{ L('مفتاح جهاز المكتب', 'Office player key') }}</h2>
-  {% if new_key %}
-  <p><b>{{ L('المفتاح الجديد (يظهر مرة واحدة — انسخه الآن):', 'New key (shown once — copy it now):') }}</b></p>
-  <p><code dir="ltr" style="font-size:16px;user-select:all">{{ new_key }}</code> <button type="button" class="ghost sm" data-copy="{{ new_key }}">{{ L('نسخ', 'Copy') }}</button></p>
-  {% elif has_key %}<p class="muted small">{{ L('يوجد مفتاح مفعّل. إنشاء مفتاح جديد يوقف القديم — أدخله بعدها في جهاز المكتب.', 'A key is active. A new key stops the old one — enter it on the office player afterwards.') }}</p>
-  {% else %}<p class="muted small">{{ L('أنشئ مفتاحاً ثم أدخله عند تثبيت جهاز المكتب.', 'Create a key, then enter it when installing the office player.') }}</p>{% endif %}
-  <form method="post" action="{{ url_for('central.key') }}"{% if has_key %} data-confirm="{{ L('إنشاء مفتاح جديد يوقف جهاز المكتب الحالي حتى تُدخل المفتاح الجديد فيه. متابعة؟', 'A new key stops the current office player until you enter it there. Continue?') }}"{% endif %}>
-    <button>{{ L('إنشاء مفتاح جديد', 'Create a new key') }}</button></form>
-</div>
-<div class="card">
-  <h2>{{ L('تثبيت جهاز المكتب (الكمبيوتر الموصول بالسمّاعات)', 'Install the office player (the PC connected to the speakers)') }}</h2>
+  <h2>{{ L('تثبيت جهاز جرس (الكمبيوتر الموصول بالسمّاعات)', 'Install a bell device (the PC connected to the speakers)') }}</h2>
   <ol class="small" style="line-height:2">
     <li>{{ L('نزّل', 'Download') }} <a href="https://github.com/AcsVe/Bell/releases/download/apps/BellPlayer.exe"><b>BellPlayer.exe</b></a> {{ L('وضعه في مجلد ثابت، مثل', 'and put it in a fixed folder, e.g.') }} <code dir="ltr">C:\BellPlayer</code>.</li>
     <li>{{ L('شغّله مرة واحدة: يسأل عن عنوان الخادم', 'Run it once: it asks for the server address') }} (<code dir="ltr">{{ server_url }}</code>) {{ L('والمفتاح، ثم يعرض «بصمة الجهاز» ويطلب مفتاح الترخيص (يُولَّد من البصمة لدى المطوّر)، ثم يضيف نفسه لبدء التشغيل مع ويندوز.', 'and the key, then shows the “device fingerprint” and asks for the license key (made from that fingerprint by the developer), then adds itself to Windows start-up.') }}</li>
@@ -161,6 +191,11 @@
     window._bellAudio = new Audio(url);
     window._bellAudio.play();
   }));
+  document.querySelectorAll('[data-all-groups]').forEach(cb => {
+    const list = cb.closest('form').querySelector('[data-group-list]');
+    const sync = () => list.querySelectorAll('input').forEach(i => { i.disabled = cb.checked; if (cb.checked) i.checked = true; });
+    cb.addEventListener('change', sync); sync();
+  });
 })();
 </script>
 {% endblock %}

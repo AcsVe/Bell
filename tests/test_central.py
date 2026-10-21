@@ -221,3 +221,80 @@ def test_page_shield(tmp_path):
     assert 'TextDecoder' in app_page and 'debugger' not in app_page          # no devtools wipe on classroom screens
     assert c.get('/healthz').get_data(as_text=True) == 'ok'
     assert c.get('/api/central/schedule').is_json
+
+
+def _key_from(html, pid):
+    import re
+    m = re.search(r'user-select:all">([^<]+)<', html)
+    return m.group(1) if m else None
+
+
+def test_multiple_bell_devices(admin, app):
+    """Two buildings: each device has its own key, rings only for its timings, own volume and test ring."""
+    _seed(admin, app)
+    import central
+    c = app.test_client()
+    with app.app_context():
+        keys = [g['key'] for g in central.groups()]
+    admin.post('/admin/central/players/add', data={'name': 'المبنى الأول'})
+    k1 = _key_from(admin.get('/admin/central').get_data(as_text=True), 'p1')
+    admin.post('/admin/central/players/add', data={'name': 'المبنى الثاني'})
+    k2 = _key_from(admin.get('/admin/central').get_data(as_text=True), 'p2')
+    assert k1 and k2 and k1 != k2
+    # building 2: only the first timing, volume 60
+    admin.post('/admin/central/players/p2/save', data={'name': 'المبنى الثاني', 'groups': [keys[0]], 'volume': '60'})
+    b1 = c.get('/api/central/schedule', headers={'X-Bell-Key': k1}).get_json()
+    b2 = c.get('/api/central/schedule', headers={'X-Bell-Key': k2}).get_json()
+    n1 = sum(len(d) for d in b1['days'].values())
+    n2 = sum(len(d) for d in b2['days'].values())
+    assert 0 < n2 < n1 and b2['volume'] == 60 and b1['volume'] == 100 and b1['version'] != b2['version']
+    with app.app_context():
+        only = central.week_rings(only={keys[0]})
+        names = {r['groups'][0] for d in only.values() for s in d for r in s['rings']}
+        assert names == {central.groups()[0]['ar']}
+    # status per device
+    c.post('/api/central/poll', headers={'X-Bell-Key': k1}, json={'host': 'PC-A'})
+    c.post('/api/central/poll', headers={'X-Bell-Key': k2}, json={'host': 'PC-B'})
+    html = admin.get('/admin/central').get_data(as_text=True)
+    assert 'PC-A' in html and 'PC-B' in html and 'المبنى الأول متصل' in html and 'المبنى الثاني متصل' in html
+    # test ring for building 2 only
+    admin.post('/admin/central/test', data={'tone': 'kids-3', 'player': 'p2'})
+    assert c.post('/api/central/poll', headers={'X-Bell-Key': k1}, json={}).get_json()['test'] is None
+    assert c.post('/api/central/poll', headers={'X-Bell-Key': k2}, json={}).get_json()['test']['tone'] == 'kids-3'
+    admin.post('/admin/central/test', data={'tone': 'class-1', 'player': 'all'})
+    assert c.post('/api/central/poll', headers={'X-Bell-Key': k1}, json={}).get_json()['test']['tone'] == 'class-1'
+    # a new key for building 1 does not stop building 2
+    admin.post('/admin/central/key', data={'player': 'p1'})
+    assert c.get('/api/central/schedule', headers={'X-Bell-Key': k1}).status_code == 401
+    assert c.get('/api/central/schedule', headers={'X-Bell-Key': k2}).status_code == 200
+    # removing a device stops its key
+    admin.post('/admin/central/players/p2/delete')
+    assert c.get('/api/central/schedule', headers={'X-Bell-Key': k2}).status_code == 401
+
+
+def test_old_single_key_becomes_a_device(admin, app):
+    """A school that set up the single office player before keeps working (same key, status moved)."""
+    _seed(admin, app)
+    import central
+    from models import AppSetting, db
+    with app.app_context():
+        AppSetting.set('central_key_hash', central._h('OLDKEY'))
+        AppSetting.set('central_player', '{"host": "OFFICE", "seen": "2000-01-01T00:00:00Z"}')
+        db.session.commit()
+    c = app.test_client()
+    assert c.get('/api/central/schedule', headers={'X-Bell-Key': 'OLDKEY'}).status_code == 200
+    with app.app_context():
+        assert list(central.players()) == ['p1'] and central.players()['p1']['name'] == 'جهاز المكتب'
+        assert central.status('p1')['host'] == 'OFFICE'
+
+
+def test_kids_tones(admin, app):
+    import central
+    kids = [k for k in central.CENTRAL_TONES if k.startswith('kids-')]
+    assert len(kids) == 8
+    c = app.test_client()
+    for k in kids:
+        r = c.get(central.tone_url(k))
+        assert r.status_code == 200 and r.data[:4] == b'RIFF'
+    html = admin.get('/admin/central').get_data(as_text=True)
+    assert 'صندوق الموسيقى' in html and 'كوكو' in html

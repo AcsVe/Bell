@@ -33,6 +33,15 @@ CENTRAL_TONES = {
     'break-4': ('نغمة الفرح', 'Happy arpeggio'),
     'break-5': ('دقّات خشبية', 'Wood blocks'),
     'break-6': ('رنّتان طويلتان', 'Two long rings'),
+    # children — soft and playful, no electric ringing
+    'kids-1': ('صندوق الموسيقى', 'Music box'),
+    'kids-2': ('إكسيليفون مرح', 'Happy xylophone'),
+    'kids-3': ('كوكو', 'Cuckoo'),
+    'kids-4': ('فقاعات', 'Bubbles'),
+    'kids-5': ('تغريد العصافير', 'Bird song'),
+    'kids-6': ('بيانو الأطفال', 'Toy piano'),
+    'kids-7': ('نجمة صغيرة', 'Little star'),
+    'kids-8': ('قفزات مرحة', 'Bouncy'),
 }
 CLASS_DEFAULTS = [k for k in CENTRAL_TONES if k.startswith('class-')]
 BREAK_DEFAULTS = [k for k in CENTRAL_TONES if k.startswith('break-')]
@@ -142,13 +151,16 @@ def persist_defaults():
 
 
 # ── schedule ────────────────────────────────────────────────────────────────
-def week_rings(cfg=None):
-    """{weekday: [{'t': 'HH:MM', 'rings': [{'tone', 'kind', 'groups': [...], 'label'}]}]} for Monday=0..Sunday=6."""
+def week_rings(cfg=None, only=None):
+    """{weekday: [{'t': 'HH:MM', 'rings': [{'tone', 'kind', 'groups': [...], 'label'}]}]} for Monday=0..Sunday=6.
+    only = a set of group keys (one bell device that serves some buildings/stages only); None = every group."""
     cfg = cfg or config()
     tones = effective_tones(cfg)
     days = {wd: {} for wd in range(7)}
 
     def add(wd, period, gkey, gname):
+        if only is not None and gkey not in only:
+            return
         tone = tones.get(gkey, {}).get('break' if period['kind'] == 'break' else 'class')
         if not tone or tone == SILENT:
             return
@@ -171,13 +183,17 @@ def week_rings(cfg=None):
     return {wd: [{'t': t, 'rings': list(slot.values())} for t, slot in sorted(slots.items())] for wd, slots in days.items()}
 
 
-def player_payload():
+def player_payload(pid=None):
+    """What one bell device plays: only its groups, at its volume (or the school volume)."""
     cfg = config()
-    week = week_rings(cfg)
+    pl = players().get(pid) if pid else None
+    only = set(pl['groups']) if pl and pl.get('groups') is not None else None
+    week = week_rings(cfg, only)
     used = sorted({r['tone'] for day in week.values() for slot in day for r in slot['rings']})
+    vol = pl.get('volume') if pl and pl.get('volume') else cfg.get('volume')
     body = {
         'enabled': bool(cfg['enabled']),
-        'volume': max(0, min(100, int(cfg.get('volume') or 100))),
+        'volume': max(0, min(100, int(vol or 100))),
         'skip_dates': sorted(set(cfg.get('skip_dates') or [])),
         'tz': 'Asia/Amman',
         'tones': {k: {'url': tone_url(k), 'name': tone_name(k)} for k in used if tone_url(k)},
@@ -187,37 +203,114 @@ def player_payload():
     return body
 
 
-# ── player key, status, test ring ──────────────────────────────────────────
+# ── bell devices (one per building / PA amplifier): key, groups, volume, status, test ring ──
+# app_settings: central_players = {id: {name, key_hash, groups: null (= all) | [group keys], volume: null | 10-100}}
+#               central_st:<id> = last status of that device;  central_test = {id, tone, url, at, target: 'all' | <id>}
 def _h(key):
     return hashlib.sha256(('central:' + (key or '')).encode()).hexdigest()
 
 
-def new_player_key():
+def players():
+    try:
+        out = json.loads(AppSetting.get('central_players') or 'null')
+    except ValueError:
+        out = None
+    if out is None:                       # before multiple devices: one office player with one key
+        out = {}
+        old = AppSetting.get('central_key_hash')
+        if old:
+            out['p1'] = {'name': 'جهاز المكتب', 'key_hash': old, 'groups': None, 'volume': None}
+            try:
+                st = AppSetting.get('central_player')
+                if st and not AppSetting.get('central_st:p1'):
+                    AppSetting.set('central_st:p1', st)
+            except Exception:   # noqa: BLE001
+                pass
+            _save_players(out)
+    return out
+
+
+def _save_players(pls):
+    AppSetting.set('central_players', json.dumps(pls, ensure_ascii=False, sort_keys=True))
+
+
+def add_player(name):
+    pls = players()
+    n = 1
+    while f'p{n}' in pls:
+        n += 1
+    pid = f'p{n}'
     key = secrets.token_urlsafe(24)
-    AppSetting.set('central_key_hash', _h(key))
+    pls[pid] = {'name': (name or '').strip()[:60] or f'جهاز {n}', 'key_hash': _h(key), 'groups': None, 'volume': None}
+    _save_players(pls)
+    return pid, key
+
+
+def new_player_key(pid=None):
+    """A new key for one device (the old key of THAT device stops). No device yet → creates «جهاز المكتب»."""
+    pls = players()
+    if not pls:
+        return add_player('جهاز المكتب')[1]
+    pid = pid if pid in pls else sorted(pls)[0]
+    key = secrets.token_urlsafe(24)
+    pls[pid]['key_hash'] = _h(key)
+    _save_players(pls)
     return key
 
 
+def update_player(pid, name=None, groups='keep', volume='keep'):
+    pls = players()
+    if pid not in pls:
+        return False
+    if name is not None and name.strip():
+        pls[pid]['name'] = name.strip()[:60]
+    if groups != 'keep':
+        pls[pid]['groups'] = groups
+    if volume != 'keep':
+        pls[pid]['volume'] = volume
+    _save_players(pls)
+    return True
+
+
+def delete_player(pid):
+    pls = players()
+    if pls.pop(pid, None) is not None:
+        _save_players(pls)
+        AppSetting.set(f'central_st:{pid}', '')
+
+
 def check_key(key):
-    stored = AppSetting.get('central_key_hash')
-    return bool(stored and key and secrets.compare_digest(stored, _h(key)))
+    """→ the device id this key belongs to, or None."""
+    if not key:
+        return None
+    h = _h(key)
+    for pid, pl in players().items():
+        if pl.get('key_hash') and secrets.compare_digest(pl['key_hash'], h):
+            return pid
+    return None
 
 
 def has_key():
-    return bool(AppSetting.get('central_key_hash'))
+    return bool(players())
 
 
-def record_status(data, ip):
+def record_status(pid, data, ip):
     st = {k: data.get(k) for k in ('host', 'version', 'last_ring', 'next_ring', 'player', 'clock_drift', 'cached', 'error',
                                    'license', 'fingerprint', 'via')}
     st['seen'] = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
     st['ip'] = ip
-    AppSetting.set('central_player', json.dumps(st, ensure_ascii=False))
+    AppSetting.set(f'central_st:{pid}', json.dumps(st, ensure_ascii=False))
 
 
-def status():
+def status(pid=None):
+    """Status of one device; without an id: the first device (kept for the page header and old callers)."""
+    if pid is None:
+        pls = players()
+        if not pls:
+            return {}
+        pid = sorted(pls)[0]
     try:
-        st = json.loads(AppSetting.get('central_player') or '{}')
+        st = json.loads(AppSetting.get(f'central_st:{pid}') or '{}')
     except ValueError:
         st = {}
     if st.get('seen'):
@@ -225,6 +318,12 @@ def status():
         st['age_s'] = int(age)
         st['online'] = age <= ONLINE_SECONDS
     return st
+
+
+def devices():
+    """[{id, name, groups, volume, st}] for the admin page, in creation order."""
+    pls = players()
+    return [dict(pl, id=pid, st=status(pid)) for pid, pl in sorted(pls.items(), key=lambda x: int(x[0][1:] or 0))]
 
 
 def lan_urls():
@@ -249,15 +348,15 @@ def lan_urls():
     return [f'http://{ip}:{port}' for ip in good][:4]
 
 
-def request_test(tone):
-    t = {'id': uuid.uuid4().hex[:12], 'tone': tone, 'url': tone_url(tone),
+def request_test(tone, target='all'):
+    t = {'id': uuid.uuid4().hex[:12], 'tone': tone, 'url': tone_url(tone), 'target': target or 'all',
          'at': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')}
     AppSetting.set('central_test', json.dumps(t))
     return t
 
 
-def pending_test():
-    """A test ring asked for in the last 2 minutes (the player plays each id once)."""
+def pending_test(pid=None):
+    """A test ring asked for in the last 2 minutes for this device (or all); the player plays each id once."""
     try:
         t = json.loads(AppSetting.get('central_test') or 'null')
     except ValueError:
@@ -265,5 +364,7 @@ def pending_test():
     if not t:
         return None
     if datetime.utcnow() - datetime.strptime(t['at'], '%Y-%m-%dT%H:%M:%SZ') > timedelta(minutes=2):
+        return None
+    if pid and t.get('target', 'all') not in ('all', pid):
         return None
     return t
