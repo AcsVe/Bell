@@ -35,16 +35,6 @@ def _to_dest(local_file, dest_file):
             time.sleep(5)
 
 
-def _neon_push(gz):
-    """نسخة ثانية في Neon (إن كان NEON_BACKUP_URL في .env) — لا تُفشل النسخ إن تعذّرت"""
-    try:
-        import neon_store
-        if neon_store._url():
-            neon_store.push(gz)
-    except BaseException as e:   # noqa: BLE001  (SystemExit من neon_store أيضاً)
-        print(t(f'⚠ Neon: تعذّر الرفع ({e})', f'⚠ Neon: upload failed ({e})'))
-
-
 def backup_db(dest_dir, tag, keep):
     import tempfile
     src = db_path()
@@ -62,7 +52,6 @@ def backup_db(dest_dir, tag, keep):
         with open(raw, 'rb') as fi, gzip.open(gz, 'wb', compresslevel=6) as fo:
             shutil.copyfileobj(fi, fo)
         _to_dest(gz, final)
-        _neon_push(gz)
     # الاحتفاظ بآخر keep نسخة من نفس النوع
     pattern = '*-phone.db.gz' if tag == 'phone' else 'bell-*.db.gz'
     files = sorted(f for f in glob.glob(os.path.join(dest_dir, pattern)) if tag == 'phone' or not f.endswith('-phone.db.gz'))
@@ -130,9 +119,7 @@ def main():
     root = a.dir or backup_root()
     f = backup_db(os.path.join(root, 'db'), a.tag, a.keep)
     print(t('✓ القاعدة: ', '✓ Database: ') + f)
-    if not a.no_uploads:
-        n = mirror(uploads_dir(), os.path.join(root, 'uploads'))
-        print(t(f'✓ المرفقات: {n} ملف جديد', f'✓ Uploads: {n} new files'))
+    # النغمات والشعارات مخزّنة داخل القاعدة نفسها — لا مجلد مرفقات منفصل (--no-uploads مقبول للتوافق)
     if not a.no_code:
         code_zip(os.path.join(root, 'code'))
         print(t('✓ الكود', '✓ Code'))
