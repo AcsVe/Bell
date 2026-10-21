@@ -178,3 +178,32 @@ def test_import_render_copies_everything(tmp_path):
     con = sqlite3.connect(tmp_path / 'data' / 'bell.db')
     assert con.execute('select code from teachers').fetchone()[0] == code
     assert con.execute('select count(*) from bell_programs').fetchone()[0] == 10
+
+
+def test_export_all_then_import(tmp_path):
+    """Settings → «تنزيل كل البيانات» on the old server, then import_render.py with that file on the PC."""
+    import subprocess
+    import sqlite3
+    root = os.path.dirname(os.path.dirname(__file__))
+    a = create_app({'TESTING': True, 'SQLALCHEMY_DATABASE_URI': f'sqlite:///{tmp_path}/old.db'})
+    c = a.test_client()
+    assert c.get('/admin/export/all').status_code == 302                 # admins only
+    c.post('/admin/login', data={'username': 'admin', 'password': 'admin'})
+    _seed(c, a)
+    c.post('/admin/teachers/add', data={'names': 'منى\nسارة'})
+    assert 'تنزيل bell.db' in c.get('/admin/settings').get_data(as_text=True)
+    r = c.get('/admin/export/all')
+    assert r.status_code == 200 and 'bell-export-' in r.headers['Content-Disposition']
+    f = tmp_path / 'export.db'
+    f.write_bytes(r.data)
+    from models import Teacher
+    with a.app_context():
+        codes = sorted(t.code for t in Teacher.query.all())
+    env = {k: v for k, v in os.environ.items() if k != 'DATABASE_URL'}
+    env['DATA_DIR'] = str(tmp_path / 'data')
+    p = subprocess.run([sys.executable, os.path.join(root, 'ops', 'import_render.py'), str(f), '--yes'],
+                       capture_output=True, text=True, env=env, cwd=root)
+    assert p.returncode == 0, p.stdout + p.stderr
+    con = sqlite3.connect(tmp_path / 'data' / 'bell.db')
+    assert sorted(x for (x,) in con.execute('select code from teachers')) == codes
+    assert con.execute('select count(*) from bell_programs').fetchone()[0] == 10

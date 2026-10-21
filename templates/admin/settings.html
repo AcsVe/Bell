@@ -72,5 +72,11 @@
   {% else %}<p class="muted">{{ L('لا توجد مراحل بعد.', 'No stages yet.') }}</p>{% endfor %}
   </div>
 </div>
+<div class="card">
+  <h2>{{ L('تنزيل كل البيانات', 'Download all data') }}</h2>
+  <p class="muted small">{{ L('ملف واحد فيه كل شيء: المراحل والحصص والبرامج والصفوف والشعب والمعلمون والأكواد والنغمات والشعارات والإعدادات. للنقل إلى جهاز آخر: شغّل هناك import_render.bat وأعطه مسار هذا الملف.',
+    'One file with everything: stages, periods, programs, grades, sections, teachers, codes, tones, logos and settings. To move to another computer run import_render.bat there and give it this file.') }}</p>
+  <a class="btn" href="{{ url_for('admin.export_all') }}">{{ L('تنزيل bell.db', 'Download bell.db') }}</a>
+</div>
 </section>
 {% endblock %}

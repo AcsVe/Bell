@@ -1144,3 +1144,38 @@ def device_delete(device_id):
     db.session.delete(d)
     db.session.commit()
     return redirect(url_for('admin.settings'))
+
+
+@admin_bp.route('/export/all')
+@login_required
+def export_all():
+    """«تنزيل كل البيانات»: نسخة كاملة من القاعدة (أياً كان نوعها) في ملف bell.db واحد — يُنقل للجهاز الجديد
+    بـ import_render.bat. للقراءة فقط، لا يغيّر شيئاً هنا."""
+    import os
+    import tempfile
+    from datetime import datetime
+    from flask import after_this_request, send_file
+    from sqlalchemy import create_engine, select
+    fd, path = tempfile.mkstemp(suffix='.db')
+    os.close(fd)
+    eng = create_engine('sqlite:///' + path)
+    db.metadata.create_all(eng)
+    with db.engine.connect() as sc, eng.begin() as dc:
+        for tb in db.metadata.sorted_tables:
+            res = sc.execution_options(stream_results=True).execute(select(tb))
+            while True:
+                rows = [dict(r._mapping) for r in res.fetchmany(100)]
+                if not rows:
+                    break
+                dc.execute(tb.insert(), rows)
+    eng.dispose()
+
+    @after_this_request
+    def _cleanup(resp):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        return resp
+    name = f'bell-export-{datetime.now().strftime("%Y%m%d-%H%M")}.db'
+    return send_file(path, as_attachment=True, download_name=name, mimetype='application/octet-stream')
