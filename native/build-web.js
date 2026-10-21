@@ -3,7 +3,7 @@
  * PWA uses, so there is one alert engine everywhere.
  *   node native/build-web.js mobile   → mobile/www
  *   node native/build-web.js desktop  → desktop/www
- * BELL_SERVER=https://your-app.onrender.com sets the default server address. */
+ * BELL_SERVER=https://5.iajaward.org sets the default server address. */
 const fs = require('fs');
 const path = require('path');
 
@@ -14,7 +14,7 @@ if (!['mobile', 'desktop'].includes(target)) {
 }
 const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, target, 'www');
-const server = (process.env.BELL_SERVER || 'https://bell-zrv4.onrender.com').replace(/\/+$/, '');
+const server = (process.env.BELL_SERVER || 'https://5.iajaward.org').replace(/\/+$/, '');
 
 fs.rmSync(OUT, { recursive: true, force: true });
 for (const d of ['js', 'css', 'icons', 'sounds']) fs.mkdirSync(path.join(OUT, d), { recursive: true });

@@ -12,13 +12,16 @@ python app.py            # http://localhost:5000  (SQLite محلي bell.db)
 - لوحة الإدارة: `/admin` (افتراضياً `admin` / `admin` — غيّرها عبر `ADMIN_USER` و`ADMIN_PASS`)
 - دخول الأجهزة بالكود: `/login` ← شاشة التنبيه `/app`
 
-## النشر على Render
+## التشغيل على جهاز المدرسة (بدل Render)
 
-1. أنشئ Postgres (Render أو Neon) وضع الرابط في `DATABASE_URL`.
-2. اضبط `SECRET_KEY` و`ADMIN_USER` و`ADMIN_PASS`.
-3. `render.yaml` جاهز؛ الجداول تُنشأ تلقائياً عند أول تشغيل.
+يعمل على كمبيوتر الخادم في `C:\Bell` على المنفذ 8005 خلف Cloudflare (`https://5.iajaward.org`)، مثل نظام ATT، مع هاتف احتياطي.
+`1_setup.bat` ← `3_autostart.bat` (كمسؤول) ← `update.bat` للتحديث. الدليل الكامل: **[docs/Bell.md](docs/Bell.md)**.
 
-الشعارات والخلفيات والنغمة تُخزَّن داخل Postgres (وليس على القرص) لأن قرص Render يُمسح مع كل نشر.
+## الجرس المركزي (سمّاعات المدرسة)
+
+برنامج `BellPlayer.exe` على كمبيوتر المكتب الموصول بالسمّاعات يرنّ ببداية كل حصة واستراحة لكل المدرسة — مستقل عن التطبيقات والأكواد،
+ويعمل أوفلاين من نسخة محفوظة. لكل توقيت (برنامج جرس أو مرحلة) نغمة حصة ونغمة استراحة يختارها المدير من صفحة **الجرس المركزي**.
+التنزيل: `https://github.com/AcsVe/Bell/releases/download/apps/BellPlayer.exe`
 
 ## ترتيب الإعداد في لوحة الإدارة
 
@@ -66,7 +69,7 @@ python app.py            # http://localhost:5000  (SQLite محلي bell.db)
 
 ### البناء (بدون تثبيت أي SDK)
 1. ارفع المشروع على GitHub.
-2. أضف متغير المستودع `BELL_SERVER` = عنوان السيرفر على Render (Settings ← Secrets and variables ← Actions ← Variables).
+2. أضف متغير المستودع `BELL_SERVER` = `https://5.iajaward.org` (Settings ← Secrets and variables ← Actions ← Variables).
 3. من تبويب Actions شغّل:
    - **Android APK** ← ملف `app-debug.apk` قابل للتثبيت مباشرة.
    - **Desktop installers** ← `.exe` لـ Windows و `.dmg` لـ Mac.

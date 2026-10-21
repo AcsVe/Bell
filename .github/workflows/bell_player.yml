@@ -1,0 +1,34 @@
+name: Office bell player (BellPlayer.exe)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['bell_player/bell_player.py', '.github/workflows/bell_player.yml']
+
+permissions:
+  contents: write          # publish the EXE to the "apps" release
+
+jobs:
+  exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Build
+        run: |
+          pip install pyinstaller==6.11.1 tzdata
+          pyinstaller --onefile --console --name BellPlayer --collect-data tzdata bell_player/bell_player.py
+      - name: Smoke test
+        run: dist\BellPlayer.exe --status
+      - uses: actions/upload-artifact@v4
+        with: { name: BellPlayer, path: dist/BellPlayer.exe }
+      - name: Publish to the fixed download link
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          gh release view apps >/dev/null 2>&1 || gh release create apps --title "تطبيقات جرس الحصص" --notes "آخر نسخة من التطبيقات، تتحدث تلقائياً مع كل بناء."
+          gh release upload apps dist/BellPlayer.exe --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

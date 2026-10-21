@@ -25,6 +25,7 @@ window.normText = (v) => String(v || '').toLowerCase()
       ('admin.programs', ['admin.programs','admin.program_view','admin.programs_assign'], 'برامج الجرس', 'Bell programs'),
       ('admin.teachers', ['admin.teachers','admin.teacher_view'], 'المعلمون', 'Teachers'),
       ('admin.codes', ['admin.codes'], 'الأكواد', 'Codes'),
+      ('central.page', ['central.page'], 'الجرس المركزي', 'Central bell'),
       ('admin.settings', ['admin.settings'], 'النغمة والأجهزة', 'Tone & devices')] %}
   {% set ns = namespace(cur=None) %}{% for item in nav if ep in item[1] %}{% set ns.cur = item %}{% endfor %}{% set current = ns.cur %}
   <button type="button" class="menu-btn" aria-expanded="false" aria-controls="mainnav">

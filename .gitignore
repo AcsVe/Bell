@@ -7,3 +7,12 @@ node_modules/
 mobile/www/
 desktop/www/
 desktop/dist/
+data/
+logs/
+backups/
+venv/
+pyexe.txt
+.secret_key
+bell_player/player_cache/
+bell_player/bell_player.ini
+bell_player/*.log

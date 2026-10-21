@@ -41,9 +41,34 @@ def normalize_db_url(url):
     return url
 
 
+def _secret_key():
+    """SECRET_KEY from the environment (.env on the school PC, Render's generated value), otherwise a random key
+    generated once and kept next to the database — never a fixed default that would let anyone forge a session."""
+    key = os.environ.get('SECRET_KEY')
+    if key:
+        return key
+    folder = os.environ.get('DATA_DIR') or os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(folder, '.secret_key')
+    try:
+        with open(path, encoding='utf-8') as f:
+            key = f.read().strip()
+    except OSError:
+        key = ''
+    if len(key) < 32:
+        import secrets
+        key = secrets.token_hex(32)
+        try:
+            os.makedirs(folder, exist_ok=True)
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(key)
+        except OSError:
+            pass
+    return key
+
+
 def create_app(test_config=None):
     app = Flask(__name__)
-    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-change-me')
+    app.config['SECRET_KEY'] = _secret_key()
     app.config['ADMIN_USER'] = os.environ.get('ADMIN_USER', 'admin')
     app.config['ADMIN_PASS'] = os.environ.get('ADMIN_PASS', 'admin')
     # Long-lived session (same pattern as the venues print station): a
@@ -69,8 +94,10 @@ def create_app(test_config=None):
 
     from blueprints.admin import admin_bp
     from blueprints.client import client_bp
+    from blueprints.central import central_bp
     app.register_blueprint(admin_bp)
     app.register_blueprint(client_bp)
+    app.register_blueprint(central_bp)
 
     with app.app_context():
         db.create_all()

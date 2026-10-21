@@ -1,0 +1,164 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ L('الجرس المركزي', 'Central bell') }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>📢 {{ L('الجرس المركزي (السمّاعات)', 'Central bell (speakers)') }}</h1>
+  <div class="actions">
+    {% if st.online %}<span class="chip" style="background:#e3f6e8;color:#14632d">● {{ L('جهاز المكتب متصل', 'Office player online') }}</span>
+    {% elif st.seen %}<span class="chip" style="background:#fde8e8;color:#9b1c1c">● {{ L('جهاز المكتب غير متصل', 'Office player offline') }}</span>
+    {% else %}<span class="chip">{{ L('لم يُثبَّت جهاز المكتب بعد', 'Office player not installed yet') }}</span>{% endif %}
+  </div>
+</div>
+<p class="hint">{{ L('جرس للمدرسة كلها عبر سمّاعات المكتب، مستقل عن التطبيقات وأكواد المعلمين. يرنّ عند بداية كل حصة وكل استراحة، ولكل توقيت (برنامج جرس أو مرحلة) نغمتان: للحصة وللاستراحة، فيميّز الطلاب جرسهم. جهاز المكتب يحفظ الجدول والنغمات ويرنّ حتى لو انقطع الإنترنت أو توقف الخادم.',
+  'A school-wide bell through the office speakers, independent of the apps and the teacher codes. It rings at the start of every period and every break; each timing (bell program or stage) has two tones — period and break — so students recognise their bell. The office player keeps the schedule and tones and rings even without internet or with the server down.') }}</p>
+
+<nav class="tabbar" data-tabs>
+  <a href="#ring-tab" data-tab="ring-tab">🔔 {{ L('النغمات لكل توقيت', 'Tones per timing') }}<span class="count">{{ groups|length }}</span></a>
+  <a href="#today-tab" data-tab="today-tab">🕘 {{ L('اليوم والأسبوع', 'Today & week') }}</a>
+  <a href="#tones-tab" data-tab="tones-tab">🎵 {{ L('مكتبة النغمات والتجربة', 'Tone library & test') }}</a>
+  <a href="#player-tab" data-tab="player-tab">💻 {{ L('جهاز المكتب', 'Office player') }}</a>
+</nav>
+
+<section class="tabpane" data-pane="ring-tab">
+<form method="post" action="{{ url_for('central.save') }}" class="card">
+  <div class="row" style="align-items:center">
+    <label class="shrink" style="display:flex;gap:8px;align-items:center;font-weight:700;font-size:16px">
+      <input type="checkbox" name="enabled" value="1" {{ 'checked' if cfg.enabled }}> {{ L('الجرس المركزي مفعّل', 'Central bell enabled') }}</label>
+    <div><label>{{ L('مستوى الصوت', 'Volume') }}: <b id="volv">{{ cfg.volume }}</b>%</label>
+      <input type="range" name="volume" min="10" max="100" step="5" value="{{ cfg.volume }}" oninput="volv.textContent=this.value"></div>
+  </div>
+  {% if not groups %}
+  <p class="muted">{{ L('لا توجد توقيتات بعد — أضف المراحل والحصص أو برامج الجرس ووزّعها على الصفوف أولاً.', 'No timings yet — add stages and periods or bell programs and assign them to grades first.') }}</p>
+  {% else %}
+  <table class="resp" style="margin-top:12px">
+    <thead><tr><th>{{ L('التوقيت', 'Timing') }}</th><th>{{ L('الصفوف', 'Grades') }}</th><th>{{ L('نغمة بداية الحصة', 'Period-start tone') }}</th><th>{{ L('نغمة الاستراحة', 'Break tone') }}</th></tr></thead>
+    <tbody>
+    {% for g in groups %}{% set cur = tones[g.key] %}
+    <tr data-row>
+      <td><b><bdi>{{ L(g.ar, g.en) }}</bdi></b><div class="small muted">{{ L('برنامج جرس', 'Bell program') if g.kind == 'program' else L('توقيت المرحلة', 'Stage times') }}</div></td>
+      <td class="small">{% for u in g.uses %}<span class="chip">{{ u }}</span>{% endfor %}</td>
+      {% for kind in ['class', 'break'] %}
+      <td><div class="row" style="flex-wrap:nowrap;gap:6px">
+        <select name="{{ kind }}__{{ g.key }}" data-tone-select>
+          {% for k, name, url in lib %}<option value="{{ k }}" {{ 'selected' if cur[kind] == k }}>{{ name }}</option>{% endfor %}
+          <option value="{{ silent }}" {{ 'selected' if cur[kind] == silent }}>— {{ L('بلا رنين', 'No ring') }} —</option>
+        </select>
+        <button type="button" class="ghost sm shrink" data-play title="{{ L('استماع', 'Listen') }}">▶</button>
+      </div></td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  <div style="margin-top:14px">
+    <label>{{ L('أيام بلا جرس (عطل، امتحانات…) — تاريخ بكل سطر بصيغة 2026-12-31', 'Days without the bell (holidays, exams…) — one date per line as 2026-12-31') }}</label>
+    <textarea name="skip_dates" rows="3" dir="ltr" style="width:100%;max-width:360px">{{ cfg.skip_dates|join('\n') }}</textarea>
+  </div>
+  <button style="margin-top:12px">{{ L('حفظ', 'Save') }}</button>
+  <p class="muted small">{{ L('الاستماع ▶ هنا على جهازك أنت. للتجربة على سمّاعات المكتب: تبويب «مكتبة النغمات والتجربة».', 'Listening ▶ plays on your own device. To test on the office speakers: the “Tone library & test” tab.') }}</p>
+</form>
+</section>
+
+<section class="tabpane" data-pane="today-tab">
+<div class="card">
+  <h2>{{ L('اليوم', 'Today') }} — {{ wd_names[now.weekday()] }} <span dir="ltr" class="muted small">{{ now.strftime('%Y-%m-%d %H:%M') }}</span></h2>
+  {% if today_off %}<p class="chip" style="background:#fff4e0;color:#8a5a00">{{ L('لا جرس اليوم (معطّل أو يوم مستثنى)', 'No bell today (disabled or a skipped day)') }}</p>{% endif %}
+  {% if next_ring and not today_off %}<p><b>{{ L('الجرس التالي', 'Next ring') }}:</b> <span dir="ltr">{{ next_ring.t }}</span> — {% for r in next_ring.rings %}{{ tone_name(r.tone) }} ({{ r.groups|join('، ') }}){{ ' + ' if not loop.last }}{% endfor %}</p>{% endif %}
+  {% if today_rings %}
+  <table class="resp">
+    <thead><tr><th>{{ L('الوقت', 'Time') }}</th><th>{{ L('الرنين', 'Ring') }}</th></tr></thead>
+    <tbody>{% for s in today_rings %}
+    <tr style="{{ 'opacity:.5' if s.t <= now.strftime('%H:%M') }}"><td dir="ltr"><b>{{ s.t }}</b></td>
+      <td>{% for r in s.rings %}<div><span class="chip {{ 'break' if r.kind == 'break' }}">{{ tone_name(r.tone) }}</span> <span class="small">{{ r.label }} — {{ r.groups|join('، ') }}</span></div>{% endfor %}</td></tr>
+    {% endfor %}</tbody>
+  </table>
+  {% else %}<p class="muted">{{ L('لا رنين اليوم.', 'No rings today.') }}</p>{% endif %}
+</div>
+<div class="card">
+  <h2>{{ L('الأسبوع', 'The week') }}</h2>
+  {% for wd in week_order %}{% if week[wd] %}
+  <details><summary><b>{{ wd_names[wd] }}</b> — {{ week[wd]|length }} {{ L('رنين', 'rings') }}</summary>
+    <div class="ptimes" style="margin:8px 0">{% for s in week[wd] %}<span class="pt {{ 'break' if s.rings[0].kind == 'break' }}"><b dir="ltr">{{ s.t }}</b><span>{% for r in s.rings %}{{ tone_name(r.tone) }}{{ ' + ' if not loop.last }}{% endfor %}</span></span>{% endfor %}</div>
+  </details>
+  {% endif %}{% endfor %}
+</div>
+</section>
+
+<section class="tabpane" data-pane="tones-tab">
+<div class="card">
+  <h2>{{ L('تجربة على سمّاعات المكتب', 'Test on the office speakers') }}</h2>
+  <form method="post" action="{{ url_for('central.test') }}" class="row">
+    <div><select name="tone">{% for k, name, url in lib %}<option value="{{ k }}">{{ name }}</option>{% endfor %}</select></div>
+    <div class="shrink"><button>{{ L('رنّ الآن على جهاز المكتب', 'Ring now on the office player') }}</button></div>
+  </form>
+</div>
+<div class="card">
+  <h2>{{ L('مكتبة النغمات', 'Tone library') }}</h2>
+  <div class="tone-list">
+  {% for k, name, url in lib %}
+    <div class="tone-row" style="grid-template-columns:minmax(160px,1fr) minmax(220px,1.4fr) auto">
+      <div class="tn"><b>{{ name }}</b> <span class="small muted" dir="ltr">{{ k }}</span></div>
+      <audio controls preload="none" src="{{ url }}"></audio>
+      <div>{% if k.startswith('media:') %}<form method="post" action="{{ url_for('central.tone_delete', media_id=k[6:]|int) }}" class="inline" data-confirm="{{ L('حذف النغمة؟ المجموعات التي تستخدمها تعود لنغمتها الافتراضية.', 'Delete the tone? Groups using it go back to their default.') }}"><button class="danger sm">✕</button></form>{% endif %}</div>
+    </div>
+  {% endfor %}
+  </div>
+  <form method="post" action="{{ url_for('central.upload') }}" enctype="multipart/form-data" class="row" style="margin-top:14px">
+    <div><label>{{ L('رفع نغمة خاصة (WAV أو MP3، أقل من 30 ثانية)', 'Upload your own tone (WAV or MP3, under 30 s)') }}</label><input type="file" name="tone" accept=".wav,.mp3,audio/wav,audio/mpeg" required></div>
+    <div class="shrink"><button>{{ L('رفع', 'Upload') }}</button></div>
+  </form>
+</div>
+</section>
+
+<section class="tabpane" data-pane="player-tab">
+<div class="card">
+  <h2>{{ L('حالة جهاز المكتب', 'Office player status') }}</h2>
+  {% if st.seen %}
+  <table class="resp"><tbody>
+    <tr><td>{{ L('الحالة', 'State') }}</td><td>{% if st.online %}<b style="color:#14632d">● {{ L('متصل', 'Online') }}</b>{% else %}<b style="color:#9b1c1c">● {{ L('غير متصل', 'Offline') }}</b> — {{ L('آخر اتصال قبل', 'last seen') }} {{ (st.age_s // 60) }} {{ L('دقيقة', 'min ago') }}{% endif %}</td></tr>
+    <tr><td>{{ L('الجهاز', 'Computer') }}</td><td dir="ltr">{{ st.host }} — {{ st.ip }} — v{{ st.player }}</td></tr>
+    <tr><td>{{ L('الجدول', 'Schedule') }}</td><td>{{ L('محدّث', 'Up to date') if st.version == week_version else L('يُحدَّث…', 'Updating…') }} {% if st.cached %}— {{ L('النغمات محفوظة على الجهاز', 'tones cached on the PC') }}{% endif %}</td></tr>
+    <tr><td>{{ L('آخر رنين', 'Last ring') }}</td><td dir="ltr">{{ st.last_ring or '—' }}</td></tr>
+    <tr><td>{{ L('الرنين التالي', 'Next ring') }}</td><td dir="ltr">{{ st.next_ring or '—' }}</td></tr>
+    <tr><td>{{ L('ساعة الجهاز', 'PC clock') }}</td><td>{% if st.clock_drift is not none and (st.clock_drift|abs) > 30 %}<b style="color:#9b1c1c">{{ L('مختلفة عن الخادم بـ', 'differs from the server by') }} {{ st.clock_drift }} {{ L('ثانية — فعّل «ضبط الوقت تلقائياً» في ويندوز', 's — turn on “Set time automatically” in Windows') }}</b>{% else %}{{ L('مضبوطة', 'OK') }}{% endif %}</td></tr>
+    {% if st.error %}<tr><td>{{ L('آخر خطأ', 'Last error') }}</td><td class="small" dir="ltr">{{ st.error }}</td></tr>{% endif %}
+  </tbody></table>
+  {% else %}<p class="muted">{{ L('لم يتصل أي جهاز مكتب بعد.', 'No office player has connected yet.') }}</p>{% endif %}
+</div>
+<div class="card">
+  <h2>{{ L('مفتاح جهاز المكتب', 'Office player key') }}</h2>
+  {% if new_key %}
+  <p><b>{{ L('المفتاح الجديد (يظهر مرة واحدة — انسخه الآن):', 'New key (shown once — copy it now):') }}</b></p>
+  <p><code dir="ltr" style="font-size:16px;user-select:all">{{ new_key }}</code> <button type="button" class="ghost sm" data-copy="{{ new_key }}">{{ L('نسخ', 'Copy') }}</button></p>
+  {% elif has_key %}<p class="muted small">{{ L('يوجد مفتاح مفعّل. إنشاء مفتاح جديد يوقف القديم — أدخله بعدها في جهاز المكتب.', 'A key is active. A new key stops the old one — enter it on the office player afterwards.') }}</p>
+  {% else %}<p class="muted small">{{ L('أنشئ مفتاحاً ثم أدخله عند تثبيت جهاز المكتب.', 'Create a key, then enter it when installing the office player.') }}</p>{% endif %}
+  <form method="post" action="{{ url_for('central.key') }}"{% if has_key %} data-confirm="{{ L('إنشاء مفتاح جديد يوقف جهاز المكتب الحالي حتى تُدخل المفتاح الجديد فيه. متابعة؟', 'A new key stops the current office player until you enter it there. Continue?') }}"{% endif %}>
+    <button>{{ L('إنشاء مفتاح جديد', 'Create a new key') }}</button></form>
+</div>
+<div class="card">
+  <h2>{{ L('تثبيت جهاز المكتب (الكمبيوتر الموصول بالسمّاعات)', 'Install the office player (the PC connected to the speakers)') }}</h2>
+  <ol class="small" style="line-height:2">
+    <li>{{ L('نزّل', 'Download') }} <a href="https://github.com/AcsVe/Bell/releases/download/apps/BellPlayer.exe"><b>BellPlayer.exe</b></a> {{ L('وضعه في مجلد ثابت، مثل', 'and put it in a fixed folder, e.g.') }} <code dir="ltr">C:\BellPlayer</code>.</li>
+    <li>{{ L('شغّله مرة واحدة: يسأل عن عنوان الخادم', 'Run it once: it asks for the server address') }} (<code dir="ltr">{{ server_url }}</code>) {{ L('والمفتاح، ثم يضيف نفسه لبدء التشغيل مع ويندوز.', 'and the key, then adds itself to Windows start-up.') }}</li>
+    <li>{{ L('اضغط «رنّ الآن» في تبويب التجربة للتأكد من خروج الصوت من السمّاعات.', 'Press “Ring now” on the test tab to check the speakers.') }}</li>
+  </ol>
+  <p class="muted small">{{ L('مهم: يجب أن يبقى مستخدم ويندوز مسجّل الدخول على جهاز المكتب (الصوت لا يعمل على شاشة القفل قبل الدخول)، وأن يكون «ضبط الوقت تلقائياً» مفعّلاً، والمنطقة الزمنية عمّان، ومنع السكون.',
+    'Important: a Windows user must stay signed in on the office PC (no sound before sign-in), “Set time automatically” on, time zone Amman, and sleep off.') }}</p>
+</div>
+</section>
+
+<script>
+(function () {
+  const URLS = {{ lib_urls|tojson }};
+  document.querySelectorAll('[data-play]').forEach(b => b.addEventListener('click', () => {
+    const sel = b.parentElement.querySelector('select');
+    const url = URLS[sel.value];
+    if (!url) return;
+    if (window._bellAudio) window._bellAudio.pause();
+    window._bellAudio = new Audio(url);
+    window._bellAudio.play();
+  }));
+})();
+</script>
+{% endblock %}
