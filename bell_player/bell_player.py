@@ -549,7 +549,7 @@ class Player:
                         log.error('tone %s is not cached — not played', r['tone'])
                 if paths:
                     self.audio.put((paths, k))
-                    log.info('RING %s: %s', k, ' + '.join(f"{r['tone']} ({'، '.join(r['groups'])})" for r in slot['rings']))
+                    log.info('RING %s: %s', k, ' + '.join(f"{r['tone']} ({', '.join(r['groups'])})" for r in slot['rings']))
             time.sleep(0.5)
 
     def audio_loop(self):
@@ -646,21 +646,21 @@ def remove_startup():
 
 def setup():
     cur = load_ini()
-    print('\n  الجرس المركزي — إعداد جهاز المكتب / Office bell player setup\n')
-    server = input(f'  عنوان الخادم / Server [{cur["server"] or DEFAULT_SERVER}]: ').strip() or cur['server'] or DEFAULT_SERVER
+    print('\n  Office bell player - setup\n')
+    server = input(f'  Server address [{cur["server"] or DEFAULT_SERVER}]: ').strip() or cur['server'] or DEFAULT_SERVER
     if not server.startswith('http'):
         server = 'https://' + server
     server = server.rstrip('/')
-    key = input('  مفتاح جهاز المكتب (من صفحة «الجرس المركزي» ← جهاز المكتب) / Player key' + (' [Enter = keep]' if cur['key'] else '') + ': ').strip() or cur['key']
+    key = input('  Player key (admin page: Central bell > Office player)' + (' [Enter = keep]' if cur['key'] else '') + ': ').strip() or cur['key']
     try:
         status, data = http('GET', f'{server}/api/central/schedule', key)
         body = json.loads(data.decode('utf-8'))
-        print(f'  ✓ متصل — {sum(len(v) for v in body.get("days", {}).values())} رنين في الأسبوع / connected')
+        print(f'  [OK] connected - {sum(len(v) for v in body.get("days", {}).values())} rings a week')
     except urllib.error.HTTPError as e:
-        print('  ✖ المفتاح غير صحيح / wrong key' if e.code == 401 else f'  ✖ HTTP {e.code}')
+        print('  [X] wrong player key' if e.code == 401 else f'  [X] HTTP {e.code}')
         return False
     except Exception as e:   # noqa: BLE001
-        print(f'  ✖ تعذّر الاتصال بالخادم / cannot reach the server: {e}')
+        print(f'  [X] cannot reach the server: {e}')
         return False
     save_ini(server, key)
     os.makedirs(CACHE, exist_ok=True)
@@ -672,12 +672,12 @@ def setup():
     except Exception:   # noqa: BLE001
         pass
     p.refresh()
-    print('  ✓ حُفظ الجدول والنغمات على هذا الجهاز / schedule and tones saved')
+    print('  [OK] schedule and tones saved on this computer')
     if not ask_license():
         return False
     install_startup()
-    print('  ✓ يعمل الآن ويبدأ تلقائياً مع ويندوز / running, starts with Windows')
-    print('  للتجربة: صفحة «الجرس المركزي» ← «رنّ الآن على جهاز المكتب» / test from the admin page\n')
+    print('  [OK] running now, and starts with Windows')
+    print('  Test it: admin page > Central bell > Tone library & test > Ring now\n')
     return True
 
 
@@ -688,33 +688,32 @@ def ask_license():
     load_clock()
     today = amman_now().date()
     ok, expired, exp = check_license(cur['license'], fp, today)
-    print('\n  ── الترخيص / License ──')
-    print(f'  بصمة هذا الجهاز / Device fingerprint:  {fp}')
+    print('\n  -- License --')
+    print(f'  Device fingerprint:  {fp}')
     if ok and not expired:
-        print('  ✓ مرخّص ' + ('دائماً / permanent' if exp == 'PERMANENT' else f'حتى {exp} / valid until {exp}'))
+        print('  [OK] licensed - ' + ('permanent' if exp == 'PERMANENT' else f'valid until {exp}'))
     elif ok:
-        print(f'  ✖ انتهى الترخيص في {exp} / the license expired on {exp}')
+        print(f'  [X] the license expired on {exp}')
     else:
-        print('  أرسل البصمة أعلاه للمطوّر لتحصل على مفتاح الترخيص / send the fingerprint above to get a license key')
+        print('  Send the fingerprint above to the developer to get a license key')
     while True:
-        prompt = '  مفتاح الترخيص / License key' + (' [Enter = keep]' if ok and not expired else '') + ': '
+        prompt = '  License key' + (' [Enter = keep]' if ok and not expired else '') + ': '
         entered = input(prompt).strip()
         if not entered:
             if ok and not expired:
                 return True
-            print('  ✖ لن يرنّ الجرس قبل إدخال مفتاح ترخيص صحيح. للمحاولة لاحقاً: BellPlayer.exe --license')
-            print('    The bell will not ring without a valid license key. Later: BellPlayer.exe --license')
+            print('  [X] The bell will not ring without a valid license key. Later: BellPlayer.exe --license')
             return False
         v, e, x = check_license(entered, fp, today)
         if not v:
-            print('  ✖ المفتاح غير صحيح لهذا الجهاز — تأكد من نسخه كاملاً / key not valid for this computer')
+            print('  [X] this key is not valid for this computer - copy it completely')
             continue
         if e:
-            print(f'  ✖ هذا المفتاح انتهى في {x} / this key expired on {x}')
+            print(f'  [X] this key expired on {x}')
             continue
         cfg = load_ini()
         save_ini(cfg['server'], cfg['key'], entered)
-        print('  ✓ تم التفعيل ' + ('— دائم / permanent' if x == 'PERMANENT' else f'حتى {x} / until {x}'))
+        print('  [OK] activated - ' + ('permanent' if x == 'PERMANENT' else f'until {x}'))
         return True
 
 
