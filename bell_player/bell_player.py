@@ -36,7 +36,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-VERSION = '1.1'
+VERSION = '1.2'
 DEFAULT_SERVER = 'https://5.iajaward.org'
 POLL_SECONDS = 15
 CATCH_UP_SECONDS = 90         # a ring missed by up to 90 s (PC busy/waking up) still plays; later ones are skipped
@@ -602,17 +602,34 @@ def launch_cmd():
     return f'"{pyw if os.path.isfile(pyw) else sys.executable}" "{os.path.abspath(__file__)}" --run'
 
 
+def _unblock(path):
+    """Remove Windows' 'downloaded from the internet' mark — otherwise the hidden start-up launch is stopped by
+    SmartScreen ('The operation was canceled by the user', 800704C7) because its prompt cannot be shown."""
+    try:
+        os.remove(path + ':Zone.Identifier')
+    except OSError:
+        pass
+
+
 def install_startup():
     if not IS_WIN:
         return
+    exe = sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(__file__)
+    _unblock(exe)
     vbs = os.path.join(startup_dir(), 'BellPlayer.vbs')
     os.makedirs(startup_dir(), exist_ok=True)
-    with open(vbs, 'w', encoding='utf-8') as f:     # hidden window, starts at every sign-in
-        f.write('CreateObject("WScript.Shell").Run "{}", 0, False\n'.format(launch_cmd().replace('"', '""')))
+    # Hidden window, starts at every sign-in. Never shows an error box: if the program is missing or blocked it
+    # just does nothing (the log and the admin page show the player as offline).
+    cmd = launch_cmd().replace('"', '""')
+    exe_v = exe.replace('"', '""')
+    with open(vbs, 'w', encoding='utf-8') as f:
+        f.write('On Error Resume Next\n'
+                'Set fso = CreateObject("Scripting.FileSystemObject")\n'
+                f'If fso.FileExists("{exe_v}") Then CreateObject("WScript.Shell").Run "{cmd}", 0, False\n')
     # Every 5 minutes: start it again if it was closed or crashed (a second copy exits at once).
     subprocess.run(['schtasks', '/create', '/f', '/tn', 'BELL Office Player', '/sc', 'minute', '/mo', '5',
-                    '/tr', f'wscript.exe "{vbs}"'], capture_output=True)
-    subprocess.Popen(['wscript.exe', vbs])
+                    '/tr', f'wscript.exe //B //Nologo "{vbs}"'], capture_output=True)
+    subprocess.Popen(['wscript.exe', '//B', '//Nologo', vbs])
 
 
 def remove_startup():
@@ -713,6 +730,8 @@ def status_report():
 
 def main():
     args = sys.argv[1:]
+    if IS_WIN and getattr(sys, 'frozen', False):
+        _unblock(sys.executable)
     if '--remove' in args:
         remove_startup()
         print('  removed from Windows start-up')
