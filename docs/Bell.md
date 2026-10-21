@@ -84,6 +84,9 @@ tests/                              28 اختباراً
 ## 5) التثبيت (مرة واحدة)
 
 ### أ) جهاز الخادم (`C:\Bell`)
+**الطريقة السريعة (جهاز جديد):** نزّل `https://github.com/AcsVe/Bell/releases/download/apps/install_bell.bat` ← كليك يمين ← Run as administrator. يثبّت Python وGit إن لم يوجدا، وينزّل النظام إلى `C:\Bell`، ويشغّل الإعداد، ويسترجع آخر نسخة من Drive، ويشغّله مع ويندوز، ثم يفحصه (`bell_check.bat`). شرطان: Google Drive for desktop مسجّل الدخول، ونفق Cloudflare `iajaward` يعمل على هذا الجهاز.
+
+**الطريقة اليدوية:**
 1. ثبّت Python 3.12 (64-bit، مع «Add to PATH») وGit إن لم يكونا مثبتين (مثبتان أصلاً لـ ATT).
 2. `git clone https://github.com/AcsVe/Bell.git C:\Bell`
 3. **`1_setup.bat`**: يكتب `.env` (كلمة مرور الإدارة، مجلد النسخ، رمز Cloudflare — يُقرأ من إعدادات ATT تلقائياً إن وُجد)، ينشئ الجداول، **يعرض نقل البيانات من Render**، ويربط `5.iajaward.org` بالجهاز.
