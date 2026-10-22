@@ -84,8 +84,13 @@
   <form id="del-p{{ p.id }}" method="post" action="{{ url_for('admin.period_delete', period_id=p.id) }}" data-confirm="{{ L('حذف هذه الحصة؟ الحصص التالية ستتقدم تلقائياً.', 'Delete this period? Later periods move up automatically.') }}"></form>
   {% endfor %}
 
-  <h2 style="margin-top:18px">{{ L('إضافة حصة / استراحة في آخر اليوم', 'Add a period / break at the end of the day') }}</h2>
+  <h2 style="margin-top:18px" id="add-row">{{ L('إضافة حصة / استراحة', 'Add a period / break') }}</h2>
   <form method="post" action="{{ url_for('admin.period_add', stage_id=st.id) }}" class="row">
+    {% if st.periods %}<div class="shrink" style="min-width:210px"><label>{{ L('المكان', 'Position') }}</label><select name="before">
+      <option value="">{{ L('في آخر اليوم', 'At the end of the day') }}</option>
+      {% set ns2 = namespace(i=0) %}{% for p in st.periods %}{% if p.kind == 'class' %}{% set ns2.i = ns2.i + 1 %}{% endif %}
+      <option value="{{ p.id }}">{{ L('قبل', 'Before') }} {{ ('☕ ' ~ p.label_ar) if p.kind == 'break' else (L('الحصة', 'period') ~ ' ' ~ ns2.i) }} ({{ p.start_time }})</option>{% endfor %}
+    </select></div>{% endif %}
     <div class="shrink" style="width:130px"><label>{{ L('النوع', 'Type') }}</label><select name="kind"><option value="class">{{ L('حصة', 'Class') }}</option><option value="break">{{ L('استراحة', 'Break') }}</option></select></div>
     <div><label>{{ L('التسمية (اختياري)', 'Label (optional)') }}</label><input type="text" name="label_ar" placeholder="{{ L('تُولَّد تلقائياً', 'Auto-generated') }}"></div>
     <div class="shrink" style="width:130px"><label>{{ L('المدة (دقيقة)', 'Minutes') }}</label><input type="number" min="1" max="240" name="duration" value="{{ st.periods[-1].duration if st.periods else 45 }}" required></div>

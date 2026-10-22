@@ -258,19 +258,31 @@ def period_add(stage_id):
     st = db.get_or_404(Stage, stage_id)
     kind = 'break' if request.form.get('kind') == 'break' else 'class'
     dur = parse_duration(request.form.get('duration'))
-    start = st.periods[-1].end_time if st.periods else st.day_start
-    times = chain_times(start, [dur]) if dur else None
+    before = next((p for p in st.periods if p.id == request.form.get('before', type=int)), None)
+    idx = st.periods.index(before) if before else len(st.periods)
+    durs = [p.duration for p in st.periods]
+    durs.insert(idx, dur)
+    times = chain_times(st.day_start, durs) if dur else None
     if not times:
         flash(_msg('أدخل مدة صحيحة بالدقائق (1-240) لا تتجاوز منتصف الليل',
                    'Enter a valid duration in minutes (1-240) that ends before midnight'), 'error')
         return redirect(url_for('admin.stage_view', stage_id=st.id) + '#periods')
-    number = max([p.number for p in st.periods] or [0]) + 1
-    class_index = sum(1 for p in st.periods if p.kind == 'class') + 1
+    if before:
+        # insert in the middle: every later period (and every day/grade override of it) moves one number down
+        number = before.number
+        grade_ids = [g.id for g in st.grades]
+        _shift_numbers(list(st.periods), 'number', number)
+        _shift_numbers(StageDayPeriodTime.query.filter_by(stage_id=st.id).all(), 'period_number', number)
+        if grade_ids:
+            _shift_numbers(GradePeriodTime.query.filter(GradePeriodTime.grade_id.in_(grade_ids)).all(), 'period_number', number)
+    else:
+        number = max([p.number for p in st.periods] or [0]) + 1
+    class_index = sum(1 for p in st.periods[:idx] if p.kind == 'class') + 1
     d_ar, d_en = default_period_labels(kind, class_index)
     db.session.add(Period(stage_id=st.id, number=number, kind=kind,
                           label_ar=_form_text('label_ar') or d_ar,
                           label_en=_form_text('label_en') or d_en,
-                          start_time=times[0][0], end_time=times[0][1]))
+                          start_time=times[idx][0], end_time=times[idx][1]))
     db.session.flush()
     db.session.expire(st, ['periods'])
     rechain_stage(st)
@@ -307,6 +319,14 @@ def periods_save(stage_id):
     db.session.commit()
     flash(_msg('تم حفظ الحصص', 'Periods saved'), 'ok')
     return redirect(url_for('admin.stage_view', stage_id=st.id) + '#periods')
+
+
+def _shift_numbers(rows, attr, from_n):
+    """Make room for a row inserted at number from_n: rows numbered from_n and later move +1 (highest first, one
+    flush at a time, so the unique (owner, number) constraints never clash)."""
+    for r in sorted((r for r in rows if getattr(r, attr) >= from_n), key=lambda r: -getattr(r, attr)):
+        setattr(r, attr, getattr(r, attr) + 1)
+        db.session.flush()
 
 
 @admin_bp.route('/periods/<int:period_id>/delete', methods=['POST'])
@@ -850,19 +870,32 @@ def program_period_add(program_id):
     prog = db.get_or_404(BellProgram, program_id)
     kind = 'break' if request.form.get('kind') == 'break' else 'class'
     dur = parse_duration(request.form.get('duration'))
-    start = prog.periods[-1].end_time if prog.periods else (_form_text('day_start') or '08:00')
-    times = chain_times(start, [dur]) if dur and valid_time(start) else None
+    day_start = prog.periods[0].start_time if prog.periods else (_form_text('day_start') or '08:00')
+    before = next((p for p in prog.periods if p.id == request.form.get('before', type=int)), None)
+    idx = prog.periods.index(before) if before else len(prog.periods)
+    durs = [p.duration for p in prog.periods]
+    durs.insert(idx, dur)
+    times = chain_times(day_start, durs) if dur and valid_time(day_start) else None
     if not times:
         flash(_msg('أدخل مدة صحيحة بالدقائق', 'Enter a valid duration in minutes'), 'error')
         return redirect(url_for('admin.program_view', program_id=prog.id))
-    class_index = sum(1 for p in prog.periods if p.kind == 'class') + 1
+    class_index = sum(1 for p in prog.periods[:idx] if p.kind == 'class') + 1
     d_ar, d_en = default_period_labels(kind, class_index)
     if kind == 'break':
         d_ar = 'الفرصة'
-    prog.periods.append(BellProgramPeriod(number=len(prog.periods) + 1, kind=kind,
-                                          label_ar=_form_text('label_ar') or d_ar,
-                                          label_en=_form_text('label_en') or d_en,
-                                          start_time=times[0][0], end_time=times[0][1]))
+    number = before.number if before else len(prog.periods) + 1
+    if before:
+        _shift_numbers(list(prog.periods), 'number', number)
+    db.session.add(BellProgramPeriod(program_id=prog.id, number=number, kind=kind,
+                                     label_ar=_form_text('label_ar') or d_ar,
+                                     label_en=_form_text('label_en') or d_en,
+                                     start_time=times[idx][0], end_time=times[idx][1]))
+    db.session.flush()
+    db.session.expire(prog, ['periods'])
+    for n, q in enumerate(prog.periods, start=1):     # keep 1..n
+        if q.number != n:
+            q.number = n
+    _rechain_program(prog, day_start, durs)
     db.session.commit()
     return redirect(url_for('admin.program_view', program_id=prog.id) + '#periods')
 

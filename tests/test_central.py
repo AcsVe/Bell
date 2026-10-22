@@ -334,3 +334,43 @@ def test_device_page_and_bluetooth_endpoints(admin, app):
     assert 'BELL-ABC123' in html and 'bluetooth' in html and 'central/device' in html
     assert admin.get('/admin/central/players/zz/payload.json').status_code == 404
     assert app.test_client().get('/admin/central/players/p1/payload.json').status_code == 302   # admins only
+
+
+def test_insert_period_in_the_middle(admin, app):
+    """Add a class/break anywhere (not only at the end) — stage periods, their day overrides, and bell programs."""
+    from models import Stage, Period, StageDayPeriodTime, BellProgram, db
+    admin.post('/admin/stages/add', data={'name_ar': 'S'})
+    with app.app_context():
+        sid = Stage.query.one().id
+    for kind, dur in [('class', 40), ('class', 40), ('class', 40)]:
+        admin.post(f'/admin/stages/{sid}/periods/add', data={'kind': kind, 'duration': dur})
+    # a Thursday override (10 min shorter periods) before inserting
+    with app.app_context():
+        nums = [p.number for p in Stage.query.get(sid).periods]
+    admin.post(f'/admin/stages/{sid}/day-times', data={'weekday': 3, 'day_start': '08:00', **{f'n{n}_dur': 30 for n in nums}})
+    with app.app_context():
+        second = Stage.query.get(sid).periods[1]
+        sec_id = second.id
+    assert 'name="before"' in admin.get(f'/admin/stages/{sid}').get_data(as_text=True)
+    admin.post(f'/admin/stages/{sid}/periods/add', data={'kind': 'break', 'duration': 15, 'before': sec_id})
+    with app.app_context():
+        ps = Stage.query.get(sid).periods
+        assert [(p.kind, p.start_time, p.end_time) for p in ps] == [
+            ('class', '08:00', '08:40'), ('break', '08:40', '08:55'), ('class', '08:55', '09:35'), ('class', '09:35', '10:15')]
+        ov = sorted(StageDayPeriodTime.query.filter_by(stage_id=sid, weekday=3).all(), key=lambda r: r.start_time)
+        assert [(r.start_time, r.end_time) for r in ov] == [('08:00', '08:30'), ('08:30', '08:45'), ('08:45', '09:15'), ('09:15', '09:45')]
+        assert [r.period_number for r in ov] == [p.number for p in ps]
+    # bell program
+    admin.post('/admin/programs/add', data={'name': 'P'})
+    with app.app_context():
+        pid = BellProgram.query.filter_by(name='P').one().id
+    for kind, dur in [('class', 45), ('class', 45)]:
+        admin.post(f'/admin/programs/{pid}/periods/add', data={'kind': kind, 'duration': dur, 'day_start': '07:30'})
+    with app.app_context():
+        first = BellProgram.query.get(pid).periods[0].id
+    admin.post(f'/admin/programs/{pid}/periods/add', data={'kind': 'break', 'duration': 10, 'before': first})
+    with app.app_context():
+        ps = BellProgram.query.get(pid).periods
+        assert [(p.number, p.kind, p.start_time, p.end_time) for p in ps] == [
+            (1, 'break', '07:30', '07:40'), (2, 'class', '07:40', '08:25'), (3, 'class', '08:25', '09:10')]
+    assert 'name="before"' in admin.get(f'/admin/programs/{pid}').get_data(as_text=True)
