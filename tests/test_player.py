@@ -211,3 +211,22 @@ def test_ecdsa_matches_the_generator_format():
         assert not bp.ecdsa_verify(f'{fp}|20301231'.encode(), raw)              # other key pair → rejected
     # the real public key is the one shared with the desktop analysis program
     assert 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE9hskm3ufgTN' in bp.LICENSE_PUBLIC_KEY_PEM
+
+
+def test_check_and_fix_asks_only_for_what_is_wrong(env, monkeypatch):
+    """«Check and fix»: a refused player key is asked again; a valid license is not asked at all."""
+    bp, admin, key, server, played = env
+    lic = bp.sign(FP)
+    bp.save_ini(server, 'OLD-REFUSED-KEY', lic)
+    asked = []
+    answers = iter([key])
+    monkeypatch.setattr('builtins.input', lambda prompt='': (asked.append(prompt), next(answers))[1])
+    assert bp.doctor()
+    assert len(asked) == 1 and 'Player key' in asked[0]
+    assert bp.load_ini()['key'] == key and bp.load_ini()['license'] == lic
+    # everything fine now → no question at all
+    asked.clear()
+    assert bp.doctor() and asked == []
+    # server down → not stuck: warns and keeps the settings
+    bp.save_ini('http://127.0.0.1:9', key, lic)
+    assert not bp.doctor() and asked == [] and bp.load_ini()['key'] == key

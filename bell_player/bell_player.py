@@ -11,8 +11,11 @@
     BellPlayer.exe --net-test      check the connection to the server (certificates, firewall)
     BellPlayer.exe --restart       restart the hidden player      --stop   stop it      --log   last log lines
     BellPlayer.exe --tools         (re)create the .bat shortcuts for all of these next to the program
-Run from anywhere else (e.g. Downloads) it offers to install itself into a folder you choose (default C:\\BellPlayer),
-or to update the copy that is already installed — settings and license are kept.
+Double-click, wherever it is:
+  • outside the installation (e.g. Downloads) → installs it (asks the folder, default C:\\BellPlayer) or UPDATES the
+    installed copy (settings and license kept), closes old copies, tidies leftover files, then runs the check;
+  • the installed copy → «check and fix»: server, player key (asks again only if refused), license (asks only if
+    missing/expired), schedule, start-up, running — then a summary.
 
 Works offline: the schedule and every tone are cached next to the program (player_cache/). The server is needed
 only to receive changes; when it is down or the internet is cut the bell keeps ringing from the cache.
@@ -41,7 +44,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-VERSION = '1.4'
+VERSION = '1.5'
 DEFAULT_SERVER = 'https://5.iajaward.org'
 POLL_SECONDS = 15
 CATCH_UP_SECONDS = 90         # a ring missed by up to 90 s (PC busy/waking up) still plays; later ones are skipped
@@ -674,16 +677,17 @@ def remove_startup():
 
 
 TOOLS = [
-    ('1 - Setup (server, player key, license).bat', '--setup', 'Server address, player key and license key'),
-    ('2 - License (enter or renew).bat', '--license', 'Shows the fingerprint, enter a new license key'),
-    ('3 - Status.bat', '--status', 'Server, schedule, next ring, license, clock'),
-    ('4 - Network test.bat', '--net-test', 'Checks the connection to the server'),
-    ('5 - Test speakers.bat', '--test', 'Plays one tone on this computer now'),
-    ('6 - Fingerprint.bat', '--fingerprint', 'This computer\'s fingerprint (for the license)'),
-    ('7 - Restart player.bat', '--restart', 'Restarts the hidden player'),
-    ('8 - Stop player.bat', '--stop', 'Stops the player until the next sign-in (it does NOT ring)'),
-    ('9 - Show log.bat', '--log', 'Last lines of bell_player.log'),
-    ('10 - Remove from Windows start-up.bat', '--remove', 'Stops it and removes it from start-up'),
+    ('1 - Check and fix (start here).bat', '--check', 'Checks everything and asks only for what is missing'),
+    ('2 - Setup (server, player key, license).bat', '--setup', 'Server address, player key and license key'),
+    ('3 - License (enter or renew).bat', '--license', 'Shows the fingerprint, enter a new license key'),
+    ('4 - Status.bat', '--status', 'Server, schedule, next ring, license, clock'),
+    ('5 - Network test.bat', '--net-test', 'Checks the connection to the server'),
+    ('6 - Test speakers.bat', '--test', 'Plays one tone on this computer now'),
+    ('7 - Fingerprint.bat', '--fingerprint', 'This computer\'s fingerprint (for the license)'),
+    ('8 - Restart player.bat', '--restart', 'Restarts the hidden player'),
+    ('9 - Stop player.bat', '--stop', 'Stops the player until the next sign-in (it does NOT ring)'),
+    ('10 - Show log.bat', '--log', 'Last lines of bell_player.log'),
+    ('11 - Remove from Windows start-up.bat', '--remove', 'Stops it and removes it from start-up'),
 ]
 
 
@@ -691,6 +695,13 @@ def write_tools(folder=None):
     """One .bat per command next to BellPlayer.exe, so nobody has to type commands."""
     folder = folder or BASE
     exe = os.path.basename(sys.executable) if getattr(sys, 'frozen', False) else 'BellPlayer.exe'
+    keep = {n for n, _a, _w in TOOLS}
+    try:
+        for f in os.listdir(folder):          # shortcuts of an older version (other numbering)
+            if f.endswith('.bat') and f[:1].isdigit() and ' - ' in f and f not in keep:
+                os.remove(os.path.join(folder, f))
+    except OSError:
+        pass
     for name, arg, what in TOOLS:
         try:
             with open(os.path.join(folder, name), 'w', encoding='ascii', errors='replace', newline='\r\n') as f:
@@ -716,87 +727,158 @@ def installed_exe():
         return None
 
 
-def install_wizard():
-    """Run from a download folder: install into a chosen folder, or update the installed copy. True = handled."""
-    if not (IS_WIN and getattr(sys, 'frozen', False)) or os.path.isfile(INI):
-        return False
-    me = os.path.abspath(sys.executable)
+DEFAULT_DIR = r'C:\BellPlayer'
+
+
+def _same(a, b):
+    return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
+
+
+def find_install():
+    """The installed BellPlayer.exe: the one Windows start-up launches, else C:\\BellPlayer\\BellPlayer.exe, else None."""
     cur = installed_exe()
-    print('\n  Bell player ' + VERSION + '\n')
-    if cur and os.path.normcase(os.path.abspath(cur)) != os.path.normcase(me):
-        ans = input(f'  An installed bell player was found in {os.path.dirname(cur)}\n  Update it with this version? (Y/n): ').strip().lower()
-        if ans in ('', 'y', 'yes'):
-            subprocess.run(['taskkill', '/f', '/fi', f'PID ne {os.getpid()}', '/im', os.path.basename(cur)], capture_output=True)
-            time.sleep(1.5)
-            for _ in range(5):
-                try:
-                    shutil.copyfile(me, cur)
-                    break
-                except OSError:
-                    time.sleep(1.5)
-            else:
-                print('  [X] could not replace it - close BellPlayer and try again')
-                return True
-            subprocess.run([cur, '--tools'], capture_output=True)
-            subprocess.run([cur, '--restart'], capture_output=True)
-            print(f'  [OK] updated to {VERSION} and restarted - settings and license kept ({os.path.dirname(cur)})')
-            return True
-    default = os.path.dirname(cur) if cur else r'C:\BellPlayer'
-    folder = input(f'  Install folder [{default}]: ').strip().strip('"') or default
+    if cur:
+        return cur
+    d = os.path.join(DEFAULT_DIR, 'BellPlayer.exe')
+    return d if os.path.isfile(d) else None
+
+
+def kill_others():
+    if IS_WIN:
+        subprocess.run(['taskkill', '/f', '/fi', f'PID ne {os.getpid()}', '/im', 'BellPlayer.exe'], capture_output=True)
+        time.sleep(1.5)
+
+
+def install_flow():
+    """Run from Downloads (or anywhere that is not the installation): install or update, clean up, then check."""
+    me = os.path.abspath(sys.executable)
+    here = os.path.dirname(me)
+    cur = find_install()
+    print(f'\n  Bell player {VERSION}\n')
+    if cur:
+        folder = os.path.dirname(cur)
+        print(f'  Updating the bell player installed in {folder}')
+    else:
+        folder = input(f'  Install folder [{DEFAULT_DIR}]: ').strip().strip('"') or DEFAULT_DIR
     try:
         os.makedirs(folder, exist_ok=True)
     except OSError as e:
         print(f'  [X] cannot create {folder}: {e}')
-        return True
+        return False
     dest = os.path.join(folder, 'BellPlayer.exe')
-    if os.path.normcase(os.path.abspath(dest)) != os.path.normcase(me):
-        subprocess.run(['taskkill', '/f', '/fi', f'PID ne {os.getpid()}', '/im', 'BellPlayer.exe'], capture_output=True)
-        shutil.copyfile(me, dest)
-    print(f'  [OK] installed in {folder} (with shortcut .bat files for every command)')
-    subprocess.run([dest, '--tools'], capture_output=True)
-    subprocess.call([dest, '--setup'])
-    return True
+    kill_others()
+    for _ in range(6):
+        try:
+            shutil.copyfile(me, dest)
+            break
+        except OSError:
+            kill_others()
+    else:
+        print(f'  [X] could not write {dest} - is it open somewhere? Restart the computer and run this again.')
+        return False
+    # settings: keep the installed ones; bring along a settings file left next to this download if there are none
+    stray_ini = os.path.join(here, 'bell_player.ini')
+    if not _same(here, folder):
+        if os.path.isfile(stray_ini) and not os.path.isfile(os.path.join(folder, 'bell_player.ini')):
+            shutil.copyfile(stray_ini, os.path.join(folder, 'bell_player.ini'))
+            if os.path.isdir(os.path.join(here, 'player_cache')) and not os.path.isdir(os.path.join(folder, 'player_cache')):
+                shutil.copytree(os.path.join(here, 'player_cache'), os.path.join(folder, 'player_cache'))
+        for name in ['bell_player.ini', 'README.txt'] + [n for n, _a, _w in TOOLS] + \
+                [f for f in os.listdir(here) if f.startswith('bell_player.log')]:
+            try:
+                os.remove(os.path.join(here, name))
+            except OSError:
+                pass
+        shutil.rmtree(os.path.join(here, 'player_cache'), ignore_errors=True)
+    print(f'  [OK] {"updated" if cur else "installed"} in {folder}')
+    return subprocess.call([dest, '--check']) == 0
 
 
-def setup():
-    cur = load_ini()
-    print('\n  Office bell player - setup\n')
-    server = input(f'  Server address [{cur["server"] or DEFAULT_SERVER}]: ').strip() or cur['server'] or DEFAULT_SERVER
+def try_server(server, key):
+    """→ ('ok', rings a week) | ('key', '') | ('net', error). Also takes the server clock (for the license date)."""
+    p = Player({'server': server, 'key': key, 'license': ''})
+    try:
+        data, t0, t1 = p.call('POST', '/api/central/poll', {'host': socket.gethostname(), 'player': VERSION})
+        p.sync_clock(json.loads(data.decode('utf-8')), t0, t1)
+        save_clock()
+        return 'ok', ''
+    except urllib.error.HTTPError as e:
+        return ('key', '') if e.code == 401 else ('net', f'HTTP {e.code}')
+    except Exception as e:   # noqa: BLE001
+        return 'net', str(e)
+
+
+def doctor(force=False):
+    """Double-click on the installed BellPlayer.exe (and «Check and fix»): checks everything, asks only for what is
+    missing or refused, then makes sure it starts with Windows and is running. force = ask everything (Setup)."""
+    print(f'\n  Bell player {VERSION} - checking this computer ({BASE})\n')
+    os.makedirs(CACHE, exist_ok=True)
+    cfg = load_ini()
+    server, key, lic = cfg['server'] or DEFAULT_SERVER, cfg['key'], cfg['license']
+    if force or not cfg['server']:
+        server = input(f'  Server address [{server}]: ').strip() or server
     if not server.startswith('http'):
         server = 'https://' + server
     server = server.rstrip('/')
-    key = input('  Player key (admin page: Central bell > Office player)' + (' [Enter = keep]' if cur['key'] else '') + ': ').strip() or cur['key']
-    try:
-        status, data = http('GET', f'{server}/api/central/schedule', key)
-        body = json.loads(data.decode('utf-8'))
-        print(f'  [OK] connected - {sum(len(v) for v in body.get("days", {}).values())} rings a week')
-    except urllib.error.HTTPError as e:
-        print('  [X] wrong player key' if e.code == 401 else f'  [X] HTTP {e.code}')
-        return False
-    except Exception as e:   # noqa: BLE001
-        print(f'  [X] cannot reach the server: {e}')
-        return False
-    save_ini(server, key)
-    os.makedirs(CACHE, exist_ok=True)
+    if force and key:
+        key = input('  Player key [Enter = keep]: ').strip() or key
+    # 1) server + player key
+    state, why = 'nokey', ''
+    while True:
+        if not key:
+            key = input('  Player key (admin page > Central bell > Bell devices > this device > New key): ').strip()
+            if not key:
+                print('  [!] no player key - the bell keeps its saved schedule but gets no changes. Later: 1 - Check and fix.bat')
+                break
+        state, why = try_server(server, key)
+        if state == 'ok':
+            print(f'  [OK] server {server} - player key accepted')
+            break
+        if state == 'key':
+            print('  [X] the server does not accept this player key (a new key was made for this device, or it was removed).')
+            key = ''
+            continue
+        print(f'  [!] the server is not reachable right now ({why}) - saved; it keeps trying by itself')
+        break
+    save_ini(server, key, lic)
+    # 2) license
+    load_clock()
+    fp = machine_fingerprint()
+    ok, expired, exp = check_license(lic, fp, amman_now().date())
+    if ok and not expired and not force:
+        print('  [OK] license ' + ('permanent' if exp == 'PERMANENT' else f'valid until {exp}') + f'  (fingerprint {fp})')
+    else:
+        ask_license()
+    # 3) schedule
     p = Player(load_ini())
-    try:
-        data, t0, t1 = p.call('POST', '/api/central/poll', {'host': socket.gethostname(), 'player': VERSION})
-        p.sync_clock(json.loads(data.decode('utf-8')), t0, t1)    # the license date is checked by the server's clock
-        save_clock()
-    except Exception:   # noqa: BLE001
-        pass
-    try:
-        p.refresh()
-        print('  [OK] schedule and tones saved on this computer')
-    except Exception as e:   # noqa: BLE001 — keep going: the running player downloads them by itself
-        print(f'  [!] could not download the schedule now ({e}) - the player will retry by itself')
-    if not ask_license():
-        return False
-    install_startup()
+    if state == 'ok':
+        try:
+            p.refresh()
+        except Exception as e:   # noqa: BLE001
+            print(f'  [!] could not download the schedule now ({e}) - it retries by itself')
+    s = p.schedule
+    if s:
+        print(f'  [OK] schedule saved on this computer - {sum(len(v) for v in s.get("days", {}).values())} rings a week'
+              + ('' if p.cached_ok() else ' (some tones still downloading)'))
+    else:
+        print('  [!] no schedule on this computer yet - it arrives as soon as the server is reached')
+    # 4) start-up + running
     write_tools()
-    print('  [OK] running now, and starts with Windows')
-    print('  Test it: admin page > Central bell > Tone library & test > Ring now\n')
-    return True
+    install_startup()
+    time.sleep(3)
+    running = (not IS_WIN) or 'BellPlayer.exe' in subprocess.run(['tasklist', '/fi', 'imagename eq BellPlayer.exe'],
+                                                                 capture_output=True, text=True).stdout
+    print('  [OK] starts with Windows' + (' - running now' if running else ''))
+    print(f'  Next ring: {p.next_ring_text() or "-"}')
+    good = state == 'ok' and p.licensed() and bool(s)
+    print('\n  ' + ('Everything is ready.' if good else 'Ready, with the warnings above.') +
+          '  Test: admin page > Central bell > Tone library & test > Ring now\n')
+    return good
+
+
+def setup():
+    """--setup: ask for everything again (Enter keeps the current value)."""
+    return doctor(force=True)
 
 
 def ask_license():
@@ -862,7 +944,7 @@ def main():
             subprocess.run(['schtasks', '/change', '/tn', 'BELL Office Player', '/disable'], capture_output=True)
             subprocess.run(['taskkill', '/f', '/fi', f'PID ne {os.getpid()}', '/im', os.path.basename(sys.executable)],
                            capture_output=True)
-        print('  stopped - it does NOT ring now. It starts again at the next sign-in, or with: 7 - Restart player.bat')
+        print('  stopped - it does NOT ring now. It starts again at the next sign-in, or with: 8 - Restart player.bat')
         return
     if '--log' in args:
         try:
@@ -871,7 +953,19 @@ def main():
         except OSError:
             print('  no log yet')
         return
-    if not args and install_wizard():
+    if '--check' in args:
+        ok = doctor()
+        if sys.stdin and sys.stdin.isatty():
+            input('  Press Enter to close')
+        sys.exit(0 if ok else 1)
+    if not args and IS_WIN and getattr(sys, 'frozen', False):
+        # double-click: outside the installation → install/update; the installed copy → check and fix
+        cur = find_install()
+        me = os.path.abspath(sys.executable)
+        if (cur and _same(cur, me)) or (not cur and _same(os.path.dirname(me), DEFAULT_DIR)):
+            doctor()
+        else:
+            install_flow()
         if sys.stdin and sys.stdin.isatty():
             input('  Press Enter to close')
         return
@@ -913,7 +1007,7 @@ def main():
         play_file(os.path.join(path, files[0]), (load_cached_schedule() or {}).get('volume', 100))
         return
     cfg = load_ini()
-    if '--setup' in args or not (cfg['server'] and cfg['key']):
+    if '--setup' in args or (not args and not (cfg['server'] and cfg['key'])):
         ok = setup()
         if not args and sys.stdin and sys.stdin.isatty():
             input('  Press Enter to close')

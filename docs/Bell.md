@@ -88,7 +88,8 @@ tests/                              40 اختباراً
 
 **الإعدادات المخزنة (`app_settings`):** `central_bell` (JSON: enabled, volume, skip_dates, tones)، `central_key_hash`، `central_player` (آخر حالة)، `central_test`.
 
-**BellPlayer.exe (الإصدار 1.4):**
+**BellPlayer.exe (الإصدار 1.5):**
+- **1.5 — المثبّت يعالج الحالات بنفسه:** خارج التثبيت = تثبيت أو تحديث تلقائي (ينقل الإعدادات المتروكة، ينظّف، يغلق النسخ القديمة) ثم «Check and fix»؛ النسخة المثبّتة = «Check and fix» (يسأل فقط عن المفتاح إن رُفض، والترخيص إن غاب أو انتهى). الأداة الأولى صارت `1 - Check and fix (start here).bat`.
 - **التثبيت والتحديث بنقرتين:** شغّله من أي مكان (مثل Downloads) ← يسأل عن مجلد التثبيت (`C:\BellPlayer` افتراضياً) وينسخ نفسه؛ وإن وجد نسخة مثبّتة يعرض «Update it with this version?» فيستبدلها ويعيد تشغيلها، والإعدادات والترخيص كما هي.
 - **ملفات bat جاهزة في مجلده** بدل كتابة الأوامر: `1 - Setup` … `10 - Remove from Windows start-up` (Setup، License، Status، Network test، Test speakers، Fingerprint، Restart، Stop، Show log، Remove) + `README.txt`.
 - الأوامر: `--setup`، `--license`، `--fingerprint`، `--net-test`، `--test`، `--status`، `--restart`، `--stop`، `--log`، `--tools`، `--remove`، `--run`.
