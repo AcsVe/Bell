@@ -92,8 +92,18 @@
   <h2>{{ L('تجربة على السمّاعات', 'Test on the speakers') }}</h2>
   <form method="post" action="{{ url_for('central.test') }}" class="row">
     <div><select name="tone">{% for k, name, url in lib %}<option value="{{ k }}">{{ name }}</option>{% endfor %}</select></div>
-    {% if devices|length > 1 %}<div class="shrink"><select name="player"><option value="all">{{ L('كل الأجهزة', 'All devices') }}</option>{% for d in devices %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select></div>{% endif %}
     <div class="shrink"><button>{{ L('رنّ الآن', 'Ring now') }}</button></div>
+    <div style="flex-basis:100%">
+      <label>{{ L('على الأجهزة (المباني):', 'On the devices (buildings):') }}</label>
+      {% if devices %}
+      <input type="hidden" name="devsel" value="1">
+      <div class="row" style="gap:4px 16px;flex-wrap:wrap">
+        <label class="shrink" style="display:flex;gap:6px;align-items:center;font-weight:700"><input type="checkbox" data-all-devices checked> {{ L('كل الأجهزة', 'All devices') }}</label>
+        {% for d in devices %}<label class="shrink" style="display:flex;gap:6px;align-items:center;font-weight:normal"><input type="checkbox" name="players" value="{{ d.id }}" checked data-device-cb>
+          {{ d.name }} {% if d.st.online %}<span style="color:#14632d">●</span>{% else %}<span style="color:#9b1c1c" title="{{ L('غير متصل', 'Offline') }}">●</span>{% endif %}</label>{% endfor %}
+      </div>
+      {% else %}<p class="muted small">{{ L('لا توجد أجهزة جرس بعد — أضفها من تبويب «أجهزة الجرس».', 'No bell devices yet — add them on the “Bell devices” tab.') }}</p>{% endif %}
+    </div>
   </form>
 </div>
 <div class="card">
@@ -191,6 +201,12 @@
     window._bellAudio = new Audio(url);
     window._bellAudio.play();
   }));
+  const allDev = document.querySelector('[data-all-devices]');
+  if (allDev) {
+    const devs = [...document.querySelectorAll('[data-device-cb]')];
+    allDev.addEventListener('change', () => devs.forEach(d => { d.checked = allDev.checked; }));
+    devs.forEach(d => d.addEventListener('change', () => { allDev.checked = devs.every(x => x.checked); }));
+  }
   document.querySelectorAll('[data-all-groups]').forEach(cb => {
     const list = cb.closest('form').querySelector('[data-group-list]');
     const sync = () => list.querySelectorAll('input').forEach(i => { i.disabled = cb.checked; if (cb.checked) i.checked = true; });

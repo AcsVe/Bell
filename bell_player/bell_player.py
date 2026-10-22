@@ -8,6 +8,11 @@
     BellPlayer.exe --remove   remove it from Windows start-up
     BellPlayer.exe --fingerprint   this computer's fingerprint (send it to get a license key)
     BellPlayer.exe --license       enter / renew the license key
+    BellPlayer.exe --net-test      check the connection to the server (certificates, firewall)
+    BellPlayer.exe --restart       restart the hidden player      --stop   stop it      --log   last log lines
+    BellPlayer.exe --tools         (re)create the .bat shortcuts for all of these next to the program
+Run from anywhere else (e.g. Downloads) it offers to install itself into a folder you choose (default C:\\BellPlayer),
+or to update the copy that is already installed — settings and license are kept.
 
 Works offline: the schedule and every tone are cached next to the program (player_cache/). The server is needed
 only to receive changes; when it is down or the internet is cut the bell keeps ringing from the cache.
@@ -36,7 +41,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-VERSION = '1.3'
+VERSION = '1.4'
 DEFAULT_SERVER = 'https://5.iajaward.org'
 POLL_SECONDS = 15
 CATCH_UP_SECONDS = 90         # a ring missed by up to 90 s (PC busy/waking up) still plays; later ones are skipped
@@ -668,6 +673,91 @@ def remove_startup():
                    capture_output=True)
 
 
+TOOLS = [
+    ('1 - Setup (server, player key, license).bat', '--setup', 'Server address, player key and license key'),
+    ('2 - License (enter or renew).bat', '--license', 'Shows the fingerprint, enter a new license key'),
+    ('3 - Status.bat', '--status', 'Server, schedule, next ring, license, clock'),
+    ('4 - Network test.bat', '--net-test', 'Checks the connection to the server'),
+    ('5 - Test speakers.bat', '--test', 'Plays one tone on this computer now'),
+    ('6 - Fingerprint.bat', '--fingerprint', 'This computer\'s fingerprint (for the license)'),
+    ('7 - Restart player.bat', '--restart', 'Restarts the hidden player'),
+    ('8 - Stop player.bat', '--stop', 'Stops the player until the next sign-in (it does NOT ring)'),
+    ('9 - Show log.bat', '--log', 'Last lines of bell_player.log'),
+    ('10 - Remove from Windows start-up.bat', '--remove', 'Stops it and removes it from start-up'),
+]
+
+
+def write_tools(folder=None):
+    """One .bat per command next to BellPlayer.exe, so nobody has to type commands."""
+    folder = folder or BASE
+    exe = os.path.basename(sys.executable) if getattr(sys, 'frozen', False) else 'BellPlayer.exe'
+    for name, arg, what in TOOLS:
+        try:
+            with open(os.path.join(folder, name), 'w', encoding='ascii', errors='replace', newline='\r\n') as f:
+                f.write(f'@echo off\ntitle Bell player - {what}\ncd /d "%~dp0"\n"%~dp0{exe}" {arg}\necho.\npause\n')
+        except OSError:
+            pass
+    try:
+        with open(os.path.join(folder, 'README.txt'), 'w', encoding='utf-8', newline='\r\n') as f:
+            f.write('Bell player - double-click a .bat file:\n\n' + '\n'.join(f'  {n:<44} {w}' for n, _a, w in TOOLS) +
+                    '\n\nUpdate: download the new BellPlayer.exe and run it - it offers to update this copy.\n')
+    except OSError:
+        pass
+
+
+def installed_exe():
+    """The BellPlayer.exe that Windows start-up launches (an existing installation), or None."""
+    vbs = os.path.join(startup_dir(), 'BellPlayer.vbs')
+    try:
+        import re
+        m = re.search(r'FileExists\("([^"]+)"\)', open(vbs, encoding='utf-8').read())
+        return m.group(1) if m and os.path.isfile(m.group(1)) else None
+    except OSError:
+        return None
+
+
+def install_wizard():
+    """Run from a download folder: install into a chosen folder, or update the installed copy. True = handled."""
+    if not (IS_WIN and getattr(sys, 'frozen', False)) or os.path.isfile(INI):
+        return False
+    me = os.path.abspath(sys.executable)
+    cur = installed_exe()
+    print('\n  Bell player ' + VERSION + '\n')
+    if cur and os.path.normcase(os.path.abspath(cur)) != os.path.normcase(me):
+        ans = input(f'  An installed bell player was found in {os.path.dirname(cur)}\n  Update it with this version? (Y/n): ').strip().lower()
+        if ans in ('', 'y', 'yes'):
+            subprocess.run(['taskkill', '/f', '/fi', f'PID ne {os.getpid()}', '/im', os.path.basename(cur)], capture_output=True)
+            time.sleep(1.5)
+            for _ in range(5):
+                try:
+                    shutil.copyfile(me, cur)
+                    break
+                except OSError:
+                    time.sleep(1.5)
+            else:
+                print('  [X] could not replace it - close BellPlayer and try again')
+                return True
+            subprocess.run([cur, '--tools'], capture_output=True)
+            subprocess.run([cur, '--restart'], capture_output=True)
+            print(f'  [OK] updated to {VERSION} and restarted - settings and license kept ({os.path.dirname(cur)})')
+            return True
+    default = os.path.dirname(cur) if cur else r'C:\BellPlayer'
+    folder = input(f'  Install folder [{default}]: ').strip().strip('"') or default
+    try:
+        os.makedirs(folder, exist_ok=True)
+    except OSError as e:
+        print(f'  [X] cannot create {folder}: {e}')
+        return True
+    dest = os.path.join(folder, 'BellPlayer.exe')
+    if os.path.normcase(os.path.abspath(dest)) != os.path.normcase(me):
+        subprocess.run(['taskkill', '/f', '/fi', f'PID ne {os.getpid()}', '/im', 'BellPlayer.exe'], capture_output=True)
+        shutil.copyfile(me, dest)
+    print(f'  [OK] installed in {folder} (with shortcut .bat files for every command)')
+    subprocess.run([dest, '--tools'], capture_output=True)
+    subprocess.call([dest, '--setup'])
+    return True
+
+
 def setup():
     cur = load_ini()
     print('\n  Office bell player - setup\n')
@@ -703,6 +793,7 @@ def setup():
     if not ask_license():
         return False
     install_startup()
+    write_tools()
     print('  [OK] running now, and starts with Windows')
     print('  Test it: admin page > Central bell > Tone library & test > Ring now\n')
     return True
@@ -758,6 +849,32 @@ def main():
     args = sys.argv[1:]
     if IS_WIN and getattr(sys, 'frozen', False):
         _unblock(sys.executable)
+    if '--tools' in args:
+        write_tools()
+        print('  shortcut .bat files written to', BASE)
+        return
+    if '--restart' in args:
+        install_startup()
+        print('  restarted')
+        return
+    if '--stop' in args:
+        if IS_WIN:
+            subprocess.run(['schtasks', '/change', '/tn', 'BELL Office Player', '/disable'], capture_output=True)
+            subprocess.run(['taskkill', '/f', '/fi', f'PID ne {os.getpid()}', '/im', os.path.basename(sys.executable)],
+                           capture_output=True)
+        print('  stopped - it does NOT ring now. It starts again at the next sign-in, or with: 7 - Restart player.bat')
+        return
+    if '--log' in args:
+        try:
+            with open(os.path.join(BASE, 'bell_player.log'), encoding='utf-8', errors='replace') as f:
+                print(''.join(f.readlines()[-40:]))
+        except OSError:
+            print('  no log yet')
+        return
+    if not args and install_wizard():
+        if sys.stdin and sys.stdin.isatty():
+            input('  Press Enter to close')
+        return
     if '--remove' in args:
         remove_startup()
         print('  removed from Windows start-up')
@@ -780,7 +897,7 @@ def main():
         if ok and IS_WIN and load_ini()['server']:
             install_startup()          # restart it with the new license (a running copy re-reads at the next start)
         if sys.stdin and sys.stdin.isatty():
-            input('  Enter ↵')
+            input('  Press Enter to close')
         sys.exit(0 if ok else 1)
     if '--status' in args:
         status_report()
@@ -799,7 +916,7 @@ def main():
     if '--setup' in args or not (cfg['server'] and cfg['key']):
         ok = setup()
         if not args and sys.stdin and sys.stdin.isatty():
-            input('  Enter ↵')
+            input('  Press Enter to close')
         sys.exit(0 if ok else 1)
     setup_logging(console='--run' not in args or not IS_WIN)
     if not single_instance():

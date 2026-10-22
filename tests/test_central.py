@@ -298,3 +298,21 @@ def test_kids_tones(admin, app):
         assert r.status_code == 200 and r.data[:4] == b'RIFF'
     html = admin.get('/admin/central').get_data(as_text=True)
     assert 'صندوق الموسيقى' in html and 'كوكو' in html
+
+
+def test_test_ring_on_chosen_devices(admin, app):
+    _seed(admin, app)
+    c = app.test_client()
+    keys = {}
+    for n in ('A', 'B', 'C'):
+        admin.post('/admin/central/players/add', data={'name': n})
+        keys[n] = _key_from(admin.get('/admin/central').get_data(as_text=True), None)
+    html = admin.get('/admin/central').get_data(as_text=True)
+    assert 'name="players" value="p1"' in html and 'data-all-devices' in html
+    admin.post('/admin/central/test', data={'tone': 'kids-1', 'devsel': '1', 'players': ['p1', 'p3']})
+    got = {n: c.post('/api/central/poll', headers={'X-Bell-Key': k}, json={}).get_json()['test'] for n, k in keys.items()}
+    assert got['A']['tone'] == 'kids-1' and got['C']['tone'] == 'kids-1' and got['B'] is None
+    r = admin.post('/admin/central/test', data={'tone': 'kids-2', 'devsel': '1'}, follow_redirects=True)
+    assert 'اختر جهازاً واحداً على الأقل' in r.get_data(as_text=True)
+    admin.post('/admin/central/test', data={'tone': 'kids-2', 'devsel': '1', 'players': ['p1', 'p2', 'p3']})
+    assert all(c.post('/api/central/poll', headers={'X-Bell-Key': k}, json={}).get_json()['test']['tone'] == 'kids-2' for k in keys.values())

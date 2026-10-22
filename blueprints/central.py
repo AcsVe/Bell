@@ -140,11 +140,17 @@ def test():
     tone = request.form.get('tone')
     if tone not in central.all_tone_keys():
         flash(_msg('اختر نغمة', 'Choose a tone'), 'error')
+    elif request.form.get('devsel') and not request.form.getlist('players'):
+        flash(_msg('اختر جهازاً واحداً على الأقل', 'Choose at least one device'), 'error')
     else:
-        target = request.form.get('player') or 'all'
+        chosen = request.form.getlist('players') or ([request.form['player']] if request.form.get('player') else [])
+        known = set(central.players())
+        chosen = [p for p in chosen if p in known]
+        target = 'all' if not chosen or set(chosen) == known else chosen
         central.request_test(tone, target)
         db.session.commit()
-        st = central.status(None if target == 'all' else target)
+        sts = [central.status(p) for p in (known if target == 'all' else chosen)]
+        st = {'online': bool(sts) and all(x.get('online') for x in sts)}
         flash(_msg('أُرسل طلب التجربة — يرنّ جهاز المكتب خلال 15 ثانية' if st.get('online') else
                    'أُرسل طلب التجربة، لكن جهاز المكتب غير متصل الآن — يرنّ إن اتصل خلال دقيقتين',
                    'Test sent — the office player rings within 15 seconds' if st.get('online') else

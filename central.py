@@ -365,6 +365,7 @@ def pending_test(pid=None):
         return None
     if datetime.utcnow() - datetime.strptime(t['at'], '%Y-%m-%dT%H:%M:%SZ') > timedelta(minutes=2):
         return None
-    if pid and t.get('target', 'all') not in ('all', pid):
+    target = t.get('target', 'all')
+    if pid and target != 'all' and pid != target and pid not in (target if isinstance(target, list) else []):
         return None
     return t
