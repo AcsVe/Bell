@@ -103,6 +103,13 @@ def create_app(test_config=None):
     from page_shield import install as _shield
     _shield(app)
 
+    @app.after_request
+    def _firmware_no_cache(resp):
+        # the device firmware changes with each build: never serve a stale manifest or .bin from the browser cache
+        if request.path.startswith('/static/firmware/'):
+            resp.headers['Cache-Control'] = 'no-cache, max-age=0'
+        return resp
+
     with app.app_context():
         db.create_all()
         ensure_schema()
