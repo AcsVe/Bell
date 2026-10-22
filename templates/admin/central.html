@@ -16,6 +16,7 @@
 
 <nav class="tabbar" data-tabs>
   <a href="#ring-tab" data-tab="ring-tab">🔔 {{ L('النغمات لكل توقيت', 'Tones per timing') }}<span class="count">{{ groups|length }}</span></a>
+  <a href="#off-tab" data-tab="off-tab">📅 {{ L('روزنامة إيقاف الجرس', 'Days without the bell') }}<span class="count">{{ off_events|length }}</span></a>
   <a href="#custom-tab" data-tab="custom-tab">⏰ {{ L('رنّات حسب الوقت', 'Rings at set times') }}<span class="count">{{ custom|length }}</span></a>
   <a href="#today-tab" data-tab="today-tab">🕘 {{ L('اليوم والأسبوع', 'Today & week') }}</a>
   <a href="#tones-tab" data-tab="tones-tab">🎵 {{ L('مكتبة النغمات والتجربة', 'Tone library & test') }}</a>
@@ -67,10 +68,7 @@
     </tbody>
   </table>
   {% endif %}
-  <div style="margin-top:14px">
-    <label>{{ L('أيام بلا جرس (عطل، امتحانات…) — تاريخ بكل سطر بصيغة 2026-12-31', 'Days without the bell (holidays, exams…) — one date per line as 2026-12-31') }}</label>
-    <textarea name="skip_dates" rows="3" dir="ltr" style="width:100%;max-width:360px">{{ cfg.skip_dates|join('\n') }}</textarea>
-  </div>
+  <p class="small" style="margin-top:14px">📅 {{ L('أيام العطل والامتحانات وأي فترة بلا جرس: تبويب', 'Holidays, exams and any period without the bell: the tab') }} <a href="#off-tab">{{ L('روزنامة إيقاف الجرس', 'Days without the bell') }}</a>.</p>
   <button style="margin-top:12px">{{ L('حفظ', 'Save') }}</button>
   <p class="muted small">{{ L('زر الاستماع ▶ يشغّل النغمة على جهازك أنت. وللتجربة على السمّاعات: تبويب «مكتبة النغمات والتجربة».', 'Listening ▶ plays on your own device. To test on the office speakers: the “Tone library & test” tab.') }}</p>
 </form>
@@ -97,6 +95,102 @@
   {% endif %}
   <label style="display:flex;gap:6px;align-items:center;font-weight:normal;margin-top:6px"><input type="checkbox" name="enabled" value="1" {{ 'checked' if not c or c.enabled }}> {{ L('مفعّل', 'Enabled') }}</label>
 {% endmacro %}
+
+<section class="tabpane" data-pane="off-tab">
+<p class="hint">{{ L('حدّد على الروزنامة الأيام التي لا يرنّ فيها الجرس: فترة «من – إلى» (عطلة، امتحانات) أو أياماً متفرقة، ويمكن أن يتكرر الحدث كل شهر أو كل سنة. لا يحتاج أي جهاز جرس إلى برمجة: يرسل الخادم إلى كل جهاز تواريخ الأشهر الاثني عشر القادمة ضمن جدوله، فيحفظها ويعمل بها حتى دون إنترنت.',
+  'Mark on the calendar the days the bell does not ring: a “from – to” period (holiday, exams) or separate days, optionally repeated every month or every year. No bell device needs programming: the server sends every device the dates of the next twelve months inside its schedule, which it keeps and follows even offline.') }}</p>
+
+<div class="card">
+  <div class="offcal-nav">
+    <button type="button" class="ghost sm" data-cal-step="-1">‹ {{ L('السابق', 'Previous') }}</button>
+    <button type="button" class="ghost sm" data-cal-today>{{ L('هذا الشهر', 'This month') }}</button>
+    <button type="button" class="ghost sm" data-cal-step="1">{{ L('التالي', 'Next') }} ›</button>
+  </div>
+  <div class="offcal" id="offcal"></div>
+  <div class="legend">
+    <span><i style="background:#fde8e8;border:1px solid #f5c2c2"></i>{{ L('بلا جرس', 'No bell') }}</span>
+    <span><i style="background:var(--brand)"></i>{{ L('اختيارك في النموذج', 'Your selection in the form') }}</span>
+    <span><i style="background:#f6f7f9;border:1px solid var(--line)"></i>{{ L('عطلة نهاية الأسبوع', 'Weekend') }}</span>
+  </div>
+  <p class="small" id="offcal-info" style="min-height:1.5em;margin:8px 0 0"></p>
+</div>
+
+<form method="post" action="{{ url_for('central.off_save') }}" class="card" id="off-form" data-add-url="{{ url_for('central.off_save') }}">
+  <h2 id="off-form-title">➕ {{ L('حدث جديد', 'New event') }}</h2>
+  <div class="row">
+    <div><label>{{ L('الاسم', 'Name') }}</label><input type="text" name="name" maxlength="80" required placeholder="{{ L('مثلاً: عطلة منتصف الفصل', 'e.g. Mid-term holiday') }}"></div>
+    <div class="shrink"><label>{{ L('النوع', 'Type') }}</label>
+      <div class="row" style="gap:12px;flex-wrap:nowrap">
+        <label class="shrink" style="font-weight:normal;display:flex;gap:5px;align-items:center"><input type="radio" name="kind" value="range" checked> {{ L('فترة من – إلى', 'Period from – to') }}</label>
+        <label class="shrink" style="font-weight:normal;display:flex;gap:5px;align-items:center"><input type="radio" name="kind" value="dates"> {{ L('أيام محددة', 'Specific days') }}</label>
+      </div></div>
+  </div>
+  <div class="row" data-kind-pane="range">
+    <div class="shrink" style="width:170px"><label>{{ L('من', 'From') }}</label><input type="date" name="from"></div>
+    <div class="shrink" style="width:170px"><label>{{ L('إلى', 'To') }}</label><input type="date" name="to"></div>
+    <p class="muted small shrink" style="align-self:end">{{ L('أو اضغط على الروزنامة: أول يوم ثم آخر يوم.', 'Or click the calendar: the first day, then the last.') }}</p>
+  </div>
+  <div data-kind-pane="dates" hidden>
+    <label>{{ L('الأيام (اضغط على الروزنامة لإضافة يوم أو إزالته، أو اكتب تاريخاً بكل سطر بصيغة 2026-12-31)', 'Days (click the calendar to add or remove a day, or type one date per line as 2026-12-31)') }}</label>
+    <textarea name="dates" rows="2" dir="ltr" style="width:100%;max-width:520px"></textarea>
+  </div>
+  <div class="row" style="margin-top:6px">
+    <div class="shrink" style="width:200px"><label>{{ L('التكرار', 'Repeat') }}</label>
+      <select name="repeat"><option value="none">{{ L('لا يتكرر', 'Does not repeat') }}</option>
+        <option value="monthly">{{ L('كل شهر', 'Every month') }}</option><option value="yearly">{{ L('كل سنة', 'Every year') }}</option></select></div>
+    <div class="shrink" style="width:170px" data-until><label>{{ L('يتكرر حتى (اختياري)', 'Repeat until (optional)') }}</label><input type="date" name="until"></div>
+    <p class="muted small shrink" style="align-self:end" data-until>{{ L('كل شهر: في الأيام نفسها من كل شهر (اليوم 31 يصبح آخر يوم في الأشهر الأقصر).', 'Every month: the same days of each month (day 31 becomes the last day of shorter months).') }}</p>
+  </div>
+  {% if devices|length > 1 %}
+  <div class="row" style="gap:4px 14px;flex-wrap:wrap;margin-top:6px">
+    <b class="shrink small">{{ L('الأجهزة:', 'Devices:') }}</b>
+    <label class="shrink" style="font-weight:normal;display:flex;gap:5px;align-items:center"><input type="checkbox" name="all_devices" value="1" checked data-off-all> {{ L('كل الأجهزة', 'All devices') }}</label>
+    {% for d in devices %}<label class="shrink" style="font-weight:normal;display:flex;gap:5px;align-items:center"><input type="checkbox" name="devices" value="{{ d.id }}" checked data-off-dev> {{ d.name }}</label>{% endfor %}
+  </div>
+  {% else %}<input type="hidden" name="all_devices" value="1">{% endif %}
+  <label style="font-weight:normal;display:flex;gap:6px;align-items:center;margin-top:8px"><input type="checkbox" name="enabled" value="1" checked> {{ L('مفعّل', 'Enabled') }}</label>
+  <div class="row" style="margin-top:10px">
+    <div class="shrink"><button>{{ L('حفظ', 'Save') }}</button></div>
+    <div class="shrink"><button type="button" class="ghost" data-off-reset>{{ L('حدث جديد / إلغاء التعديل', 'New event / cancel edit') }}</button></div>
+  </div>
+</form>
+
+<div class="card">
+  <h2>{{ L('الأحداث', 'Events') }} <span class="count">{{ off_events|length }}</span></h2>
+  <form id="bulk-off" class="bulk-bar" data-bulk="off" method="post" action="{{ url_for('central.off_bulk') }}">
+    <label class="bulk-sel"><input type="checkbox" class="bulk-all" data-bulk="off"> {{ L('تحديد الكل', 'Select all') }}</label>
+    <span class="bulk-count" data-bulk="off">{{ L('لم يُحدَّد شيء', 'Nothing selected') }}</span>
+    <span class="bulk-actions">
+      <button type="submit" name="action" value="enable" class="sm ghost" disabled>{{ L('تفعيل', 'Enable') }}</button>
+      <button type="submit" name="action" value="disable" class="sm ghost" disabled>{{ L('تعطيل', 'Disable') }}</button>
+      <button type="submit" name="action" value="delete" class="sm danger" disabled data-confirm-bulk="{{ L('حذف {n} من الأحداث؟', 'Delete {n} event(s)?') }}">{{ L('حذف', 'Delete') }}</button>
+    </span>
+  </form>
+  {% if off_events %}
+  <div class="dt-wrap"><table data-table class="resp">
+    <thead><tr><th data-nosort><input type="checkbox" class="bulk-all" data-bulk="off" aria-label="{{ L('تحديد الكل', 'Select all') }}"></th>
+      <th data-filter="text">{{ L('الاسم', 'Name') }}</th><th data-filter="select">{{ L('النوع', 'Type') }}</th><th data-filter="text">{{ L('التواريخ', 'Dates') }}</th>
+      <th data-filter="select">{{ L('التكرار', 'Repeat') }}</th>{% if devices|length > 1 %}<th data-filter="select">{{ L('الأجهزة', 'Devices') }}</th>{% endif %}
+      <th data-sort="num">{{ L('أيام خلال سنة', 'Days in a year') }}</th><th>{{ L('القادم', 'Next') }}</th><th data-filter="select">{{ L('الحالة', 'Status') }}</th><th data-nosort></th></tr></thead>
+    <tbody>
+    {% for e in off_events %}{% set info = off_info[e.id] %}
+    <tr data-row style="{{ 'opacity:.55' if not e.enabled }}">
+      <td><input type="checkbox" class="bulk-item" data-bulk="off" name="ids" value="{{ e.id }}" form="bulk-off" aria-label="{{ L('تحديد', 'Select') }}"></td>
+      <td><b>{{ e.name }}</b></td>
+      <td>{{ L('فترة', 'Period') if e.kind == 'range' else L('أيام محددة', 'Specific days') }}</td>
+      <td class="small"><span dir="ltr" style="unicode-bidi:isolate">{% if e.kind == 'range' %}{{ e['from'] }}{% if e.to != e['from'] %} – {{ e.to }}{% endif %}{% else %}{{ e.dates[:6]|join(', ') }}{% if e.dates|length > 6 %} … (+{{ e.dates|length - 6 }}){% endif %}{% endif %}</span></td>
+      <td>{{ {'none': L('لا يتكرر', 'No'), 'monthly': L('كل شهر', 'Monthly'), 'yearly': L('كل سنة', 'Yearly')}[e.repeat or 'none'] }}{% if e.until %} <span class="small muted">{{ L('حتى', 'until') }} <span dir="ltr">{{ e.until }}</span></span>{% endif %}</td>
+      {% if devices|length > 1 %}<td>{% if e.devices is none %}{{ L('كل الأجهزة', 'All devices') }}{% else %}{% for d in devices if d.id in e.devices %}{{ d.name }}{{ '، ' if not loop.last }}{% endfor %}{% endif %}</td>{% endif %}
+      <td data-value="{{ info|length }}">{{ info|length }}</td>
+      <td dir="ltr" class="small" style="white-space:nowrap">{{ (info|list|first) or '—' }}</td>
+      <td data-value="{{ L('مفعّل', 'Enabled') if e.enabled else L('معطّل', 'Disabled') }}">{% if e.enabled %}<span class="chip" style="background:#e3f6e8;color:#14632d">{{ L('مفعّل', 'Enabled') }}</span>{% else %}<span class="chip">{{ L('معطّل', 'Disabled') }}</span>{% endif %}</td>
+      <td><button type="button" class="ghost sm" data-off-edit="{{ e|tojson|forceescape }}" data-off-url="{{ url_for('central.off_save', eid=e.id) }}">{{ L('تعديل', 'Edit') }}</button></td>
+    </tr>
+    {% endfor %}
+    </tbody></table></div>
+  {% else %}<p class="muted">{{ L('لا توجد أحداث بعد — أضف أول حدث من النموذج أعلاه.', 'No events yet — add the first one with the form above.') }}</p>{% endif %}
+</div>
+</section>
 
 <section class="tabpane" data-pane="custom-tab">
 <p class="hint">{{ L('رنّات بأسماء وأوقات تحدّدها أنت، غير مرتبطة بالحصص أو الاستراحات، مثل: طابور الصباح، ونهاية الدوام، وصلاة الظهر، والإذاعة المدرسية. لكلٍّ منها وقته وأيامه ونغمته، وتحدّد الأجهزة (المباني) التي ترنّ فيها. وتُراعى فيها أيام العطل وزر التفعيل العام.',
@@ -261,6 +355,105 @@
 
 <script>
 (function () {
+  // calendar of days without the bell
+  const OFF = {{ off_map|tojson }};
+  const TODAY = {{ now.strftime('%Y-%m-%d')|tojson }};
+  const AR = {{ (session.get('lang', 'ar') != 'en')|tojson }};
+  const MONTHS = AR ? ['كانون الثاني','شباط','آذار','نيسان','أيار','حزيران','تموز','آب','أيلول','تشرين الأول','تشرين الثاني','كانون الأول']
+                    : ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const WD = AR ? ['أحد','إثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت'] : ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const cal = document.getElementById('offcal'), info = document.getElementById('offcal-info');
+  const form = document.getElementById('off-form');
+  if (cal && form) {
+    let base = new Date(TODAY + 'T00:00:00'); base.setDate(1);
+    const iso = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const kind = () => form.querySelector('[name=kind]:checked').value;
+    const picked = () => {
+      if (kind() === 'range') {
+        const a = form.elements.from.value, b = form.elements.to.value || a;
+        return { a, b };
+      }
+      return { set: new Set(form.elements.dates.value.split(/[\s,،]+/).filter(Boolean)) };
+    };
+    function render() {
+      cal.innerHTML = '';
+      const p = picked();
+      const months = window.innerWidth > 900 ? 3 : (window.innerWidth > 600 ? 2 : 1);
+      for (let m = 0; m < months; m++) {
+        const first = new Date(base.getFullYear(), base.getMonth() + m, 1);
+        const box = document.createElement('div'); box.className = 'mon';
+        box.innerHTML = '<h3>' + MONTHS[first.getMonth()] + ' ' + first.getFullYear() + '</h3>';
+        const g = document.createElement('div'); g.className = 'grid7';
+        WD.forEach((w) => { const h = document.createElement('div'); h.className = 'wd'; h.textContent = w; g.appendChild(h); });
+        for (let i = 0; i < first.getDay(); i++) { const b = document.createElement('div'); b.className = 'blank'; g.appendChild(b); }
+        const days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+        for (let d = 1; d <= days; d++) {
+          const dt = new Date(first.getFullYear(), first.getMonth(), d), k = iso(dt);
+          const c = document.createElement('div'); c.className = 'day'; c.textContent = d; c.dataset.date = k;
+          if (dt.getDay() === 5 || dt.getDay() === 6) c.classList.add('we');
+          if (OFF[k]) { c.classList.add('off'); c.title = OFF[k].join('، '); }
+          if (k === TODAY) c.classList.add('today');
+          if (p.set ? p.set.has(k) : (p.a && (k === p.a || k === p.b))) c.classList.add('pick');
+          else if (!p.set && p.a && k > p.a && k < p.b) c.classList.add('inrange');
+          g.appendChild(c);
+        }
+        box.appendChild(g); cal.appendChild(box);
+      }
+    }
+    cal.addEventListener('click', (e) => {
+      const c = e.target.closest('.day'); if (!c) return;
+      const k = c.dataset.date;
+      info.textContent = k + ': ' + (OFF[k] ? (AR ? 'بلا جرس — ' : 'No bell — ') + OFF[k].join('، ') : (AR ? 'يرنّ الجرس' : 'The bell rings'));
+      if (kind() === 'range') {
+        const f = form.elements.from, t = form.elements.to;
+        if (!f.value || (f.value && t.value && f.value !== t.value) || k < f.value) { f.value = k; t.value = k; }
+        else { t.value = k; }
+      } else {
+        const s = picked().set; s.has(k) ? s.delete(k) : s.add(k);
+        form.elements.dates.value = [...s].sort().join('\n');
+      }
+      render();
+    });
+    document.querySelectorAll('[data-cal-step]').forEach((b) => b.addEventListener('click', () => { base.setMonth(base.getMonth() + Number(b.dataset.calStep)); render(); }));
+    document.querySelector('[data-cal-today]').addEventListener('click', () => { base = new Date(TODAY + 'T00:00:00'); base.setDate(1); render(); });
+    const syncKind = () => {
+      form.querySelectorAll('[data-kind-pane]').forEach((p) => { p.hidden = p.dataset.kindPane !== kind(); });
+      form.querySelectorAll('[data-until]').forEach((p) => { p.hidden = form.elements.repeat.value === 'none'; });
+      render();
+    };
+    form.addEventListener('change', (e) => { if (['kind', 'repeat', 'from', 'to', 'dates'].includes(e.target.name)) syncKind(); });
+    form.elements.dates.addEventListener('input', render);
+    const all = form.querySelector('[data-off-all]'), devs = [...form.querySelectorAll('[data-off-dev]')];
+    if (all) {
+      all.addEventListener('change', () => devs.forEach((d) => { d.checked = all.checked; }));
+      devs.forEach((d) => d.addEventListener('change', () => { all.checked = devs.every((x) => x.checked); }));
+    }
+    const title = document.getElementById('off-form-title'), titleNew = title.textContent;
+    function reset() {
+      form.reset(); form.action = form.dataset.addUrl; title.textContent = titleNew; syncKind();
+    }
+    document.querySelector('[data-off-reset]').addEventListener('click', reset);
+    document.querySelectorAll('[data-off-edit]').forEach((b) => b.addEventListener('click', () => {
+      const ev = JSON.parse(b.dataset.offEdit);
+      reset();
+      form.action = b.dataset.offUrl;
+      title.textContent = '✏️ ' + (AR ? 'تعديل: ' : 'Edit: ') + ev.name;
+      form.elements.name.value = ev.name || '';
+      form.querySelector('[name=kind][value="' + (ev.kind || 'range') + '"]').checked = true;
+      form.elements.from.value = ev.from || ''; form.elements.to.value = ev.to || '';
+      form.elements.dates.value = (ev.dates || []).join('\n');
+      form.elements.repeat.value = ev.repeat || 'none'; form.elements.until.value = ev.until || '';
+      form.elements.enabled.checked = ev.enabled !== false;
+      if (all) { all.checked = ev.devices == null; devs.forEach((d) => { d.checked = ev.devices == null || ev.devices.includes(d.value); }); }
+      const start = ev.kind === 'range' ? ev.from : (ev.dates || [])[0];
+      if (start) { base = new Date(start + 'T00:00:00'); base.setDate(1); }
+      syncKind();
+      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }));
+    window.addEventListener('resize', render);
+    syncKind();
+  }
+
   const URLS = {{ lib_urls|tojson }};
   document.querySelectorAll('[data-play]').forEach(b => b.addEventListener('click', () => {
     const sel = b.parentElement.querySelector('select');

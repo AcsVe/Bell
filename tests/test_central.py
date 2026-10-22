@@ -475,3 +475,53 @@ def test_remove_tones_from_the_library(admin, app):
     admin.post(f'/admin/central/tone/{unused}/restore')
     with app.app_context():
         assert unused in central.library_keys()
+
+
+def test_off_calendar_events_reach_the_devices(admin, app):
+    """Calendar of days without the bell: periods, specific days, monthly/yearly repeat, per-device events,
+    bulk enable/disable/delete — all delivered to the devices as plain skip_dates."""
+    from datetime import date
+    import central
+    _seed(admin, app)
+    admin.post('/admin/central/players/add', data={'name': 'المبنى أ'})
+    admin.post('/admin/central/players/add', data={'name': 'المبنى ب'})
+    # the old «one date per line» list becomes one event
+    with app.app_context():
+        cfg = central.config()
+        cfg['skip_dates'] = ['2099-01-05']
+        central.save_config(cfg)
+        central.db.session.commit()
+        evs = central.off_events()
+        central.db.session.commit()
+        assert [e['dates'] for e in evs] == [['2099-01-05']] and central.config()['skip_dates'] == []
+        pids = sorted(central.players())
+    r = admin.post('/admin/central/off/add', data={'name': 'عطلة الشتاء', 'kind': 'range', 'from': '2099-01-10',
+                                                   'to': '2099-01-12', 'repeat': 'none', 'enabled': '1',
+                                                   'all_devices': '1'}, follow_redirects=True)
+    assert 'عطلة الشتاء' in r.get_data(as_text=True)
+    admin.post('/admin/central/off/add', data={'name': 'اجتماع شهري', 'kind': 'dates', 'dates': '2099-01-31',
+                                               'repeat': 'monthly', 'until': '2099-04-30', 'enabled': '1',
+                                               'devices': [pids[-1]]})
+    r = admin.post('/admin/central/off/add', data={'name': 'خطأ', 'kind': 'range', 'from': '2099-02-10',
+                                                   'to': '2099-02-01', 'enabled': '1'}, follow_redirects=True)
+    assert 'قبل البداية' in r.get_data(as_text=True)
+    with app.app_context():
+        start = date(2099, 1, 1)
+        everyone = central.off_dates(pids[0], start=start)
+        building_b = central.off_dates(pids[-1], start=start)
+        assert set(everyone) == {'2099-01-05', '2099-01-10', '2099-01-11', '2099-01-12'}
+        assert {'2099-01-31', '2099-02-28', '2099-03-31', '2099-04-30'} <= set(building_b)
+        assert '2099-05-31' not in building_b                               # «until» respected
+        monthly = next(e for e in central.off_events() if e['name'] == 'اجتماع شهري')
+        assert central.event_dates({'kind': 'range', 'from': '2099-03-01', 'to': '2099-03-02', 'repeat': 'yearly'},
+                                   date(2099, 1, 1), date(2101, 12, 31)) == {
+            date(2099, 3, 1), date(2099, 3, 2), date(2100, 3, 1), date(2100, 3, 2), date(2101, 3, 1), date(2101, 3, 2)}
+    # disabled events stop counting; delete removes them
+    admin.post('/admin/central/off/bulk', data={'action': 'disable', 'ids': [monthly['id']]})
+    with app.app_context():
+        assert not set(central.off_dates(pids[-1], start=date(2099, 1, 1))) & {'2099-01-31'}
+    admin.post('/admin/central/off/bulk', data={'action': 'delete', 'ids': [monthly['id']]})
+    with app.app_context():
+        assert all(e['name'] != 'اجتماع شهري' for e in central.off_events())
+    html = admin.get('/admin/central').get_data(as_text=True)
+    assert 'offcal' in html and 'عطلة الشتاء' in html and 'data-off-edit' in html

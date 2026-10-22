@@ -1,6 +1,6 @@
 """Central (office) bell: admin page + the API used by the office player (bell_player/bell_player.py)."""
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from flask import (Blueprint, flash, jsonify, redirect, render_template, request, session, url_for)
 
@@ -33,7 +33,10 @@ def page():
     week = central.week_rings(cfg)
     now = _today()
     today_rings = week[now.weekday()]
-    today_off = (not cfg['enabled']) or now.strftime('%Y-%m-%d') in (cfg.get('skip_dates') or [])
+    events = central.off_events()
+    off_map = central.off_dates('*', start=now.date() - timedelta(days=62), days=62 + 400,
+                                events=events)
+    today_off = (not cfg['enabled']) or now.strftime('%Y-%m-%d') in off_map
     next_ring = next((s for s in today_rings if s['t'] > now.strftime('%H:%M')), None)
     lib = [(k, central.tone_name(k, session.get('lang', 'ar')), central.tone_url(k)) for k in central.library_keys(cfg)]
     hidden_lib = [(k, central.tone_name(k, session.get('lang', 'ar')), central.tone_url(k)) for k in cfg.get('hidden_tones') or []
@@ -46,7 +49,8 @@ def page():
                            now=now, week_order=WEEK_ORDER, wd_names=weekday_names(session.get('lang', 'ar')),
                            tone_name=lambda k: central.tone_name(k, session.get('lang', 'ar')),
                            tone_url=central.tone_url, silent=central.SILENT, custom=central.custom_rings(), group_periods=central.group_periods, hidden_lib=hidden_lib, server_url=request.host_url.rstrip('/'),
-                           lib_urls={k: url for k, _n, url in lib}, dev_versions={d['id']: central.player_payload(d['id'])['version'] for d in devs})
+                           lib_urls={k: url for k, _n, url in lib}, off_events=events, off_map=off_map,
+                           off_info={e['id']: central.off_dates('*', start=now.date(), events=[e]) for e in events}, dev_versions={d['id']: central.player_payload(d['id'])['version'] for d in devs})
 
 
 @central_bp.route('/admin/central/save', methods=['POST'])
@@ -58,7 +62,7 @@ def save():
         cfg['volume'] = max(10, min(100, int(request.form.get('volume') or 100)))
     except ValueError:
         pass
-    dates = set()
+    dates = set(cfg.get('skip_dates') or []) if 'skip_dates' not in request.form else set()
     for raw in (request.form.get('skip_dates') or '').replace(',', '\n').splitlines():
         raw = raw.strip()
         if not raw:
@@ -331,6 +335,95 @@ def custom_delete(cid):
     central.save_custom_rings([c for c in central.custom_rings() if c.get('id') != cid])
     db.session.commit()
     return redirect(url_for('central.page') + '#custom-tab')
+
+
+# ── calendar of days without the bell ──────────────────────────────────────
+def _off_from_form(cur=None):
+    e = dict(cur or {})
+    name = (request.form.get('name') or '').strip()[:80]
+    kind = request.form.get('kind') if request.form.get('kind') in ('range', 'dates') else 'range'
+    rep = request.form.get('repeat') if request.form.get('repeat') in ('none', 'monthly', 'yearly') else 'none'
+    if not name:
+        return None, _msg('اكتب اسم الحدث (مثل: عطلة منتصف الفصل)', 'Enter the event name (e.g. Mid-term holiday)')
+    a = central._d(request.form.get('from'))
+    b = central._d(request.form.get('to')) or a
+    dates = []
+    if kind == 'range':
+        if not a:
+            return None, _msg('اختر تاريخ البداية (من)', 'Choose the start date (from)')
+        if b < a:
+            return None, _msg('تاريخ النهاية قبل البداية', 'The end date is before the start date')
+    else:
+        bad = []
+        for raw in (request.form.get('dates') or '').replace(',', '\n').replace('،', '\n').split():
+            d = central._d(raw.strip())
+            (dates.append(d.isoformat()) if d else bad.append(raw))
+        if bad:
+            return None, _msg('تاريخ غير صحيح: ' + '، '.join(bad) + ' (الصيغة 2026-12-31)',
+                              'Invalid date: ' + ', '.join(bad) + ' (format 2026-12-31)')
+        if not dates:
+            return None, _msg('اختر يوماً واحداً على الأقل من الروزنامة', 'Pick at least one day on the calendar')
+    until = central._d(request.form.get('until'))
+    known = set(central.players())
+    devs = [d for d in request.form.getlist('devices') if d in known]
+    e.update({'name': name, 'kind': kind, 'repeat': rep,
+              'from': a.isoformat() if kind == 'range' else '', 'to': b.isoformat() if kind == 'range' else '',
+              'dates': sorted(set(dates)), 'until': until.isoformat() if until and rep != 'none' else '',
+              'enabled': bool(request.form.get('enabled')),
+              'devices': None if request.form.get('all_devices') or not known or set(devs) == known else devs})
+    return e, None
+
+
+@central_bp.route('/admin/central/off/add', methods=['POST'])
+@central_bp.route('/admin/central/off/<eid>/save', methods=['POST'])
+@login_required
+def off_save(eid=None):
+    import uuid
+    items = central.off_events()
+    idx = next((i for i, x in enumerate(items) if x.get('id') == eid), None) if eid else None
+    if eid and idx is None:
+        flash(_msg('الحدث غير موجود', 'Event not found'), 'error')
+        return redirect(url_for('central.page') + '#off-tab')
+    e, err = _off_from_form(items[idx] if idx is not None else None)
+    if err:
+        flash(err, 'error')
+    else:
+        if idx is None:
+            e['id'] = uuid.uuid4().hex[:8]
+            items.append(e)
+        else:
+            items[idx] = e
+        central.save_off_events(items)
+        db.session.commit()
+        n = len(central.off_dates('*', events=[e]))
+        flash(_msg(f'حُفظ «{e["name"]}» — {n} يوماً بلا جرس خلال السنة القادمة',
+                   f'Saved “{e["name"]}” — {n} days without the bell in the coming year'), 'ok')
+    return redirect(url_for('central.page') + '#off-tab')
+
+
+@central_bp.route('/admin/central/off/bulk', methods=['POST'])
+@login_required
+def off_bulk():
+    act = request.form.get('action')
+    ids = set(request.form.getlist('ids'))
+    items = central.off_events()
+    if act == 'delete':
+        left = [x for x in items if x.get('id') not in ids]
+        n = len(items) - len(left)
+        items = left
+    elif act in ('enable', 'disable'):
+        n = 0
+        for x in items:
+            if x.get('id') in ids:
+                x['enabled'] = act == 'enable'
+                n += 1
+    else:
+        return redirect(url_for('central.page') + '#off-tab')
+    central.save_off_events(items)
+    db.session.commit()
+    verb = {'delete': ('حُذف', 'Deleted'), 'enable': ('فُعِّل', 'Enabled'), 'disable': ('عُطِّل', 'Disabled')}[act]
+    flash(_msg(f'{verb[0]}: {n}', f'{verb[1]}: {n}'), 'ok')
+    return redirect(url_for('central.page') + '#off-tab')
 
 
 # ── bell DEVICE (ESP32 box): flashing page + Bluetooth programming ──────────

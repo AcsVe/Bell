@@ -11,8 +11,9 @@ timings hear different bells. Rings at the same minute with the same tone are pl
 import hashlib
 import json
 import secrets
+import calendar
 import uuid
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from models import db, AppSetting, BellProgram, MediaFile, Stage
 from services import resolve_grade_day, resolve_stage_day
@@ -207,6 +208,122 @@ def save_custom_rings(items):
     AppSetting.set('central_custom', json.dumps(items, ensure_ascii=False, sort_keys=True))
 
 
+# ── calendar of days without the bell (holidays, exams…) ──────────────────────
+# app_settings: central_off_events = [{id, name, kind: 'range' | 'dates', from, to, dates: [...],
+#                                      repeat: 'none' | 'monthly' | 'yearly', until: '' | 'YYYY-MM-DD',
+#                                      devices: null (= all) | [device ids], enabled}]
+# The devices never see the events: the server expands them into plain dates (``skip_dates``) for the next
+# OFF_HORIZON_DAYS, which every BellPlayer and ESP32 box already understands and keeps offline.
+OFF_HORIZON_DAYS = 400
+
+
+def off_events():
+    try:
+        out = json.loads(AppSetting.get('central_off_events') or '[]')
+    except ValueError:
+        out = []
+    out = [e for e in out if isinstance(e, dict) and e.get('id')]
+    # the old text box «one date per line» becomes one event the first time
+    cfg = config()
+    if cfg.get('skip_dates'):
+        out.append({'id': uuid.uuid4().hex[:8], 'name': 'أيام بلا جرس (من القائمة السابقة)', 'kind': 'dates',
+                    'dates': sorted(set(cfg['skip_dates'])), 'from': '', 'to': '', 'repeat': 'none', 'until': '',
+                    'devices': None, 'enabled': True})
+        cfg['skip_dates'] = []
+        save_config(cfg)
+        save_off_events(out)
+    return out
+
+
+def save_off_events(items):
+    AppSetting.set('central_off_events', json.dumps(items, ensure_ascii=False, sort_keys=True))
+
+
+def _d(v):
+    try:
+        return date.fromisoformat(str(v)[:10])
+    except (TypeError, ValueError):
+        return None
+
+
+def _shift_month(d, months, day=None):
+    """The same day ``months`` later; a day that does not exist (31 in a 30-day month) → the month's last day."""
+    y, m = divmod(d.month - 1 + months, 12)
+    y, m = d.year + y, m + 1
+    return date(y, m, min(day or d.day, calendar.monthrange(y, m)[1]))
+
+
+def event_dates(ev, start, end):
+    """Every date in [start, end] on which the event stops the bell."""
+    out = set()
+    rep = ev.get('repeat') or 'none'
+    until = _d(ev.get('until')) or end
+    stop = min(end, until) if rep != 'none' else end
+    if ev.get('kind') == 'range':
+        a, b = _d(ev.get('from')), _d(ev.get('to'))
+        if not a:
+            return out
+        b = b if b and b >= a else a
+        spans = [(a, b)]
+        if rep in ('monthly', 'yearly'):
+            step = 1 if rep == 'monthly' else 12
+            length = (b - a).days
+            k = step
+            while True:
+                s0 = _shift_month(a, k)
+                if s0 > stop:
+                    break
+                spans.append((s0, s0 + timedelta(days=length)))
+                k += step
+        for s0, s1 in spans:
+            day = max(s0, start)
+            while day <= min(s1, end):
+                out.add(day)
+                day += timedelta(days=1)
+    else:
+        for raw in ev.get('dates') or []:
+            d0 = _d(raw)
+            if not d0:
+                continue
+            if start <= d0 <= end:
+                out.add(d0)
+            if rep in ('monthly', 'yearly'):
+                step = 1 if rep == 'monthly' else 12
+                k = step
+                while True:
+                    dk = _shift_month(d0, k)
+                    if dk > stop:
+                        break
+                    if dk >= start:
+                        out.add(dk)
+                    k += step
+    return {d for d in out if start <= d <= end}
+
+
+def off_dates(pid='*', start=None, days=OFF_HORIZON_DAYS, events=None):
+    """{iso date: [event names]} for one device ('*' = every event, for the admin views)."""
+    start = start or today_amman()
+    end = start + timedelta(days=days)
+    out = {}
+    for ev in events if events is not None else off_events():
+        if not ev.get('enabled', True):
+            continue
+        devs = ev.get('devices')
+        if pid != '*' and devs is not None and pid not in devs:
+            continue
+        for d in event_dates(ev, start, end):
+            out.setdefault(d.isoformat(), []).append(ev.get('name') or '')
+    return dict(sorted(out.items()))
+
+
+def today_amman():
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo('Asia/Amman')).date()
+    except Exception:   # noqa: BLE001
+        return datetime.now().date()
+
+
 def week_rings(cfg=None, only=None, pid='*'):
     """{weekday: [{'t': 'HH:MM', 'rings': [{'tone', 'kind', 'groups': [...], 'label'}]}]} for Monday=0..Sunday=6.
     only = a set of group keys (one bell device that serves some buildings/stages only); None = every group."""
@@ -268,7 +385,7 @@ def player_payload(pid=None):
     body = {
         'enabled': bool(cfg['enabled']),
         'volume': max(0, min(100, int(vol or 100))),
-        'skip_dates': sorted(set(cfg.get('skip_dates') or [])),
+        'skip_dates': sorted(set(cfg.get('skip_dates') or []) | set(off_dates(pid or '*'))),
         'tz': 'Asia/Amman',
         'tones': {k: {'url': tone_url(k), 'name': tone_name(k)} for k in used if tone_url(k)},
         'days': {str(wd): v for wd, v in week.items()},

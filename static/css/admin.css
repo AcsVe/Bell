@@ -184,3 +184,27 @@ td.open{white-space:nowrap}
 /* Arrows that point "forward" in the reading direction */
 .fwd{display:inline-block}
 [dir=rtl] .fwd{transform:scaleX(-1)}
+/* data tables (static/js/table.js) */
+.dt-wrap{overflow:auto;max-height:70vh;border:1px solid var(--line);border-radius:10px;background:#fff}
+.dt-wrap table.dt thead th{position:sticky;top:0;background:#f3f6fb;z-index:2}
+.dt-wrap table.dt thead tr.dt-filter th{top:38px;background:#f8fafd}
+table.dt th.dt-sort{cursor:pointer;user-select:none;white-space:nowrap}
+table.dt th.dt-sort::after{content:' ⇅';opacity:.4}table.dt th.asc::after{content:' ▲';opacity:1}table.dt th.desc::after{content:' ▼';opacity:1}
+.dt-filter input,.dt-filter select{width:100%;min-width:70px;padding:4px 7px;font-size:13px}
+tr.selected td{background:#eef5ff}
+/* calendar of days without the bell */
+.offcal{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:16px}
+.offcal .mon h3{margin:0 0 6px;font-size:15px;text-align:center}
+.offcal .grid7{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.offcal .wd{font-size:11px;color:var(--muted);text-align:center;padding:2px 0}
+.offcal .day{border:1px solid var(--line);border-radius:7px;text-align:center;padding:6px 0;font-size:13px;cursor:pointer;background:#fff;user-select:none}
+.offcal .day:hover{border-color:var(--brand)}
+.offcal .day.we{background:#f6f7f9;color:#98a2b3}
+.offcal .day.off{background:#fde8e8;color:#9b1c1c;font-weight:700;border-color:#f5c2c2}
+.offcal .day.today{outline:2px solid var(--brand);outline-offset:-2px}
+.offcal .day.pick{background:var(--brand);color:#fff;border-color:var(--brand)}
+.offcal .day.inrange{background:#dbe8fb;color:var(--ink)}
+.offcal .blank{visibility:hidden}
+.offcal-nav{display:flex;gap:8px;align-items:center;justify-content:center;margin-bottom:10px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin-inline-end:4px}
