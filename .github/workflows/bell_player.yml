@@ -18,12 +18,13 @@ jobs:
         with: { python-version: '3.12' }
       - name: Build
         run: |
-          pip install pyinstaller==6.11.1 tzdata
-          pyinstaller --onefile --console --name BellPlayer --icon bell_player/bell.ico --collect-data tzdata bell_player/bell_player.py
+          pip install pyinstaller==6.11.1 tzdata certifi
+          pyinstaller --onefile --console --name BellPlayer --icon bell_player/bell.ico --collect-data tzdata --collect-data certifi --hidden-import certifi bell_player/bell_player.py
       - name: Smoke test
         run: |
           dist\BellPlayer.exe --status
           dist\BellPlayer.exe --fingerprint
+          dist\BellPlayer.exe --net-test; if ($LASTEXITCODE -eq 2) { exit 1 } else { exit 0 }
       - uses: actions/upload-artifact@v4
         with: { name: BellPlayer, path: dist/BellPlayer.exe }
       - name: Publish to the fixed download link

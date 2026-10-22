@@ -36,7 +36,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-VERSION = '1.2'
+VERSION = '1.3'
 DEFAULT_SERVER = 'https://5.iajaward.org'
 POLL_SECONDS = 15
 CATCH_UP_SECONDS = 90         # a ring missed by up to 90 s (PC busy/waking up) still plays; later ones are skipped
@@ -256,11 +256,31 @@ def machine_fingerprint():
 
 
 # ── server ─────────────────────────────────────────────────────────────────
+_SSL = None
+
+
+def ssl_context():
+    """Trust BOTH the Windows certificate store (incl. an antivirus / school firewall that inspects HTTPS) and the
+    bundled Mozilla list (certifi) — a fresh Windows often lacks the root certificate until a browser fetches it,
+    which gives CERTIFICATE_VERIFY_FAILED in programs."""
+    global _SSL
+    if _SSL is None:
+        import ssl
+        ctx = ssl.create_default_context()
+        try:
+            import certifi
+            ctx.load_verify_locations(certifi.where())
+        except Exception:   # noqa: BLE001 — running as a plain script without certifi: the system store only
+            pass
+        _SSL = ctx
+    return _SSL
+
+
 def http(method, url, key, body=None, timeout=20):
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(url, data=data, method=method, headers={
         'X-Bell-Key': key, 'User-Agent': f'BellPlayer/{VERSION}', 'Content-Type': 'application/json'})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    with urllib.request.urlopen(req, timeout=timeout, context=ssl_context() if url.startswith('https') else None) as r:
         return r.status, r.read()
 
 
@@ -626,6 +646,10 @@ def install_startup():
         f.write('On Error Resume Next\n'
                 'Set fso = CreateObject("Scripting.FileSystemObject")\n'
                 f'If fso.FileExists("{exe_v}") Then CreateObject("WScript.Shell").Run "{cmd}", 0, False\n')
+    # Close any copy that is already running (it may hold an old key) — not this one.
+    if getattr(sys, 'frozen', False):
+        subprocess.run(['taskkill', '/f', '/fi', f'PID ne {os.getpid()}', '/im', os.path.basename(sys.executable)],
+                       capture_output=True)
     # Every 5 minutes: start it again if it was closed or crashed (a second copy exits at once).
     subprocess.run(['schtasks', '/create', '/f', '/tn', 'BELL Office Player', '/sc', 'minute', '/mo', '5',
                     '/tr', f'wscript.exe //B //Nologo "{vbs}"'], capture_output=True)
@@ -671,8 +695,11 @@ def setup():
         save_clock()
     except Exception:   # noqa: BLE001
         pass
-    p.refresh()
-    print('  [OK] schedule and tones saved on this computer')
+    try:
+        p.refresh()
+        print('  [OK] schedule and tones saved on this computer')
+    except Exception as e:   # noqa: BLE001 — keep going: the running player downloads them by itself
+        print(f'  [!] could not download the schedule now ({e}) - the player will retry by itself')
     if not ask_license():
         return False
     install_startup()
@@ -734,6 +761,16 @@ def main():
     if '--remove' in args:
         remove_startup()
         print('  removed from Windows start-up')
+        return
+    if '--net-test' in args:          # checks HTTPS to the server (certificates, firewall) and prints the answer
+        url = (load_ini()['server'] or DEFAULT_SERVER) + '/healthz'
+        try:
+            print(f'  {url}: HTTP', http('GET', url, '')[0])
+        except urllib.error.HTTPError as e:
+            print(f'  {url}: HTTP {e.code} (the connection and certificates are fine)')
+        except Exception as e:   # noqa: BLE001
+            print(f'  {url}: {e}')
+            sys.exit(2 if 'CERTIFICATE' in str(e).upper() else 1)
         return
     if '--fingerprint' in args:
         print(machine_fingerprint())
