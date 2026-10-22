@@ -15,7 +15,7 @@
 <section class="tabpane" data-pane="devices-tab">
 <div class="card">
   <h2>{{ L('الأجهزة المسجلة', 'Registered devices') }}</h2>
-  <p class="muted small">{{ L('آخر مزامنة لكل جهاز. الشاشة الشغالة تتزامن كل 5 دقائق تقريباً عند توفر الإنترنت.', 'Last sync per device. A running screen syncs about every 5 minutes when online.') }}</p>
+  <p class="muted small">{{ L('آخر مزامنة لكل جهاز. الشاشة العاملة تتزامن كل 5 دقائق تقريباً عند توفر الإنترنت.', 'Last sync per device. A running screen syncs about every 5 minutes when online.') }}</p>
   {% if devices %}{{ bulk_bar('devices', [('delete', 'حذف', 'Delete', true)]) }}{% endif %}
   <table class="resp">
     <thead><tr><th class="chk">{{ bulk_all('devices') }}</th><th>{{ L('مرتبط بـ', 'Linked to') }}</th><th>{{ L('النوع', 'Type') }}</th><th>{{ L('آخر مزامنة (UTC)', 'Last sync (UTC)') }}</th><th>{{ L('المتصفح', 'Browser') }}</th><th></th></tr></thead>
@@ -73,10 +73,10 @@
   </div>
 </div>
 <div class="card">
-  <h2>{{ L('تنزيل كل البيانات', 'Download all data') }}</h2>
-  <p class="muted small">{{ L('ملف واحد فيه كل شيء: المراحل والحصص والبرامج والصفوف والشعب والمعلمون والأكواد والنغمات والشعارات والإعدادات. للنقل إلى جهاز آخر: شغّل هناك import_render.bat وأعطه مسار هذا الملف.',
+  <h2>{{ L('تحميل كل البيانات', 'Download all data') }}</h2>
+  <p class="muted small">{{ L('ملف واحد يتضمّن كل البيانات: المراحل والحصص والبرامج والصفوف والشعب والمعلمين والأكواد والنغمات والشعارات والإعدادات. وللنقل إلى جهاز آخر: شغِّل عليه import_render.bat وحدِّد مسار هذا الملف.',
     'One file with everything: stages, periods, programs, grades, sections, teachers, codes, tones, logos and settings. To move to another computer run import_render.bat there and give it this file.') }}</p>
-  <a class="btn" href="{{ url_for('admin.export_all') }}">{{ L('تنزيل bell.db', 'Download bell.db') }}</a>
+  <a class="btn" href="{{ url_for('admin.export_all') }}">{{ L('تحميل bell.db', 'Download bell.db') }}</a>
 </div>
 </section>
 {% endblock %}

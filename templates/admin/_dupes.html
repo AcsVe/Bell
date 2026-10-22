@@ -1,7 +1,7 @@
 {# Stages that look duplicated (same grade range in the name) → one-tap merge. #}
 {% for src, dst in dupes %}
 <div class="card" style="border-color:#e6b800;background:#fffbe8">
-  <p style="margin:0 0 8px">⚠️ {{ L('يبدو أن هاتين نفس المرحلة:', 'These look like the same stage:') }}
+  <p style="margin:0 0 8px">⚠️ {{ L('يبدو أن هاتين المرحلتين مرحلة واحدة:', 'These look like the same stage:') }}
     <b><bdi>{{ L(src.name_ar, src.name_en or src.name_ar) }}</bdi></b>
     <span class="muted small">({{ src.grades|length }} {{ L('صف', 'grades') }} · {{ src.teacher_links|length }} {{ L('معلم', 'teachers') }})</span>
     {{ L('و', 'and') }} <b><bdi>{{ L(dst.name_ar, dst.name_en or dst.name_ar) }}</bdi></b>

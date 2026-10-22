@@ -3,13 +3,13 @@
 {% block content %}
 <div class="crumbs"><a href="{{ url_for('central.page') }}#player-tab">{{ L('الجرس المركزي', 'Central bell') }}</a></div>
 <div class="page-head"><h1>📟 {{ L('جهاز جرس بدون كمبيوتر (ESP32)', 'Bell device without a PC (ESP32)') }}</h1></div>
-<p class="hint">{{ L('علبة صغيرة موصولة بجهاز الصوت بدل الكمبيوتر: تتصل بالخادم عبر Wi-Fi مثل BellPlayer، أو تُبرمج من هنا عبر Bluetooth في المباني التي لا شبكة فيها. ترنّ من ذاكرتها وساعتها حتى دون إنترنت. القطع وطريقة التوصيل: docs/Bell_Hardware.md.',
+<p class="hint">{{ L('علبة صغيرة موصولة بجهاز الصوت بدلاً من الكمبيوتر: تتصل بالخادم عبر Wi-Fi مثل BellPlayer، أو تُبرمج من هنا عبر Bluetooth في المباني التي لا شبكة فيها. ترنّ من ذاكرتها وساعتها حتى دون إنترنت. القطع وطريقة التوصيل: docs/Bell_Hardware.md.',
   'A small box connected to the amplifier instead of a PC: it talks to the server over Wi-Fi like BellPlayer, or is programmed from here over Bluetooth where a building has no network. It rings from its own memory and clock, even without internet. Parts and wiring: docs/Bell_Hardware.md.') }}</p>
 
 <div class="card">
   <h2>1) {{ L('تحميل البرنامج على الجهاز (مرة واحدة، بسلك USB)', 'Install the firmware (once, with a USB cable)') }}</h2>
   {% if fw_version %}
-  <p class="small">{{ L('الإصدار المتوفر:', 'Available version:') }} <b dir="ltr">{{ fw_version }}</b> — {{ L('يعمل في Chrome أو Edge على الكمبيوتر. وصّل الجهاز بمنفذ USB (المكتوب عليه USB، لا UART) ثم اضغط:', 'Works in Chrome or Edge on a computer. Connect the board by its USB port (marked USB, not UART), then press:') }}</p>
+  <p class="small">{{ L('الإصدار المتوفر:', 'Available version:') }} <b dir="ltr">{{ fw_version }}</b> — {{ L('يعمل في متصفح Chrome أو Edge على الكمبيوتر. صِل الجهاز بسلك USB في المنفذ المكتوب عليه USB (لا UART)، ثم اضغط:', 'Works in Chrome or Edge on a computer. Connect the board by its USB port (marked USB, not UART), then press:') }}</p>
   <esp-web-install-button manifest="{{ url_for('static', filename='firmware/manifest.json') }}">
     <button slot="activate">{{ L('تثبيت / تحديث برنامج الجهاز', 'Install / update the device firmware') }}</button>
     <span slot="unsupported">{{ L('هذا المتصفح لا يدعم التثبيت عبر USB — استخدم Chrome أو Edge على كمبيوتر.', 'This browser cannot install over USB — use Chrome or Edge on a computer.') }}</span>
@@ -17,13 +17,13 @@
   <p class="muted small">{{ L('عند السؤال عن «Erase device»: اختر نعم في أول تثبيت فقط؛ في التحديث اختر لا لتبقى الإعدادات والترخيص والنغمات.', 'When asked “Erase device”: yes only for the first install; for an update choose no to keep settings, license and tones.') }}</p>
   <script type="module" src="https://unpkg.com/esp-web-tools@10.2.1/dist/web/install-button.js?module"></script>
   {% else %}
-  <p class="muted">{{ L('لم يُبنَ برنامج الجهاز بعد على هذا الخادم — شغّل update.bat بعد اكتمال البناء في GitHub.', 'The device firmware is not on this server yet — run update.bat once the GitHub build has finished.') }}</p>
+  <p class="muted">{{ L('برنامج الجهاز غير متوفر بعد على هذا الخادم — شغِّل update.bat بعد اكتمال بنائه في GitHub.', 'The device firmware is not on this server yet — run update.bat once the GitHub build has finished.') }}</p>
   {% endif %}
 </div>
 
 <div class="card">
   <h2>2) {{ L('البرمجة عبر Bluetooth', 'Program over Bluetooth') }}</h2>
-  <p class="muted small">{{ L('يعمل في Chrome على أندرويد أو على كمبيوتر فيه Bluetooth (لا يعمل على iPhone). اقترب من الجهاز ثم «اتصال».', 'Works in Chrome on Android or on a computer with Bluetooth (not on iPhone). Stand near the device, then “Connect”.') }}</p>
+  <p class="muted small">{{ L('يعمل في متصفح Chrome على أندرويد، أو على كمبيوتر مزوَّد بـ Bluetooth (لا يعمل على iPhone). اقترب من الجهاز ثم اضغط «اتصال».', 'Works in Chrome on Android or on a computer with Bluetooth (not on iPhone). Stand near the device, then “Connect”.') }}</p>
   {% if not devices %}<p class="chip" style="background:#fff4e0;color:#8a5a00">{{ L('أضف الجهاز أولاً في تبويب «أجهزة الجرس» ثم عد هنا.', 'Add the device on the “Bell devices” tab first, then come back.') }}</p>{% endif %}
   <div class="row">
     <div><label>{{ L('هذا الجهاز هو', 'This device is') }}</label>
@@ -64,7 +64,7 @@
 
 <div class="card">
   <h2>{{ L('بدون Bluetooth؟', 'No Bluetooth?') }}</h2>
-  <p class="small">{{ L('اضغط زر BOOT على الجهاز 3 ثوانٍ: تظهر شبكة Wi-Fi باسم «Bell-xxxx» (كلمة المرور bellsetup). اتصل بها من الهاتف فتفتح صفحة الإعداد (أو افتح 192.168.4.1) وأدخل شبكة المدرسة والخادم والمفتاح والترخيص.',
+  <p class="small">{{ L('اضغط زر BOOT على الجهاز 3 ثوانٍ: تظهر شبكة Wi-Fi باسم «Bell-xxxx» (كلمة المرور bellsetup). اتصل بها من الهاتف، فتُفتح صفحة الإعداد (أو افتح العنوان 192.168.4.1)، ثم أدخل شبكة المدرسة والخادم والمفتاح والترخيص.',
     'Hold the BOOT button 3 seconds: a Wi-Fi network “Bell-xxxx” appears (password bellsetup). Join it from a phone — the setup page opens (or open 192.168.4.1) — and enter the school Wi-Fi, server, key and license.') }}</p>
 </div>
 
@@ -157,7 +157,7 @@
     cfg.tz_offset_min = p.tz_offset_min; cfg.lan = (p.lan || []).join(',');
     await sendFile('config.json', enc.encode(JSON.stringify(cfg)), T('الإعدادات', 'Settings'));
     await setTime(p);
-    prog('✓ ' + T('أُرسلت الإعدادات — يتصل الجهاز بالشبكة ويأخذ جدوله ونغماته خلال دقيقة', 'Settings sent — the device joins the network and downloads its schedule and tones within a minute'));
+    prog('✓ ' + T('أُرسلت الإعدادات — يتصل الجهاز بالشبكة ويُحمِّل جدوله ونغماته خلال دقيقة', 'Settings sent — the device joins the network and downloads its schedule and tones within a minute'));
     await report();
   }));
 
@@ -176,7 +176,7 @@
     await sendFile('schedule.json', enc.encode(JSON.stringify(sched)), T('الجدول', 'Schedule'));
     await setTime(p);
     prog('✓ ' + T('أُرسل الجدول و', 'Sent the schedule and ') + (keys.length - skipped.length) + T(' نغمة، وضُبط الوقت', ' tones, and set the time') +
-         (skipped.length ? ' — ' + T('تُخطّيت نغمات MP3 (الجهاز يشغّل WAV فقط): ', 'MP3 tones skipped (the device plays WAV only): ') + skipped.join('، ') : ''));
+         (skipped.length ? ' — ' + T('لم تُرسَل نغمات MP3 لأن الجهاز يشغّل ملفات WAV فقط: ', 'MP3 tones skipped (the device plays WAV only): ') + skipped.join('، ') : ''));
     await report();
   }));
 

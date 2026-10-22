@@ -191,7 +191,7 @@ def test_export_all_then_import(tmp_path):
     c.post('/admin/login', data={'username': 'admin', 'password': 'admin'})
     _seed(c, a)
     c.post('/admin/teachers/add', data={'names': 'منى\nسارة'})
-    assert 'تنزيل bell.db' in c.get('/admin/settings').get_data(as_text=True)
+    assert 'تحميل bell.db' in c.get('/admin/settings').get_data(as_text=True)
     r = c.get('/admin/export/all')
     assert r.status_code == 200 and 'bell-export-' in r.headers['Content-Disposition']
     f = tmp_path / 'export.db'
@@ -456,3 +456,22 @@ def test_switch_timings_and_single_periods_off(admin, app):
     admin.post('/admin/central/save', data={'enabled': '1', 'switches': '1', 'grp_seen': gs, **{'on__' + g: '1' for g in gs}})
     with app.app_context():
         assert central.config()['off_groups'] == [] and central.config()['off_periods'] == []
+
+
+def test_remove_tones_from_the_library(admin, app):
+    _seed(admin, app)
+    import central
+    with app.app_context():
+        used = central.effective_tones()[central.groups()[0]['key']]['class']
+        unused = next(k for k in central.CENTRAL_TONES if not central.tone_uses(k))
+    r = admin.post(f'/admin/central/tone/{used}/hide', follow_redirects=True).get_data(as_text=True)
+    assert 'مستخدمة في' in r
+    r = admin.post(f'/admin/central/tone/{unused}/hide', follow_redirects=True).get_data(as_text=True)
+    assert 'حُذفت النغمة من المكتبة' in r and 'النغمات المحذوفة' in r
+    with app.app_context():
+        assert unused not in central.library_keys() and unused in central.config()['hidden_tones']
+    html = admin.get('/admin/central').get_data(as_text=True)
+    assert f'<option value="{unused}"' not in html and f'tone/{unused}/restore' in html
+    admin.post(f'/admin/central/tone/{unused}/restore')
+    with app.app_context():
+        assert unused in central.library_keys()

@@ -60,7 +60,8 @@ def config():
     c.setdefault('skip_dates', [])
     c.setdefault('tones', {})
     c.setdefault('off_groups', [])      # timings switched off (no ring at all for them)
-    c.setdefault('off_periods', [])     # single periods/breaks switched off: 'pp:<program period id>' / 'sp:<stage period id>'
+    c.setdefault('off_periods', [])
+    c.setdefault('hidden_tones', [])    # built-in tones removed from the library (can be restored)     # single periods/breaks switched off: 'pp:<program period id>' / 'sp:<stage period id>'
     return c
 
 
@@ -98,6 +99,26 @@ def uploaded_tones():
 
 def all_tone_keys():
     return list(CENTRAL_TONES) + [f'media:{m.id}' for m in uploaded_tones()]
+
+
+def library_keys(cfg=None):
+    """The tones shown in the library and the tone menus (hidden built-in tones left out)."""
+    hidden = set((cfg or config()).get('hidden_tones') or [])
+    return [k for k in all_tone_keys() if k not in hidden]
+
+
+def tone_uses(key, cfg=None):
+    """Where a tone is used: ['<timing> (period)', '<custom ring name>' ...] — a used tone cannot be removed."""
+    cfg = cfg or config()
+    out = []
+    eff = effective_tones(cfg)
+    names = {g['key']: g['ar'] for g in groups()}
+    for gk, t in eff.items():
+        for kind, label in (('class', 'الحصص'), ('break', 'الاستراحات')):
+            if t.get(kind) == key:
+                out.append(f'{names.get(gk, gk)} ({label})')
+    out += [c.get('name') or c.get('t') for c in custom_rings() if c.get('tone') == key]
+    return out
 
 
 # ── groups ──────────────────────────────────────────────────────────────────
@@ -150,9 +171,12 @@ def effective_tones(cfg=None, group_list=None):
     out = {}
     for i, g in enumerate(group_list):
         saved = cfg['tones'].get(g['key'], {})
+        hidden = set(cfg.get('hidden_tones') or [])
+        cd = [k for k in CLASS_DEFAULTS if k not in hidden] or CLASS_DEFAULTS
+        bd = [k for k in BREAK_DEFAULTS if k not in hidden] or BREAK_DEFAULTS
         out[g['key']] = {
-            'class': saved.get('class') if saved.get('class') in valid else CLASS_DEFAULTS[i % len(CLASS_DEFAULTS)],
-            'break': saved.get('break') if saved.get('break') in valid else BREAK_DEFAULTS[i % len(BREAK_DEFAULTS)],
+            'class': saved.get('class') if saved.get('class') in valid else cd[i % len(cd)],
+            'break': saved.get('break') if saved.get('break') in valid else bd[i % len(bd)],
         }
     return out
 

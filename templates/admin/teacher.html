@@ -13,7 +13,7 @@
   <h2>{{ L('كود المعلم', 'Teacher code') }}</h2>
   <p><span class="code copy" data-copy="{{ t.code }}">{{ t.code }}</span>
     <button class="ghost sm" data-copy="{{ t.code }}">{{ L('نسخ', 'Copy') }}</button></p>
-  <p class="muted small">{{ L('كود واحد يغطي كل الشعب أدناه، يُدخله المعلم من موبايله أو لابتوبه.', 'One code covering all sections below; the teacher enters it on their phone or laptop.') }}
+  <p class="muted small">{{ L('كود واحد يغطي كل الشعب أدناه، يُدخله المعلم على هاتفه أو حاسوبه المحمول.', 'One code covering all sections below; the teacher enters it on their phone or laptop.') }}
     {% if devices %}· {{ L('أجهزة مسجلة:', 'Registered devices:') }} {{ devices|length }}{% endif %}</p>
   <form method="post" action="{{ url_for('admin.teacher_regen', teacher_id=t.id) }}" class="inline"
         data-confirm="{{ L('سيتوقف الكود الحالي عن العمل. متابعة؟', 'The current code will stop working. Continue?') }}">

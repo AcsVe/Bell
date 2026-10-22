@@ -16,7 +16,7 @@
   <h2>{{ L('كود الصف', 'Section code') }}</h2>
   <p><span class="code copy" data-copy="{{ s.code }}">{{ s.code }}</span>
     <button class="ghost sm" data-copy="{{ s.code }}">{{ L('نسخ', 'Copy') }}</button></p>
-  <p class="muted small">{{ L('أدخل هذا الكود على الشاشة/التابلت الثابت في الصف.', 'Enter this code on the fixed classroom screen/tablet.') }}
+  <p class="muted small">{{ L('أدخل هذا الكود على الشاشة أو الجهاز اللوحي الثابت في الصف.', 'Enter this code on the fixed classroom screen/tablet.') }}
     {% if devices %}· {{ L('أجهزة مسجلة:', 'Registered devices:') }} {{ devices|length }}{% endif %}</p>
   <form method="post" action="{{ url_for('admin.section_regen', section_id=s.id) }}" class="inline"
         data-confirm="{{ L('سيتوقف الكود الحالي عن العمل على كل الأجهزة. متابعة؟', 'The current code will stop working on all devices. Continue?') }}">

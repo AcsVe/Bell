@@ -63,7 +63,7 @@
   {% if progs %}{{ seed_card(false) }}{% endif %}
   <div class="card">
     <h2>{{ L('استيراد / تصدير (Excel)', 'Import / export (Excel)') }}</h2>
-    <p class="muted small">{{ L('الملف يحتوي البرامج وتوزيعها على الصفوف والأيام. صدّر الحالي، عدّل عليه، ثم ارفعه.', 'The file holds the programs and their grade/day assignment. Export, edit, re-upload.') }}</p>
+    <p class="muted small">{{ L('الملف يحتوي البرامج وتوزيعها على الصفوف والأيام. صدِّر الملف الحالي، وعدِّله، ثم ارفعه.', 'The file holds the programs and their grade/day assignment. Export, edit, re-upload.') }}</p>
     <form method="post" action="{{ url_for('admin.programs_import') }}" enctype="multipart/form-data">
       <input type="file" name="file" accept=".xlsx" required>
       <div class="row" style="margin-top:10px">

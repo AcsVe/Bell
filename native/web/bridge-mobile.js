@@ -96,7 +96,7 @@
       }
       if (isIOS) {
         issues.push({ key: 'silent', text: txt(lang,
-          'على iPhone/iPad يظهر التنبيه والجهاز صامت لكن بدون صوت. أبقِ مفتاح الصامت مغلقاً على الجهاز المخصص للتنبيه.',
+          'على iPhone/iPad يظهر التنبيه دون صوت إذا كان الجهاز على الوضع الصامت، فأبقِ مفتاح الصامت مغلقاً على الجهاز المخصص للتنبيه.',
           'On iPhone/iPad the alert shows in silent mode but without sound. Keep the ring/silent switch on ring.') });
       }
       return issues;

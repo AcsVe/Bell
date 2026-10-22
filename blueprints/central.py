@@ -35,7 +35,9 @@ def page():
     today_rings = week[now.weekday()]
     today_off = (not cfg['enabled']) or now.strftime('%Y-%m-%d') in (cfg.get('skip_dates') or [])
     next_ring = next((s for s in today_rings if s['t'] > now.strftime('%H:%M')), None)
-    lib = [(k, central.tone_name(k, session.get('lang', 'ar')), central.tone_url(k)) for k in central.all_tone_keys()]
+    lib = [(k, central.tone_name(k, session.get('lang', 'ar')), central.tone_url(k)) for k in central.library_keys(cfg)]
+    hidden_lib = [(k, central.tone_name(k, session.get('lang', 'ar')), central.tone_url(k)) for k in cfg.get('hidden_tones') or []
+                  if k in central.CENTRAL_TONES]
     new_key = session.pop('central_new_key', None)
     new_key_for = session.pop('central_new_key_for', None)
     return render_template('admin/central.html', cfg=cfg, groups=group_list, tones=tones, week=week, lib=lib,
@@ -43,7 +45,7 @@ def page():
                            new_key=new_key, new_key_for=new_key_for, devices=devs, today_rings=today_rings, today_off=today_off, next_ring=next_ring,
                            now=now, week_order=WEEK_ORDER, wd_names=weekday_names(session.get('lang', 'ar')),
                            tone_name=lambda k: central.tone_name(k, session.get('lang', 'ar')),
-                           tone_url=central.tone_url, silent=central.SILENT, custom=central.custom_rings(), group_periods=central.group_periods, server_url=request.host_url.rstrip('/'),
+                           tone_url=central.tone_url, silent=central.SILENT, custom=central.custom_rings(), group_periods=central.group_periods, hidden_lib=hidden_lib, server_url=request.host_url.rstrip('/'),
                            lib_urls={k: url for k, _n, url in lib}, dev_versions={d['id']: central.player_payload(d['id'])['version'] for d in devs})
 
 
@@ -83,7 +85,7 @@ def save():
             cur['break'] = b
     central.save_config(cfg)
     db.session.commit()
-    flash(_msg('حُفظت إعدادات الجرس المركزي — يصل التحديث لجهاز المكتب خلال 15 ثانية',
+    flash(_msg('حُفظت إعدادات الجرس المركزي، ويصل التحديث إلى أجهزة الجرس خلال 15 ثانية',
                'Central bell saved — the office player picks it up within 15 seconds'), 'ok')
     return redirect(url_for('central.page'))
 
@@ -105,7 +107,7 @@ def player_add():
     pid, k = central.add_player(request.form.get('name'))
     session['central_new_key'], session['central_new_key_for'] = k, pid
     db.session.commit()
-    flash(_msg('أُضيف الجهاز — انسخ مفتاحه الآن وأدخله عند تثبيت BellPlayer عليه',
+    flash(_msg('أُضيف الجهاز. انسخ مفتاحه الآن، وأدخله عند تثبيت BellPlayer عليه',
                'Device added — copy its key now and enter it when installing BellPlayer on it'), 'ok')
     return redirect(url_for('central.page') + '#player-tab')
 
@@ -125,7 +127,7 @@ def player_save(pid):
         vol = None
     if central.update_player(pid, request.form.get('name'), groups, vol):
         db.session.commit()
-        flash(_msg('حُفظ الجهاز — يصله التغيير خلال 15 ثانية' + ('' if groups is None or groups else ' (تنبيه: لم تختر أي توقيت، فلن يرنّ)'),
+        flash(_msg('حُفظت إعدادات الجهاز، ويصل إليه التغيير خلال 15 ثانية' + ('' if groups is None or groups else ' (تنبيه: لم تختر أي توقيت، فلن يرنّ)'),
                    'Device saved — it picks up the change within 15 seconds' + ('' if groups is None or groups else ' (note: no timing chosen, it will not ring)')), 'ok')
     return redirect(url_for('central.page') + '#player-tab')
 
@@ -135,7 +137,7 @@ def player_save(pid):
 def player_delete(pid):
     central.delete_player(pid)
     db.session.commit()
-    flash(_msg('حُذف الجهاز — توقف مفتاحه', 'Device removed — its key no longer works'), 'ok')
+    flash(_msg('حُذف الجهاز، وأُوقف مفتاحه', 'Device removed — its key no longer works'), 'ok')
     return redirect(url_for('central.page') + '#player-tab')
 
 
@@ -156,8 +158,8 @@ def test():
         db.session.commit()
         sts = [central.status(p) for p in (known if target == 'all' else chosen)]
         st = {'online': bool(sts) and all(x.get('online') for x in sts)}
-        flash(_msg('أُرسل طلب التجربة — يرنّ جهاز المكتب خلال 15 ثانية' if st.get('online') else
-                   'أُرسل طلب التجربة، لكن جهاز المكتب غير متصل الآن — يرنّ إن اتصل خلال دقيقتين',
+        flash(_msg('أُرسل طلب التجربة، وترنّ الأجهزة المختارة خلال 15 ثانية' if st.get('online') else
+                   'أُرسل طلب التجربة، لكن بعض الأجهزة المختارة غير متصلة الآن، وترنّ إن اتصلت خلال دقيقتين',
                    'Test sent — the office player rings within 15 seconds' if st.get('online') else
                    'Test sent, but the office player is offline — it rings if it connects within 2 minutes'), 'ok')
     return redirect(url_for('central.page') + '#tones-tab')
@@ -173,7 +175,37 @@ def upload():
     m, changed = _save_upload('tone', 'central', 'audio/')
     if changed:
         db.session.commit()
-        flash(_msg('رُفعت النغمة — اخترها لأي مجموعة', 'Tone uploaded — choose it for any group'), 'ok')
+        flash(_msg('رُفعت النغمة، ويمكنك اختيارها لأي توقيت', 'Tone uploaded — choose it for any group'), 'ok')
+    return redirect(url_for('central.page') + '#tones-tab')
+
+
+@central_bp.route('/admin/central/tone/<key>/hide', methods=['POST'])
+@login_required
+def tone_hide(key):
+    """Remove a built-in tone from the library (it can be restored). Refused while a timing or ring uses it."""
+    if key not in central.CENTRAL_TONES:
+        return redirect(url_for('central.page') + '#tones-tab')
+    cfg = central.config()
+    uses = central.tone_uses(key, cfg)
+    if uses:
+        flash(_msg('لا يمكن حذف النغمة لأنها مستخدمة في: ' + '، '.join(uses) + '. اختر لها نغمة أخرى أولاً.',
+                   'This tone is in use: ' + ', '.join(uses) + '. Choose another tone there first.'), 'error')
+    else:
+        cfg['hidden_tones'] = sorted(set(cfg.get('hidden_tones') or []) | {key})
+        central.save_config(cfg)
+        db.session.commit()
+        flash(_msg('حُذفت النغمة من المكتبة، ويمكنك إعادتها من «النغمات المحذوفة» أسفل الصفحة.',
+                   'Tone removed from the library — restore it from “Removed tones” below.'), 'ok')
+    return redirect(url_for('central.page') + '#tones-tab')
+
+
+@central_bp.route('/admin/central/tone/<key>/restore', methods=['POST'])
+@login_required
+def tone_restore(key):
+    cfg = central.config()
+    cfg['hidden_tones'] = [k for k in cfg.get('hidden_tones') or [] if k != key]
+    central.save_config(cfg)
+    db.session.commit()
     return redirect(url_for('central.page') + '#tones-tab')
 
 
