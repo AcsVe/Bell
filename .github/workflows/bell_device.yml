@@ -1,0 +1,60 @@
+name: Bell device firmware (ESP32-S3)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['firmware/**', '.github/workflows/bell_device.yml']
+
+permissions:
+  contents: write          # commits the firmware to static/firmware (flashed from the admin page)
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Tools
+        run: pip install platformio==6.1.18 certifi cryptography
+      - name: HTTPS root certificates for the device (Mozilla list → ESP-IDF bundle)
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/espressif/esp-idf/v4.4.7/components/mbedtls/esp_crt_bundle/gen_crt_bundle.py -o gen_crt_bundle.py
+          python gen_crt_bundle.py --input "$(python -m certifi)"
+          mkdir -p firmware/bell_device/data_embed
+          mv x509_crt_bundle firmware/bell_device/data_embed/x509_crt_bundle.bin
+          ls -l firmware/bell_device/data_embed
+      - name: Build
+        run: |
+          set -o pipefail
+          pio run -d firmware/bell_device 2>&1 | tee build.log || {
+            grep -E "error|Error|undefined reference|fatal" build.log | head -40 | while IFS= read -r l; do echo "::error::${l:0:400}"; done
+            exit 1; }
+      - name: Collect the firmware
+        run: |
+          B=firmware/bell_device/.pio/build/esp32s3
+          mkdir -p static/firmware
+          cp $B/bootloader.bin $B/partitions.bin $B/firmware.bin static/firmware/
+          cp ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin static/firmware/
+          V=$(grep -oP '#define FW_VERSION "\K[^"]+' firmware/bell_device/src/main.cpp)
+          cat > static/firmware/manifest.json <<JSON
+          {"name": "School bell device", "version": "$V.${{ github.run_number }}", "new_install_prompt_erase": true,
+           "builds": [{"chipFamily": "ESP32-S3", "parts": [
+             {"path": "bootloader.bin", "offset": 0}, {"path": "partitions.bin", "offset": 32768},
+             {"path": "boot_app0.bin", "offset": 57344}, {"path": "firmware.bin", "offset": 65536}]}]}
+          JSON
+          ls -l static/firmware
+          echo "::notice::firmware $V.${{ github.run_number }} $(stat -c %s static/firmware/firmware.bin) bytes"
+      - uses: actions/upload-artifact@v4
+        with: { name: bell-device-firmware, path: static/firmware }
+      - name: Publish (committed to static/firmware, served by the bell server itself)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add static/firmware
+          git diff --cached --quiet && exit 0
+          git commit -m "Bell device firmware ${{ github.run_number }} [skip ci]"
+          git pull --rebase -q origin main
+          git push
