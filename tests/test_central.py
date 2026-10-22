@@ -415,3 +415,44 @@ def test_custom_rings_name_and_time(admin, app):
     admin.post(f'/admin/central/custom/{cid}/delete')
     with app.app_context():
         assert len(central.custom_rings()) == 1
+
+
+def test_switch_timings_and_single_periods_off(admin, app):
+    _seed(admin, app)
+    import central
+    with app.app_context():
+        groups = central.groups()
+        gs = [g['key'] for g in groups]
+        g0 = gs[0]
+        sunday_names = {n for s in central.week_rings()[6] for r in s['rings'] for n in r['groups']}
+        g1 = next(g['key'] for g in groups[1:] if g['ar'] in sunday_names)
+        g1_name = next(g['ar'] for g in groups if g['key'] == g1)
+        ps = central.group_periods(g1)
+        before = central.week_rings()
+        n_before = sum(len(s['rings']) for d in before.values() for s in d)
+    html = admin.get('/admin/central').get_data(as_text=True)
+    assert f'name="on__{g0}"' in html and f'name="on__{ps[0]["key"]}"' in html
+    # switch off the whole first timing and the first period of the second timing
+    data = {'enabled': '1', 'switches': '1', 'grp_seen': gs, 'per_seen': [p['key'] for p in ps]}
+    for g in gs[1:]:
+        data['on__' + g] = '1'
+    for p in ps[1:]:
+        data['on__' + p['key']] = '1'
+    admin.post('/admin/central/save', data=data)
+    with app.app_context():
+        cfg = central.config()
+        assert cfg['off_groups'] == [g0] and cfg['off_periods'] == [ps[0]['key']]
+        wk = central.week_rings()
+        names0 = {central.groups()[0]['ar']}
+        assert not any(set(r['groups']) & names0 and len(r['groups']) == 1 for d in wk.values() for s in d for r in s['rings'])
+        sun_g1 = [s['t'] for s in wk[6] for r in s['rings'] if g1_name in r['groups']]
+        assert ps[0]['t'] not in sun_g1 and ps[1]['t'] in sun_g1
+        assert sum(len(s['rings']) for d in wk.values() for s in d) < n_before
+    # saving tones without the switch block keeps the switches
+    admin.post('/admin/central/save', data={'enabled': '1', 'volume': '80'})
+    with app.app_context():
+        assert central.config()['off_groups'] == [g0]
+    # everything back on
+    admin.post('/admin/central/save', data={'enabled': '1', 'switches': '1', 'grp_seen': gs, **{'on__' + g: '1' for g in gs}})
+    with app.app_context():
+        assert central.config()['off_groups'] == [] and central.config()['off_periods'] == []

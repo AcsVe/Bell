@@ -59,7 +59,13 @@ def config():
     c.setdefault('volume', 100)
     c.setdefault('skip_dates', [])
     c.setdefault('tones', {})
+    c.setdefault('off_groups', [])      # timings switched off (no ring at all for them)
+    c.setdefault('off_periods', [])     # single periods/breaks switched off: 'pp:<program period id>' / 'sp:<stage period id>'
     return c
+
+
+def period_key(period):
+    return ('pp:' if period.get('source') == 'program' else 'sp:') + str(period.get('pid'))
 
 
 def save_config(c):
@@ -124,6 +130,18 @@ def groups():
     return out
 
 
+def group_periods(gkey):
+    """The periods/breaks of one timing, for the on/off switches: [{key, kind, label, t}]."""
+    kind, _, gid = gkey.partition(':')
+    if not gid.isdigit():
+        return []
+    owner = db.session.get(BellProgram if kind == 'program' else Stage, int(gid))
+    if owner is None:
+        return []
+    pre = 'pp:' if kind == 'program' else 'sp:'
+    return [{'key': pre + str(p.id), 'kind': p.kind, 'label': p.label_ar, 't': p.start_time} for p in owner.periods]
+
+
 def effective_tones(cfg=None, group_list=None):
     """{group key: {'class': key, 'break': key}} — saved choice, otherwise a different default per group."""
     cfg = cfg or config()
@@ -172,8 +190,12 @@ def week_rings(cfg=None, only=None, pid='*'):
     tones = effective_tones(cfg)
     days = {wd: {} for wd in range(7)}
 
+    off_g, off_p = set(cfg.get('off_groups') or []), set(cfg.get('off_periods') or [])
+
     def add(wd, period, gkey, gname):
         if only is not None and gkey not in only:
+            return
+        if gkey in off_g or period_key(period) in off_p:
             return
         tone = tones.get(gkey, {}).get('break' if period['kind'] == 'break' else 'class')
         if not tone or tone == SILENT:

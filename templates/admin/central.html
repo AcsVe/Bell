@@ -24,6 +24,7 @@
 
 <section class="tabpane" data-pane="ring-tab">
 <form method="post" action="{{ url_for('central.save') }}" class="card">
+  <input type="hidden" name="switches" value="1">
   <div class="row" style="align-items:center">
     <label class="shrink" style="display:flex;gap:8px;align-items:center;font-weight:700;font-size:16px">
       <input type="checkbox" name="enabled" value="1" {{ 'checked' if cfg.enabled }}> {{ L('الجرس المركزي مفعّل', 'Central bell enabled') }}</label>
@@ -34,11 +35,23 @@
   <p class="muted">{{ L('لا توجد توقيتات بعد — أضف المراحل والحصص أو برامج الجرس ووزّعها على الصفوف أولاً.', 'No timings yet — add stages and periods or bell programs and assign them to grades first.') }}</p>
   {% else %}
   <table class="resp" style="margin-top:12px">
-    <thead><tr><th>{{ L('التوقيت', 'Timing') }}</th><th>{{ L('الصفوف', 'Grades') }}</th><th>{{ L('نغمة بداية الحصة', 'Period-start tone') }}</th><th>{{ L('نغمة الاستراحة', 'Break tone') }}</th></tr></thead>
+    <thead><tr><th style="width:70px">{{ L('مفعّل', 'On') }}</th><th>{{ L('التوقيت', 'Timing') }}</th><th>{{ L('الصفوف', 'Grades') }}</th><th>{{ L('نغمة بداية الحصة', 'Period-start tone') }}</th><th>{{ L('نغمة الاستراحة', 'Break tone') }}</th></tr></thead>
     <tbody>
-    {% for g in groups %}{% set cur = tones[g.key] %}
-    <tr data-row>
-      <td><b><bdi>{{ L(g.ar, g.en) }}</bdi></b><div class="small muted">{{ L('برنامج جرس', 'Bell program') if g.kind == 'program' else L('توقيت المرحلة', 'Stage times') }}</div></td>
+    {% for g in groups %}{% set cur = tones[g.key] %}{% set g_on = g.key not in cfg.off_groups %}
+    <tr data-row style="{{ 'opacity:.55' if not g_on }}">
+      <td><input type="hidden" name="grp_seen" value="{{ g.key }}">
+        <label class="switch" title="{{ L('تفعيل / تعطيل كل رنّات هذا التوقيت', 'Turn all rings of this timing on / off') }}" style="display:flex;gap:6px;align-items:center;font-weight:normal">
+          <input type="checkbox" name="on__{{ g.key }}" value="1" {{ 'checked' if g_on }}> <span class="small">{{ L('مفعّل', 'On') if g_on else L('معطّل', 'Off') }}</span></label></td>
+      <td><b><bdi>{{ L(g.ar, g.en) }}</bdi></b><div class="small muted">{{ L('برنامج جرس', 'Bell program') if g.kind == 'program' else L('توقيت المرحلة', 'Stage times') }}</div>
+        {% set gps = group_periods(g.key) %}{% if gps %}
+        {% set n_off = gps|selectattr('key', 'in', cfg.off_periods)|list|length %}
+        <details style="margin-top:4px"><summary class="small">{{ L('الحصص والاستراحات', 'Periods and breaks') }} ({{ gps|length - n_off }}/{{ gps|length }} {{ L('مفعّلة', 'on') }})</summary>
+          <div style="display:grid;gap:2px;margin-top:4px">
+          {% for p in gps %}<input type="hidden" name="per_seen" value="{{ p.key }}">
+            <label class="small" style="display:flex;gap:6px;align-items:center;font-weight:normal"><input type="checkbox" name="on__{{ p.key }}" value="1" {{ 'checked' if p.key not in cfg.off_periods }}>
+              <span dir="ltr" class="muted">{{ p.t }}</span> {{ '☕ ' if p.kind == 'break' }}{{ p.label }}</label>
+          {% endfor %}</div>
+        </details>{% endif %}</td>
       <td class="small">{% for u in g.uses %}<span class="chip">{{ u }}</span>{% endfor %}</td>
       {% for kind in ['class', 'break'] %}
       <td><div class="row" style="flex-wrap:nowrap;gap:6px">

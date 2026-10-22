@@ -43,7 +43,7 @@ def page():
                            new_key=new_key, new_key_for=new_key_for, devices=devs, today_rings=today_rings, today_off=today_off, next_ring=next_ring,
                            now=now, week_order=WEEK_ORDER, wd_names=weekday_names(session.get('lang', 'ar')),
                            tone_name=lambda k: central.tone_name(k, session.get('lang', 'ar')),
-                           tone_url=central.tone_url, silent=central.SILENT, custom=central.custom_rings(), server_url=request.host_url.rstrip('/'),
+                           tone_url=central.tone_url, silent=central.SILENT, custom=central.custom_rings(), group_periods=central.group_periods, server_url=request.host_url.rstrip('/'),
                            lib_urls={k: url for k, _n, url in lib}, dev_versions={d['id']: central.player_payload(d['id'])['version'] for d in devs})
 
 
@@ -68,6 +68,11 @@ def save():
     # keep only today and later (old days are useless to the player)
     today = _today().date().isoformat()
     cfg['skip_dates'] = sorted(d for d in dates if d >= today)
+    if request.form.get('switches'):         # the on/off switches of every timing and period were on the form
+        seen_g = request.form.getlist('grp_seen')
+        seen_p = request.form.getlist('per_seen')
+        cfg['off_groups'] = sorted(g for g in seen_g if not request.form.get('on__' + g))
+        cfg['off_periods'] = sorted(p for p in seen_p if not request.form.get('on__' + p))
     valid = set(central.all_tone_keys()) | {central.SILENT}
     for g in central.groups():
         c, b = request.form.get(f'class__{g["key"]}'), request.form.get(f'break__{g["key"]}')
