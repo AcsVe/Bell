@@ -374,3 +374,44 @@ def test_insert_period_in_the_middle(admin, app):
         assert [(p.number, p.kind, p.start_time, p.end_time) for p in ps] == [
             (1, 'break', '07:30', '07:40'), (2, 'class', '07:40', '08:25'), (3, 'class', '08:25', '09:10')]
     assert 'name="before"' in admin.get(f'/admin/programs/{pid}').get_data(as_text=True)
+
+
+def test_custom_rings_name_and_time(admin, app):
+    """Rings with your own name and time, any days, any tone, chosen devices — not tied to periods."""
+    _seed(admin, app)
+    import central
+    c = app.test_client()
+    admin.post('/admin/central/players/add', data={'name': 'A'})
+    ka = _key_from(admin.get('/admin/central').get_data(as_text=True), None)
+    admin.post('/admin/central/players/add', data={'name': 'B'})
+    kb = _key_from(admin.get('/admin/central').get_data(as_text=True), None)
+    r = admin.post('/admin/central/custom/add', data={'name': 'طابور الصباح', 't': '07:35', 'days': ['6', '0'], 'tone': 'kids-1',
+                                                      'devices': ['p1'], 'enabled': '1'}, follow_redirects=True)
+    assert 'أُضيف' in r.get_data(as_text=True)
+    admin.post('/admin/central/custom/add', data={'name': 'نهاية الدوام', 't': '13:47', 'days': ['3'], 'tone': 'class-8',
+                                                  'all_devices': '1', 'enabled': '1'})
+    bad = admin.post('/admin/central/custom/add', data={'name': 'x', 't': '25:00', 'days': ['1'], 'tone': 'kids-1'}, follow_redirects=True)
+    assert 'وقتاً صحيحاً' in bad.get_data(as_text=True)
+    with app.app_context():
+        wk = central.week_rings()
+        sun = {s['t']: s for s in wk[6]}
+        assert sun['07:35']['rings'][0] == {'tone': 'kids-1', 'kind': 'custom', 'groups': ['طابور الصباح'], 'label': 'طابور الصباح'}
+        assert '07:35' not in {s['t'] for s in wk[1]}
+        assert '13:47' in {s['t'] for s in wk[3]}
+    a = c.get('/api/central/schedule', headers={'X-Bell-Key': ka}).get_json()
+    b = c.get('/api/central/schedule', headers={'X-Bell-Key': kb}).get_json()
+    assert '07:35' in {s['t'] for s in a['days']['6']} and '07:35' not in {s['t'] for s in b['days']['6']}
+    assert '13:47' in {s['t'] for s in b['days']['3']} and 'kids-1' in a['tones']
+    html = admin.get('/admin/central').get_data(as_text=True)
+    assert 'طابور الصباح' in html and 'custom-tab' in html
+    # edit (switch off) and delete
+    with app.app_context():
+        cid = [x for x in central.custom_rings() if x['t'] == '07:35'][0]['id']
+    admin.post(f'/admin/central/custom/{cid}/save', data={'name': 'طابور الصباح', 't': '07:40', 'days': ['6'], 'tone': 'kids-1', 'all_devices': '1'})
+    with app.app_context():
+        x = [x for x in central.custom_rings() if x['id'] == cid][0]
+        assert x['t'] == '07:40' and x['enabled'] is False
+        assert '07:40' not in {s['t'] for s in central.week_rings()[6]}
+    admin.post(f'/admin/central/custom/{cid}/delete')
+    with app.app_context():
+        assert len(central.custom_rings()) == 1

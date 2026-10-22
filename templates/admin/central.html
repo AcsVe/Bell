@@ -16,6 +16,7 @@
 
 <nav class="tabbar" data-tabs>
   <a href="#ring-tab" data-tab="ring-tab">🔔 {{ L('النغمات لكل توقيت', 'Tones per timing') }}<span class="count">{{ groups|length }}</span></a>
+  <a href="#custom-tab" data-tab="custom-tab">⏰ {{ L('رنّات حسب الوقت', 'Rings at set times') }}<span class="count">{{ custom|length }}</span></a>
   <a href="#today-tab" data-tab="today-tab">🕘 {{ L('اليوم والأسبوع', 'Today & week') }}</a>
   <a href="#tones-tab" data-tab="tones-tab">🎵 {{ L('مكتبة النغمات والتجربة', 'Tone library & test') }}</a>
   <a href="#player-tab" data-tab="player-tab">💻 {{ L('أجهزة الجرس', 'Bell devices') }}<span class="count">{{ devices|length }}</span></a>
@@ -59,6 +60,48 @@
   </div>
   <button style="margin-top:12px">{{ L('حفظ', 'Save') }}</button>
   <p class="muted small">{{ L('الاستماع ▶ هنا على جهازك أنت. للتجربة على سمّاعات المكتب: تبويب «مكتبة النغمات والتجربة».', 'Listening ▶ plays on your own device. To test on the office speakers: the “Tone library & test” tab.') }}</p>
+</form>
+</section>
+
+{% macro custom_fields(c, idp) %}
+  <div class="row">
+    <div><label>{{ L('الاسم', 'Name') }}</label><input type="text" name="name" value="{{ c.name if c else '' }}" maxlength="60" placeholder="{{ L('مثلاً: طابور الصباح', 'e.g. Morning line-up') }}" required></div>
+    <div class="shrink" style="width:130px"><label>{{ L('الوقت', 'Time') }}</label><input type="time" name="t" value="{{ c.t if c else '' }}" required></div>
+    <div class="shrink" style="min-width:220px"><label>{{ L('النغمة', 'Tone') }}</label>
+      <div class="row" style="flex-wrap:nowrap;gap:6px"><select name="tone" data-tone-select>{% for k, name, url in lib %}<option value="{{ k }}" {{ 'selected' if c and c.tone == k }}>{{ name }}</option>{% endfor %}</select>
+      <button type="button" class="ghost sm shrink" data-play title="{{ L('استماع', 'Listen') }}">▶</button></div></div>
+  </div>
+  <div class="row" style="gap:4px 14px;flex-wrap:wrap;margin-top:6px">
+    <b class="shrink small">{{ L('الأيام:', 'Days:') }}</b>
+    {% for wd in week_order %}<label class="shrink" style="display:flex;gap:5px;align-items:center;font-weight:normal"><input type="checkbox" name="days" value="{{ wd }}" {{ 'checked' if (c and wd in c.days) or (not c and wd not in [4, 5]) }}> {{ wd_names[wd] }}</label>{% endfor %}
+  </div>
+  {% if devices|length > 1 %}
+  <div class="row" style="gap:4px 14px;flex-wrap:wrap;margin-top:6px">
+    <b class="shrink small">{{ L('على:', 'On:') }}</b>
+    <label class="shrink" style="display:flex;gap:5px;align-items:center;font-weight:700"><input type="checkbox" name="all_devices" value="1" {{ 'checked' if not c or c.devices is none }}> {{ L('كل الأجهزة', 'All devices') }}</label>
+    {% for d in devices %}<label class="shrink" style="display:flex;gap:5px;align-items:center;font-weight:normal"><input type="checkbox" name="devices" value="{{ d.id }}" {{ 'checked' if not c or c.devices is none or d.id in c.devices }}> {{ d.name }}</label>{% endfor %}
+  </div>
+  {% endif %}
+  <label style="display:flex;gap:6px;align-items:center;font-weight:normal;margin-top:6px"><input type="checkbox" name="enabled" value="1" {{ 'checked' if not c or c.enabled }}> {{ L('مفعّل', 'Enabled') }}</label>
+{% endmacro %}
+
+<section class="tabpane" data-pane="custom-tab">
+<p class="hint">{{ L('رنّات بأسماء وأوقات تختارها أنت، غير مرتبطة بالحصص أو الاستراحات: طابور الصباح، نهاية الدوام، صلاة الظهر، الإذاعة… لكلٍّ وقته وأيامه ونغمته، وتختار الأجهزة (المباني) التي ترنّ له. تحترم أيام العطل وزر التفعيل العام.',
+  'Rings with names and times you choose, not tied to periods or breaks: morning line-up, end of day, noon prayer, radio… each with its own time, days and tone, and the devices (buildings) that play it. Holidays and the main on/off switch apply.') }}</p>
+{% for c in custom %}
+<form method="post" action="{{ url_for('central.custom_save', cid=c.id) }}" class="card" style="{{ 'opacity:.6' if not c.enabled }}">
+  {{ custom_fields(c, c.id) }}
+  <div class="row" style="margin-top:8px">
+    <div class="shrink"><button>{{ L('حفظ', 'Save') }}</button></div>
+    <div class="shrink"><button class="danger sm" form="del-c{{ c.id }}">{{ L('حذف', 'Delete') }}</button></div>
+  </div>
+</form>
+<form id="del-c{{ c.id }}" method="post" action="{{ url_for('central.custom_delete', cid=c.id) }}" data-confirm="{{ L('حذف هذا الرنين؟', 'Delete this ring?') }}"></form>
+{% endfor %}
+<form method="post" action="{{ url_for('central.custom_add') }}" class="card">
+  <h2>➕ {{ L('رنين جديد', 'New ring') }}</h2>
+  {{ custom_fields(none, 'new') }}
+  <div style="margin-top:8px"><button>{{ L('إضافة', 'Add') }}</button></div>
 </form>
 </section>
 

@@ -43,7 +43,7 @@ def page():
                            new_key=new_key, new_key_for=new_key_for, devices=devs, today_rings=today_rings, today_off=today_off, next_ring=next_ring,
                            now=now, week_order=WEEK_ORDER, wd_names=weekday_names(session.get('lang', 'ar')),
                            tone_name=lambda k: central.tone_name(k, session.get('lang', 'ar')),
-                           tone_url=central.tone_url, silent=central.SILENT, server_url=request.host_url.rstrip('/'),
+                           tone_url=central.tone_url, silent=central.SILENT, custom=central.custom_rings(), server_url=request.host_url.rstrip('/'),
                            lib_urls={k: url for k, _n, url in lib}, dev_versions={d['id']: central.player_payload(d['id'])['version'] for d in devs})
 
 
@@ -230,6 +230,70 @@ def api_poll():
                     'tz_offset_min': int(off.total_seconds() // 60) if off is not None else 180,
                     # the same server on the school network — used when the internet is down
                     'lan': central.lan_urls()})
+
+
+# ── custom rings (name + any time) ──────────────────────────────────────────
+def _custom_from_form(cur=None):
+    import re
+    c = dict(cur or {})
+    name = (request.form.get('name') or '').strip()[:60]
+    t = (request.form.get('t') or '').strip()
+    if not re.fullmatch(r'([01]\d|2[0-3]):[0-5]\d', t):
+        return None, _msg('أدخل وقتاً صحيحاً مثل 07:45', 'Enter a valid time such as 07:45')
+    days = sorted({int(d) for d in request.form.getlist('days') if d.isdigit() and 0 <= int(d) <= 6})
+    if not days:
+        return None, _msg('اختر يوماً واحداً على الأقل', 'Choose at least one day')
+    tone = request.form.get('tone')
+    if tone not in central.all_tone_keys():
+        return None, _msg('اختر نغمة', 'Choose a tone')
+    known = set(central.players())
+    devs = [d for d in request.form.getlist('devices') if d in known]
+    c.update({'name': name or t, 't': t, 'days': days, 'tone': tone, 'enabled': bool(request.form.get('enabled')),
+              'devices': None if request.form.get('all_devices') or not known or set(devs) == known else devs})
+    return c, None
+
+
+@central_bp.route('/admin/central/custom/add', methods=['POST'])
+@login_required
+def custom_add():
+    import uuid
+    c, err = _custom_from_form()
+    if err:
+        flash(err, 'error')
+    else:
+        items = central.custom_rings()
+        c['id'] = uuid.uuid4().hex[:8]
+        items.append(c)
+        central.save_custom_rings(items)
+        db.session.commit()
+        flash(_msg(f'أُضيف «{c["name"]}» الساعة {c["t"]}', f'Added “{c["name"]}” at {c["t"]}'), 'ok')
+    return redirect(url_for('central.page') + '#custom-tab')
+
+
+@central_bp.route('/admin/central/custom/<cid>/save', methods=['POST'])
+@login_required
+def custom_save(cid):
+    items = central.custom_rings()
+    for i, cur in enumerate(items):
+        if cur.get('id') == cid:
+            c, err = _custom_from_form(cur)
+            if err:
+                flash(err, 'error')
+            else:
+                items[i] = c
+                central.save_custom_rings(items)
+                db.session.commit()
+                flash(_msg('حُفظ', 'Saved'), 'ok')
+            break
+    return redirect(url_for('central.page') + '#custom-tab')
+
+
+@central_bp.route('/admin/central/custom/<cid>/delete', methods=['POST'])
+@login_required
+def custom_delete(cid):
+    central.save_custom_rings([c for c in central.custom_rings() if c.get('id') != cid])
+    db.session.commit()
+    return redirect(url_for('central.page') + '#custom-tab')
 
 
 # ── bell DEVICE (ESP32 box): flashing page + Bluetooth programming ──────────

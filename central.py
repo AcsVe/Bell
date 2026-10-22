@@ -151,7 +151,21 @@ def persist_defaults():
 
 
 # ── schedule ────────────────────────────────────────────────────────────────
-def week_rings(cfg=None, only=None):
+# ── custom rings: a name + any time you choose (morning line-up, end of day, prayer…), not tied to periods ──
+# app_settings central_custom = [{id, name, t: 'HH:MM', days: [0..6] (Monday = 0), tone, devices: null (all) | [ids], enabled}]
+def custom_rings():
+    try:
+        out = json.loads(AppSetting.get('central_custom') or '[]')
+    except ValueError:
+        out = []
+    return sorted([c for c in out if isinstance(c, dict) and c.get('t')], key=lambda c: (c['t'], c.get('name', '')))
+
+
+def save_custom_rings(items):
+    AppSetting.set('central_custom', json.dumps(items, ensure_ascii=False, sort_keys=True))
+
+
+def week_rings(cfg=None, only=None, pid='*'):
     """{weekday: [{'t': 'HH:MM', 'rings': [{'tone', 'kind', 'groups': [...], 'label'}]}]} for Monday=0..Sunday=6.
     only = a set of group keys (one bell device that serves some buildings/stages only); None = every group."""
     cfg = cfg or config()
@@ -180,6 +194,20 @@ def week_rings(cfg=None, only=None):
             else:
                 for p in resolve_stage_day(st, wd):
                     add(wd, p, f'stage:{st.id}', st.name_ar)
+    # custom rings (pid '*' = the admin view: every device)
+    valid = set(all_tone_keys())
+    for c in custom_rings():
+        if not c.get('enabled', True) or c.get('tone') not in valid:
+            continue
+        devs = c.get('devices')
+        if pid != '*' and devs is not None and pid not in devs:
+            continue
+        for wd in c.get('days') or []:
+            if 0 <= int(wd) <= 6:
+                slot = days[int(wd)].setdefault(c['t'], {})
+                r = slot.setdefault(c['tone'], {'tone': c['tone'], 'kind': 'custom', 'groups': [], 'label': c.get('name', '')})
+                if c.get('name', '') not in r['groups']:
+                    r['groups'].append(c.get('name', ''))
     return {wd: [{'t': t, 'rings': list(slot.values())} for t, slot in sorted(slots.items())] for wd, slots in days.items()}
 
 
@@ -188,7 +216,7 @@ def player_payload(pid=None):
     cfg = config()
     pl = players().get(pid) if pid else None
     only = set(pl['groups']) if pl and pl.get('groups') is not None else None
-    week = week_rings(cfg, only)
+    week = week_rings(cfg, only, pid or '*')
     used = sorted({r['tone'] for day in week.values() for slot in day for r in slot['rings']})
     vol = pl.get('volume') if pl and pl.get('volume') else cfg.get('volume')
     body = {
