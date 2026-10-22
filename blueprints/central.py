@@ -230,3 +230,58 @@ def api_poll():
                     'tz_offset_min': int(off.total_seconds() // 60) if off is not None else 180,
                     # the same server on the school network — used when the internet is down
                     'lan': central.lan_urls()})
+
+
+# ── bell DEVICE (ESP32 box): flashing page + Bluetooth programming ──────────
+@central_bp.route('/admin/central/device')
+@login_required
+def device_page():
+    import os
+    devs = central.devices()
+    db.session.commit()
+    fw = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'firmware', 'manifest.json')
+    fw_version = None
+    if os.path.isfile(fw):
+        try:
+            import json
+            fw_version = json.load(open(fw, encoding='utf-8')).get('version')
+        except (OSError, ValueError):
+            fw_version = '?'
+    return render_template('admin/device.html', devices=devs, fw_version=fw_version,
+                           server_url=request.host_url.rstrip('/'))
+
+
+@central_bp.route('/admin/central/players/<pid>/payload.json')
+@login_required
+def player_payload_json(pid):
+    """What the Bluetooth page sends to a device that has no network: its schedule + tones + the server time."""
+    if pid not in central.players():
+        return jsonify({'error': 'unknown device'}), 404
+    body = central.player_payload(pid)
+    off = _today().utcoffset()
+    body.update({'server_ms': int(time.time() * 1000), 'tz_offset_min': int(off.total_seconds() // 60) if off else 180,
+                 'lan': central.lan_urls()})
+    return jsonify(body)
+
+
+@central_bp.route('/admin/central/players/<pid>/newkey.json', methods=['POST'])
+@login_required
+def player_newkey_json(pid):
+    if pid not in central.players():
+        return jsonify({'error': 'unknown device'}), 404
+    k = central.new_player_key(pid)
+    db.session.commit()
+    return jsonify({'key': k})
+
+
+@central_bp.route('/admin/central/players/<pid>/ble_status', methods=['POST'])
+@login_required
+def player_ble_status(pid):
+    """After programming over Bluetooth the page reports what the device said (so its card shows it)."""
+    if pid not in central.players():
+        return jsonify({'error': 'unknown device'}), 404
+    data = request.get_json(silent=True) or {}
+    data['via'] = 'bluetooth ' + datetime.now().strftime('%Y-%m-%d %H:%M')
+    central.record_status(pid, data, 'bluetooth')
+    db.session.commit()
+    return jsonify({'ok': True})

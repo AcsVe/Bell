@@ -316,3 +316,21 @@ def test_test_ring_on_chosen_devices(admin, app):
     assert 'اختر جهازاً واحداً على الأقل' in r.get_data(as_text=True)
     admin.post('/admin/central/test', data={'tone': 'kids-2', 'devsel': '1', 'players': ['p1', 'p2', 'p3']})
     assert all(c.post('/api/central/poll', headers={'X-Bell-Key': k}, json={}).get_json()['test']['tone'] == 'kids-2' for k in keys.values())
+
+
+def test_device_page_and_bluetooth_endpoints(admin, app):
+    _seed(admin, app)
+    admin.post('/admin/central/players/add', data={'name': 'Box'})
+    html = admin.get('/admin/central/device').get_data(as_text=True)
+    assert 'Bluetooth' in html and 'option value="p1"' in html
+    p = admin.get('/admin/central/players/p1/payload.json').get_json()
+    assert p['days']['6'] and p['tz_offset_min'] == 180 and p['server_ms'] > 0 and p['version']
+    k = admin.post('/admin/central/players/p1/newkey.json').get_json()['key']
+    c = app.test_client()
+    assert c.get('/api/central/schedule', headers={'X-Bell-Key': k}).status_code == 200
+    assert admin.post('/admin/central/players/p1/ble_status', json={'host': 'BELL-ABC123', 'license': 'PERMANENT',
+                                                                      'fingerprint': 'ABCDEF0123456789'}).get_json()['ok']
+    html = admin.get('/admin/central').get_data(as_text=True)
+    assert 'BELL-ABC123' in html and 'bluetooth' in html and 'central/device' in html
+    assert admin.get('/admin/central/players/zz/payload.json').status_code == 404
+    assert app.test_client().get('/admin/central/players/p1/payload.json').status_code == 302   # admins only

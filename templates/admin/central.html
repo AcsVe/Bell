@@ -172,6 +172,11 @@
 </div>
 {% endfor %}
 <div class="card">
+  <h2>📟 {{ L('جهاز جرس بدون كمبيوتر (ESP32)', 'Bell device without a PC (ESP32)') }}</h2>
+  <p class="small">{{ L('علبة صغيرة تُوصل بجهاز الصوت بدل الكمبيوتر — عبر Wi-Fi أو Bluetooth.', 'A small box connected to the amplifier instead of a PC — over Wi-Fi or Bluetooth.') }}
+    <a class="btn ghost sm" href="{{ url_for('central.device_page') }}">{{ L('تثبيت البرنامج والبرمجة عبر Bluetooth', 'Install the firmware and program over Bluetooth') }}</a></p>
+</div>
+<div class="card">
   <h2>➕ {{ L('إضافة جهاز جرس (مبنى آخر / جهاز صوت آخر)', 'Add a bell device (another building / PA amplifier)') }}</h2>
   <form method="post" action="{{ url_for('central.player_add') }}" class="row">
     <div><label>{{ L('الاسم', 'Name') }}</label><input type="text" name="name" placeholder="{{ L('مثلاً: المبنى الثاني', 'e.g. Building 2') }}" maxlength="60" required></div>

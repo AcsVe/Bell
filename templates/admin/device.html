@@ -1,0 +1,197 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ L('جهاز جرس بدون كمبيوتر', 'Bell device (no PC)') }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('central.page') }}#player-tab">{{ L('الجرس المركزي', 'Central bell') }}</a></div>
+<div class="page-head"><h1>📟 {{ L('جهاز جرس بدون كمبيوتر (ESP32)', 'Bell device without a PC (ESP32)') }}</h1></div>
+<p class="hint">{{ L('علبة صغيرة موصولة بجهاز الصوت بدل الكمبيوتر: تتصل بالخادم عبر Wi-Fi مثل BellPlayer، أو تُبرمج من هنا عبر Bluetooth في المباني التي لا شبكة فيها. ترنّ من ذاكرتها وساعتها حتى دون إنترنت. القطع وطريقة التوصيل: docs/Bell_Hardware.md.',
+  'A small box connected to the amplifier instead of a PC: it talks to the server over Wi-Fi like BellPlayer, or is programmed from here over Bluetooth where a building has no network. It rings from its own memory and clock, even without internet. Parts and wiring: docs/Bell_Hardware.md.') }}</p>
+
+<div class="card">
+  <h2>1) {{ L('تحميل البرنامج على الجهاز (مرة واحدة، بسلك USB)', 'Install the firmware (once, with a USB cable)') }}</h2>
+  {% if fw_version %}
+  <p class="small">{{ L('الإصدار المتوفر:', 'Available version:') }} <b dir="ltr">{{ fw_version }}</b> — {{ L('يعمل في Chrome أو Edge على الكمبيوتر. وصّل الجهاز بمنفذ USB (المكتوب عليه USB، لا UART) ثم اضغط:', 'Works in Chrome or Edge on a computer. Connect the board by its USB port (marked USB, not UART), then press:') }}</p>
+  <esp-web-install-button manifest="{{ url_for('static', filename='firmware/manifest.json') }}">
+    <button slot="activate">{{ L('تثبيت / تحديث برنامج الجهاز', 'Install / update the device firmware') }}</button>
+    <span slot="unsupported">{{ L('هذا المتصفح لا يدعم التثبيت عبر USB — استخدم Chrome أو Edge على كمبيوتر.', 'This browser cannot install over USB — use Chrome or Edge on a computer.') }}</span>
+  </esp-web-install-button>
+  <p class="muted small">{{ L('عند السؤال عن «Erase device»: اختر نعم في أول تثبيت فقط؛ في التحديث اختر لا لتبقى الإعدادات والترخيص والنغمات.', 'When asked “Erase device”: yes only for the first install; for an update choose no to keep settings, license and tones.') }}</p>
+  <script type="module" src="https://unpkg.com/esp-web-tools@10.2.1/dist/web/install-button.js?module"></script>
+  {% else %}
+  <p class="muted">{{ L('لم يُبنَ برنامج الجهاز بعد على هذا الخادم — شغّل update.bat بعد اكتمال البناء في GitHub.', 'The device firmware is not on this server yet — run update.bat once the GitHub build has finished.') }}</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>2) {{ L('البرمجة عبر Bluetooth', 'Program over Bluetooth') }}</h2>
+  <p class="muted small">{{ L('يعمل في Chrome على أندرويد أو على كمبيوتر فيه Bluetooth (لا يعمل على iPhone). اقترب من الجهاز ثم «اتصال».', 'Works in Chrome on Android or on a computer with Bluetooth (not on iPhone). Stand near the device, then “Connect”.') }}</p>
+  {% if not devices %}<p class="chip" style="background:#fff4e0;color:#8a5a00">{{ L('أضف الجهاز أولاً في تبويب «أجهزة الجرس» ثم عد هنا.', 'Add the device on the “Bell devices” tab first, then come back.') }}</p>{% endif %}
+  <div class="row">
+    <div><label>{{ L('هذا الجهاز هو', 'This device is') }}</label>
+      <select id="pid">{% for d in devices %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select></div>
+    <div class="shrink"><button type="button" id="connect">🔗 {{ L('اتصال', 'Connect') }}</button></div>
+  </div>
+  <pre id="st" class="small" dir="ltr" style="background:#f4f6fa;padding:10px;border-radius:8px;white-space:pre-wrap;min-height:40px">{{ L('غير متصل', 'Not connected') }}</pre>
+  <div id="progress" class="small" style="margin:6px 0"></div>
+
+  <fieldset id="ops" disabled style="border:0;padding:0;margin:0">
+  <h3>{{ L('أ) مع شبكة Wi-Fi (مزامنة تلقائية — الأفضل)', 'a) With Wi-Fi (automatic sync — best)') }}</h3>
+  <div class="row">
+    <div><label>{{ L('اسم شبكة Wi-Fi', 'Wi-Fi name') }}</label><input id="ssid" type="text" autocomplete="off"></div>
+    <div><label>{{ L('كلمة مرورها', 'Wi-Fi password') }}</label><input id="pass" type="password" autocomplete="new-password"></div>
+    <div><label>{{ L('عنوان الخادم', 'Server') }}</label><input id="server" type="text" dir="ltr" value="{{ server_url }}"></div>
+  </div>
+  <label style="display:flex;gap:6px;align-items:center;font-weight:normal"><input type="checkbox" id="newkey" checked> {{ L('إنشاء مفتاح جديد لهذا الجهاز وإرساله إليه (يوقف المفتاح السابق لهذا الجهاز فقط)', 'Create a new key for this device and send it (stops only this device\'s previous key)') }}</label>
+  <button type="button" id="sendwifi" style="margin-top:8px">📶 {{ L('إرسال إعدادات Wi-Fi', 'Send Wi-Fi settings') }}</button>
+
+  <h3 style="margin-top:16px">{{ L('ب) دون شبكة (يُعاد عند تغيير الجداول)', 'b) Without a network (repeat when timings change)') }}</h3>
+  <button type="button" id="sendsched">🔔 {{ L('إرسال الجدول والنغمات وضبط الوقت', 'Send schedule, tones and time') }}</button>
+  <button type="button" id="sendtime" class="ghost">🕘 {{ L('ضبط الوقت فقط', 'Set the time only') }}</button>
+
+  <h3 style="margin-top:16px">{{ L('ج) الترخيص', 'c) License') }}</h3>
+  <div class="row">
+    <div><label>{{ L('مفتاح الترخيص لبصمة هذا الجهاز', 'License key for this device\'s fingerprint') }}</label><input id="lic" type="text" dir="ltr" autocomplete="off"></div>
+    <div class="shrink"><button type="button" id="sendlic">🔑 {{ L('إرسال الترخيص', 'Send license') }}</button></div>
+  </div>
+
+  <h3 style="margin-top:16px">{{ L('د) تجربة', 'd) Test') }}</h3>
+  <div class="row">
+    <div><select id="tone"></select></div>
+    <div class="shrink"><button type="button" id="test" class="ghost">▶ {{ L('رنّ الآن على الجهاز', 'Ring now on the device') }}</button></div>
+    <div class="shrink"><button type="button" id="reboot" class="ghost">↻ {{ L('إعادة تشغيل الجهاز', 'Restart the device') }}</button></div>
+  </div>
+  </fieldset>
+</div>
+
+<div class="card">
+  <h2>{{ L('بدون Bluetooth؟', 'No Bluetooth?') }}</h2>
+  <p class="small">{{ L('اضغط زر BOOT على الجهاز 3 ثوانٍ: تظهر شبكة Wi-Fi باسم «Bell-xxxx» (كلمة المرور bellsetup). اتصل بها من الهاتف فتفتح صفحة الإعداد (أو افتح 192.168.4.1) وأدخل شبكة المدرسة والخادم والمفتاح والترخيص.',
+    'Hold the BOOT button 3 seconds: a Wi-Fi network “Bell-xxxx” appears (password bellsetup). Join it from a phone — the setup page opens (or open 192.168.4.1) — and enter the school Wi-Fi, server, key and license.') }}</p>
+</div>
+
+<script>
+(function () {
+  const SVC = '6e1b0001-5a1e-4b1e-9c1e-be11be11be11', RX = '6e1b0002-5a1e-4b1e-9c1e-be11be11be11', ST = '6e1b0003-5a1e-4b1e-9c1e-be11be11be11';
+  const AR = document.documentElement.lang !== 'en';
+  const T = (a, e) => AR ? a : e;
+  const $ = (id) => document.getElementById(id);
+  let rx = null, st = null, waiting = null, lastStatus = {};
+  const enc = new TextEncoder();
+  const show = (o) => { $('st').textContent = typeof o === 'string' ? o : JSON.stringify(o, null, 1); };
+  const prog = (t) => { $('progress').textContent = t; };
+  const safe = (k) => k.replace(/[^A-Za-z0-9_-]/g, '_');
+
+  function onNotify(ev) {
+    const txt = new TextDecoder().decode(ev.target.value);
+    let j; try { j = JSON.parse(txt); } catch (e) { return; }
+    if (j.ack !== undefined) { if (waiting) { const w = waiting; waiting = null; w(j); } return; }
+    lastStatus = j; show(j);
+  }
+  function waitAck(ms) {
+    return new Promise((res, rej) => { waiting = res; setTimeout(() => { if (waiting === res) { waiting = null; rej(new Error('timeout')); } }, ms || 8000); });
+  }
+  async function send(op, bytes) {
+    const b = new Uint8Array(1 + bytes.length); b[0] = op; b.set(bytes, 1);
+    await rx.writeValueWithResponse(b);
+  }
+  async function sendFile(name, data, label) {
+    const a1 = waitAck(); await send(1, enc.encode(name + '\n' + data.length));
+    const r1 = await a1; if (!r1.ok) throw new Error(r1.err || 'begin failed');
+    const CH = 240;
+    for (let i = 0; i < data.length; i += CH) {
+      await send(2, data.subarray(i, i + CH));
+      if ((i / CH) % 20 === 0) prog(label + ' ' + Math.round(100 * i / data.length) + '%');
+    }
+    const a3 = waitAck(); await send(3, new Uint8Array(0));
+    const r3 = await a3; if (!r3.ok) throw new Error(r3.err || 'end failed');
+  }
+  async function command(c) { const a = waitAck(); await send(5, enc.encode(c)); return a; }
+  async function refresh() { await send(5, enc.encode('status')); }
+  async function payload() {
+    const r = await fetch('players/' + $('pid').value + '/payload.json', { credentials: 'same-origin' });
+    if (!r.ok) throw new Error('payload ' + r.status);
+    return r.json();
+  }
+  async function setTime(p) {
+    const tz = p ? p.tz_offset_min : -new Date().getTimezoneOffset();
+    const ms = p ? p.server_ms : Date.now();
+    const a = waitAck(); await send(4, enc.encode(String(ms) + ',' + tz)); await a;
+  }
+  async function report() {
+    await refresh();
+    await new Promise(r => setTimeout(r, 600));
+    try { await fetch('players/' + $('pid').value + '/ble_status', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lastStatus) }); } catch (e) {}
+  }
+  async function guard(fn) {
+    $('ops').disabled = true;
+    try { await fn(); } catch (e) { prog('✖ ' + e.message); }
+    $('ops').disabled = !rx;
+  }
+
+  $('connect').addEventListener('click', () => guard(async () => {
+    if (!navigator.bluetooth) throw new Error(T('هذا المتصفح لا يدعم Bluetooth — استخدم Chrome', 'This browser has no Web Bluetooth — use Chrome'));
+    const dev = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: 'Bell-' }], optionalServices: [SVC] });
+    dev.addEventListener('gattserverdisconnected', () => { rx = null; $('ops').disabled = true; prog(T('انقطع الاتصال', 'Disconnected')); });
+    const gatt = await dev.gatt.connect();
+    const svc = await gatt.getPrimaryService(SVC);
+    rx = await svc.getCharacteristic(RX);
+    st = await svc.getCharacteristic(ST);
+    await st.startNotifications();
+    st.addEventListener('characteristicvaluechanged', onNotify);
+    const v = await st.readValue();
+    try { lastStatus = JSON.parse(new TextDecoder().decode(v)); show(lastStatus); } catch (e) {}
+    try {
+      const p = await payload();
+      $('tone').innerHTML = Object.entries(p.tones).map(([k, t]) => `<option value="${k}">${t.name}</option>`).join('');
+    } catch (e) {}
+    prog('✓ ' + T('متصل بـ ', 'Connected to ') + dev.name);
+  }));
+
+  $('sendwifi').addEventListener('click', () => guard(async () => {
+    const cfg = { ssid: $('ssid').value.trim(), pass: $('pass').value, server: $('server').value.trim() };
+    if (!cfg.ssid) throw new Error(T('اكتب اسم شبكة Wi-Fi', 'Enter the Wi-Fi name'));
+    if ($('newkey').checked) {
+      const r = await fetch('players/' + $('pid').value + '/newkey.json', { method: 'POST', credentials: 'same-origin' });
+      cfg.key = (await r.json()).key;
+    }
+    const p = await payload();
+    cfg.tz_offset_min = p.tz_offset_min; cfg.lan = (p.lan || []).join(',');
+    await sendFile('config.json', enc.encode(JSON.stringify(cfg)), T('الإعدادات', 'Settings'));
+    await setTime(p);
+    prog('✓ ' + T('أُرسلت الإعدادات — يتصل الجهاز بالشبكة ويأخذ جدوله ونغماته خلال دقيقة', 'Settings sent — the device joins the network and downloads its schedule and tones within a minute'));
+    await report();
+  }));
+
+  $('sendsched').addEventListener('click', () => guard(async () => {
+    const p = await payload();
+    const keys = Object.keys(p.tones);
+    let i = 0, skipped = [];
+    for (const k of keys) {
+      i++;
+      const url = p.tones[k].url;
+      if (/\.mp3$/i.test(url)) { skipped.push(p.tones[k].name); continue; }
+      const data = new Uint8Array(await (await fetch(url, { credentials: 'same-origin' })).arrayBuffer());
+      await sendFile('t/' + safe(k) + '.wav', data, T('النغمة', 'Tone') + ` ${i}/${keys.length}`);
+    }
+    const sched = Object.assign({}, p); delete sched.server_ms; delete sched.lan;
+    await sendFile('schedule.json', enc.encode(JSON.stringify(sched)), T('الجدول', 'Schedule'));
+    await setTime(p);
+    prog('✓ ' + T('أُرسل الجدول و', 'Sent the schedule and ') + (keys.length - skipped.length) + T(' نغمة، وضُبط الوقت', ' tones, and set the time') +
+         (skipped.length ? ' — ' + T('تُخطّيت نغمات MP3 (الجهاز يشغّل WAV فقط): ', 'MP3 tones skipped (the device plays WAV only): ') + skipped.join('، ') : ''));
+    await report();
+  }));
+
+  $('sendtime').addEventListener('click', () => guard(async () => { await setTime(await payload()); prog('✓ ' + T('ضُبط الوقت', 'Time set')); await refresh(); }));
+  $('sendlic').addEventListener('click', () => guard(async () => {
+    const lic = $('lic').value.trim(); if (!lic) throw new Error(T('الصق مفتاح الترخيص', 'Paste the license key'));
+    await sendFile('config.json', enc.encode(JSON.stringify({ license: lic })), T('الترخيص', 'License'));
+    await report();
+    prog(lastStatus.license && !/^invalid|^expired/.test(lastStatus.license) ? '✓ ' + T('تم التفعيل: ', 'Activated: ') + lastStatus.license : '✖ ' + T('المفتاح غير صحيح لبصمة هذا الجهاز', 'The key is not valid for this device\'s fingerprint'));
+  }));
+  $('test').addEventListener('click', () => guard(async () => {
+    const r = await command('test:' + $('tone').value);
+    prog(r.ok ? '✓ ' + T('يرنّ الآن', 'Ringing') : '✖ ' + r.err);
+  }));
+  $('reboot').addEventListener('click', () => guard(async () => { try { await command('reboot'); } catch (e) {} prog(T('يُعاد تشغيل الجهاز…', 'Restarting…')); }));
+})();
+</script>
+{% endblock %}
