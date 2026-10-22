@@ -75,7 +75,7 @@ def up(tun):
 def main():
     load_env()
     cmd = (sys.argv[1] if len(sys.argv) > 1 else 'status').lower()
-    if cmd not in ('setup', 'status', 'phone', 'server', 'auto', 'server-up', 'token'):
+    if cmd not in ('setup', 'status', 'phone', 'server', 'auto', 'server-up', 'token', 'main-token', 'connectors'):
         print(__doc__)
         return
     token = os.environ.get('CF_API_TOKEN', '').strip()
@@ -140,6 +140,17 @@ def main():
         return
 
     t_main = tunnel(main_name)
+    if cmd == 'main-token':
+        # tunnel_here.bat: run the main tunnel «iajaward» on THIS PC (cloudflared service) — token never shown
+        sys.stdout.write(cf.call('GET', f"/accounts/{acc}/cfd_tunnel/{t_main['id']}/token"))
+        return
+    if cmd == 'connectors':
+        conns = cf.call('GET', f"/accounts/{acc}/cfd_tunnel/{t_main['id']}/connections") or []
+        print(len(conns))
+        for c in conns:
+            ips = sorted({x.get('origin_ip', '?') for x in (c.get('conns') or [])})
+            print(f"  - {c.get('arch', '?')} v{c.get('version', '?')} from {', '.join(ips) or '?'} since {c.get('run_at', '?')}", file=sys.stderr)
+        return
     if cmd == 'setup':
         t_sb = tunnel(sb_name, create=True)
         ensure_ingress(t_main)
