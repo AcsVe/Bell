@@ -1,8 +1,10 @@
 Flask>=3.0
 Flask-SQLAlchemy>=3.1
 SQLAlchemy>=2.0.36
-psycopg[binary]>=3.2.10
-gunicorn>=22.0
+# PostgreSQL is used only by the old Render deployment (Linux). The school PC runs SQLite, so Windows skips it;
+# ops/import_render.py installs it on demand when copying from a Postgres URL.
+psycopg[binary]>=3.2.10; sys_platform != "win32"
+gunicorn>=22.0; sys_platform != "win32"
 openpyxl>=3.1
 waitress>=3.0.2
 requests>=2.32
