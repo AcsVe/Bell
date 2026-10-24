@@ -14,6 +14,7 @@ import re
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
+from i18n import Bi, join_pairs
 from models import (db, BellProgram, BellProgramPeriod, Grade, GradeDayProgram, Stage,
                     StageWeekday)
 from services import minutes_between
@@ -121,9 +122,9 @@ def import_programs(fileobj):
     try:
         wb = load_workbook(fileobj, data_only=True)
     except Exception:
-        raise ValueError('الملف ليس ملف Excel صالحاً (xlsx).')
+        raise Bi('الملف ليس ملف Excel صالحاً (xlsx).', 'This is not a valid Excel file (xlsx).')
     if PROG_SHEET not in wb.sheetnames:
-        raise ValueError(f'لم أجد ورقة «{PROG_SHEET}» في الملف.')
+        raise Bi(f'لم أجد ورقة «{PROG_SHEET}» في الملف.', f'The sheet «{PROG_SHEET}» is not in the file.')
 
     errors, warnings = [], []
     programs = {}                       # name → list of period dicts (in file order)
@@ -134,11 +135,12 @@ def import_programs(fileobj):
         if not name and not label:
             continue
         if not name or not label:
-            errors.append(f'البرامج سطر {i}: اسم البرنامج والتسمية مطلوبان')
+            errors.append((f'البرامج سطر {i}: اسم البرنامج والتسمية مطلوبان', f'Programs row {i}: the program name and the label are required'))
             continue
         start, end = parse_time(r[5]), parse_time(r[6])
         if not start or not end or start >= end:
-            errors.append(f'البرامج سطر {i} ({name} / {label}): توقيت غير صالح «{_t(r[5])} – {_t(r[6])}»')
+            errors.append((f'البرامج سطر {i} ({name} / {label}): توقيت غير صالح «{_t(r[5])} – {_t(r[6])}»',
+                           f'Programs row {i} ({name} / {label}): invalid time «{_t(r[5])} – {_t(r[6])}»'))
             continue
         programs.setdefault(name, []).append({
             'order': r[1] if isinstance(r[1], (int, float)) else len(programs.get(name, [])) + 1,
@@ -149,9 +151,12 @@ def import_programs(fileobj):
         ps.sort(key=lambda p: (p['order'], p['start']))
         for a, b in zip(ps, ps[1:]):
             if b['start'] < a['end']:
-                errors.append(f'{name}: «{a["label_ar"]}» و«{b["label_ar"]}» متداخلتان')
+                errors.append((f'{name}: «{a["label_ar"]}» و«{b["label_ar"]}» متداخلتان',
+                               f'{name}: «{a["label_ar"]}» and «{b["label_ar"]}» overlap'))
             elif b['start'] > a['end']:
-                warnings.append(f'{name}: فجوة {minutes_between(a["end"], b["start"])} د بين «{a["label_ar"]}» و«{b["label_ar"]}»')
+                gap = minutes_between(a['end'], b['start'])
+                warnings.append((f'{name}: فجوة {gap} د بين «{a["label_ar"]}» و«{b["label_ar"]}»',
+                                 f'{name}: a {gap}-minute gap between «{a["label_ar"]}» and «{b["label_ar"]}»'))
 
     assignments = []
     if ASSIGN_SHEET in wb.sheetnames:
@@ -165,20 +170,23 @@ def import_programs(fileobj):
             if not stage_name and not grade_name:
                 continue
             if not stage_name or not grade_name:
-                errors.append(f'التوزيع سطر {i}: المرحلة والصف مطلوبان')
+                errors.append((f'التوزيع سطر {i}: المرحلة والصف مطلوبان', f'Assignment row {i}: the stage and the grade are required'))
                 continue
             days = {}
             for wd, c in day_idx.items():
                 pn = _t(r[c])
                 if pn and pn not in programs and pn not in existing_names:
-                    errors.append(f'التوزيع سطر {i} ({grade_name}): البرنامج «{pn}» غير موجود')
+                    errors.append((f'التوزيع سطر {i} ({grade_name}): البرنامج «{pn}» غير موجود',
+                                   f'Assignment row {i} ({grade_name}): the program «{pn}» does not exist'))
                 days[wd] = pn or None
             assignments.append({'stage': stage_name, 'grade': grade_name,
                                 'grade_en': _t(r[2]) or None, 'days': days})
 
     if errors:
-        more = f' … و{len(errors) - 8} أخطاء أخرى' if len(errors) > 8 else ''
-        raise ValueError('لم يُحفظ شيء: ' + ' | '.join(errors[:8]) + more)
+        ar, en = join_pairs(errors[:8])
+        more = len(errors) - 8
+        raise Bi('لم يُحفظ شيء: ' + ar + (f' … و{more} أخطاء أخرى' if more > 0 else ''),
+                 'Nothing was saved: ' + en + (f' … and {more} more errors' if more > 0 else ''))
 
     # ── save (all or nothing) ──
     summary = {'programs': 0, 'stages': 0, 'grades': 0, 'assigned': 0, 'warnings': warnings}

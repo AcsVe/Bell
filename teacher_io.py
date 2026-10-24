@@ -16,6 +16,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 
 import csv
 
+from i18n import Bi
 from models import db, Section, Stage, Teacher, TeacherSection, TeacherStage
 from services import generate_code
 
@@ -155,19 +156,21 @@ def import_template(stage, fileobj, sync=True):
     try:
         wb = load_workbook(fileobj, data_only=True)
     except Exception:
-        raise ValueError('الملف ليس ملف Excel صالحاً (xlsx).')
+        raise Bi('الملف ليس ملف Excel صالحاً (xlsx).', 'This is not a valid Excel file (xlsx).')
     ws = wb[SHEET] if SHEET in wb.sheetnames else wb.worksheets[0]
     rows = list(ws.iter_rows(values_only=True))
     if len(rows) < 2:
-        raise ValueError('الملف فارغ.')
+        raise Bi('الملف فارغ.', 'The file is empty.')
 
     keys, headers = rows[0], rows[1]
     if keys and str(keys[0] or '').startswith('stage:'):
         file_stage = str(keys[0]).split(':', 1)[1]
         if file_stage != str(stage.id):
             other = db.session.get(Stage, int(file_stage)) if file_stage.isdigit() else None
-            raise ValueError(f'هذا القالب يخص مرحلة أخرى ({other.name_ar if other else file_stage}). '
-                             'اختر المرحلة الصحيحة أو نزّل قالب هذه المرحلة.')
+            raise Bi(f'هذا القالب يخص مرحلة أخرى ({other.name_ar if other else file_stage}). '
+                     'اختر المرحلة الصحيحة أو حمِّل قالب هذه المرحلة.',
+                     f'This template belongs to another stage ({(other.name_en or other.name_ar) if other else file_stage}). '
+                     'Choose the right stage or download this stage\'s template.')
         data_rows = rows[2:]
     else:
         # No hidden key row (e.g. retyped by hand): match section columns by header text.
@@ -275,7 +278,7 @@ def _decode(raw):
             return text
         except UnicodeError:
             continue
-    raise ValueError('تعذّر قراءة ترميز الملف.')
+    raise Bi('تعذّر قراءة ترميز الملف.', 'Could not read the file\'s text encoding.')
 
 
 def _read_rows(raw):
@@ -287,7 +290,7 @@ def _read_rows(raw):
             return [[('' if v is None else str(v)) for v in r] for r in ws.iter_rows(values_only=True)
                     if any(v not in (None, '') for v in r)]
         except Exception:
-            raise ValueError('تعذّر قراءة ملف Excel.')
+            raise Bi('تعذّر قراءة ملف Excel.', 'Could not read the Excel file.')
     text = _decode(raw)
     # Windows (CRLF), old Mac (CR) or Unix (LF) line endings — all become LF.
     text = text.replace('\r\n', '\n').replace('\r', '\n').lstrip('\ufeff')
@@ -311,7 +314,8 @@ def import_members_csv(stage, fileobj, sync=False):
     raw = fileobj.read()
     rows = _read_rows(raw)
     if not rows:
-        raise ValueError('الملف فارغ — لا يحتوي أي أعضاء. أعد تصديره من Microsoft 365.')
+        raise Bi('الملف فارغ — لا يحتوي أي أعضاء. أعد تصديره من Microsoft 365.',
+                 'The file is empty - it has no members. Export it again from Microsoft 365.')
     head = [str(h or '').strip().lower() for h in rows[0]]
 
     def col(*names):
@@ -327,7 +331,8 @@ def import_members_csv(stage, fileobj, sync=False):
         c_email = next((i for i, v in enumerate(rows[0]) if _norm_email(v)), None)
         data = rows
         if c_email is None:
-            raise ValueError('لم أجد عمود البريد الإلكتروني (PrimarySmtpAddress) في الملف.')
+            raise Bi('لم أجد عمود البريد الإلكتروني (PrimarySmtpAddress) في الملف.',
+                     'The e-mail column (PrimarySmtpAddress) is not in the file.')
     else:
         data = rows[1:]
 
@@ -362,7 +367,7 @@ def import_members_csv(stage, fileobj, sync=False):
             summary['linked'] += 1
         summary['teachers'].append(t)
     if not in_file:
-        raise ValueError('لم يُعثر على أي بريد إلكتروني صالح في الملف.')
+        raise Bi('لم يُعثر على أي بريد إلكتروني صالح في الملف.', 'No valid e-mail address was found in the file.')
     if sync:
         for l in TeacherStage.query.filter_by(stage_id=stage.id).all():
             if not l.teacher.email or l.teacher.email not in in_file:

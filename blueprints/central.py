@@ -48,9 +48,25 @@ def page():
                            new_key=new_key, new_key_for=new_key_for, devices=devs, today_rings=today_rings, today_off=today_off, next_ring=next_ring,
                            now=now, week_order=WEEK_ORDER, wd_names=weekday_names(session.get('lang', 'ar')),
                            tone_name=lambda k: central.tone_name(k, session.get('lang', 'ar')),
+                           tr=_translator(),
                            tone_url=central.tone_url, silent=central.SILENT, custom=central.custom_rings(), group_periods=central.group_periods, hidden_lib=hidden_lib, server_url=request.host_url.rstrip('/'),
                            lib_urls={k: url for k, _n, url in lib}, off_events=events, off_map=off_map,
                            off_info={e['id']: central.off_dates('*', start=now.date(), events=[e]) for e in events}, dev_versions={d['id']: central.player_payload(d['id'])['version'] for d in devs})
+
+
+def _translator():
+    """tr(name): the English of a timing / period / default name when the page is in English."""
+    if session.get('lang', 'ar') != 'en':
+        return lambda t: t
+    import re
+    m = central.en_names()
+
+    def tr(t):
+        if t in m:
+            return m[t]
+        x = re.fullmatch(r'جهاز (\d+)', t or '')
+        return f'Player {x.group(1)}' if x else t
+    return tr
 
 
 @central_bp.route('/admin/central/save', methods=['POST'])

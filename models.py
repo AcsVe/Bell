@@ -144,11 +144,18 @@ class BellProgram(db.Model):
     __tablename__ = 'bell_programs'
     id         = db.Column(db.Integer, primary_key=True)
     name       = db.Column(db.String(200), unique=True, nullable=False)
+    name_en    = db.Column(db.String(200))
     sort_order = db.Column(db.Integer, default=0)
 
     periods     = db.relationship('BellProgramPeriod', backref='program', cascade='all, delete-orphan',
                                   order_by='BellProgramPeriod.number')
     assignments = db.relationship('GradeDayProgram', backref='program', cascade='all, delete-orphan')
+
+    @property
+    def title_en(self):
+        """English name: the one typed in, else the Arabic name with its usual words translated
+        («الصفوف 3+4 — الثلاثاء» → «Grades 3+4 — Tuesday»), else the Arabic name as it is."""
+        return self.name_en or auto_en(self.name)
 
     @property
     def day_start(self):
@@ -157,6 +164,69 @@ class BellProgram(db.Model):
     @property
     def day_end(self):
         return self.periods[-1].end_time if self.periods else ''
+
+
+_EN_WORDS = [('الصفوف', 'Grades'), ('الصف', 'Grade'), ('صفوف', 'Grades'), ('صف', 'Grade'), ('الروضة', 'KG'),
+             ('التمهيدي', 'Pre-K'), ('الأحد', 'Sunday'), ('الاثنين', 'Monday'), ('الإثنين', 'Monday'),
+             ('الثلاثاء', 'Tuesday'), ('الأربعاء', 'Wednesday'), ('الخميس', 'Thursday'), ('الجمعة', 'Friday'),
+             ('السبت', 'Saturday'), ('رمضان', 'Ramadan'), ('الامتحانات', 'Exams'), ('امتحانات', 'Exams'),
+             ('دوام', 'Day'), ('قصير', 'short'), ('طويل', 'long'), ('صباحي', 'morning'), ('مسائي', 'evening'),
+             ('مبنى', 'Building'), ('و', '&')]
+_DIGITS = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
+
+
+def auto_en(text):
+    """Arabic program/stage name → English when every word is a known one; otherwise the text unchanged."""
+    import re
+    out = (text or '').translate(_DIGITS)
+    for ar, en in _EN_WORDS:
+        out = re.sub(rf'(?<![\u0600-\u06FF]){ar}(?![\u0600-\u06FF])', en, out)
+    return text if re.search(r'[\u0600-\u06FF]', out) else re.sub(r'\s+', ' ', out).strip()
+
+
+_ORD = {'الأول': 1, 'الثاني': 2, 'الثالث': 3, 'الرابع': 4, 'الخامس': 5, 'السادس': 6, 'السابع': 7, 'الثامن': 8,
+        'التاسع': 9, 'العاشر': 10, 'الحادي عشر': 11, 'الثاني عشر': 12}
+_LETTERS = dict(zip(['أ', 'ا', 'ب', 'ج', 'د', 'هـ', 'ه', 'و', 'ز', 'ح', 'ط', 'ي'],
+                    ['A', 'A', 'B', 'C', 'D', 'E', 'E', 'F', 'G', 'H', 'I', 'J']))
+
+
+def grade_en_guess(name):
+    """«الصف الأول» / «الصف 1» → «Grade 1»; «الروضة» / «التمهيدي» → KG / Pre-K; otherwise None."""
+    import re
+    n = re.sub(r'\s+', ' ', (name or '').translate(_DIGITS)).strip()
+    m = re.fullmatch(r'(?:ال)?صف (.+)', n)
+    if m:
+        rest = m.group(1).strip()
+        if rest.isdigit():
+            return f'Grade {int(rest)}'
+        if rest in _ORD:
+            return f'Grade {_ORD[rest]}'
+    return {'الروضة': 'KG', 'روضة': 'KG', 'التمهيدي': 'Pre-K', 'البستان': 'KG 1'}.get(n)
+
+
+_ORD_F = {'الأولى': 1, 'الثانية': 2, 'الثالثة': 3, 'الرابعة': 4, 'الخامسة': 5, 'السادسة': 6, 'السابعة': 7,
+          'الثامنة': 8, 'التاسعة': 9, 'العاشرة': 10, 'الحادية عشرة': 11, 'الثانية عشرة': 12}
+
+
+def period_en_guess(label):
+    """«الحصة الأولى» → «Period 1», «الفرصة» → «Break», «الفرصة الثانية» → «Break 2»; otherwise None."""
+    import re
+    n = re.sub(r'\s+', ' ', (label or '').translate(_DIGITS)).strip().lstrip('☕').strip()
+    m = re.fullmatch(r'(?:ال)?(حصة|فرصة|استراحة)(?: (.+))?', n)
+    if not m:
+        return None
+    word = 'Period' if m.group(1) == 'حصة' else 'Break'
+    rest = (m.group(2) or '').strip()
+    if not rest:
+        return word
+    num = int(rest) if rest.isdigit() else _ORD_F.get(rest)
+    return f'{word} {num}' if num else None
+
+
+def section_en_guess(name):
+    """«أ» → «A», «2» → «2»; otherwise None."""
+    n = (name or '').strip().translate(_DIGITS)
+    return n if n.isdigit() else _LETTERS.get(n)
 
 
 class BellProgramPeriod(db.Model):
@@ -288,6 +358,20 @@ def ensure_schema():
             with db.engine.begin() as conn:
                 conn.execute(text('ALTER TABLE teachers ADD COLUMN email VARCHAR(255)'))
                 conn.execute(text('CREATE UNIQUE INDEX IF NOT EXISTS uq_teachers_email ON teachers (email)'))
+    if 'bell_programs' in insp.get_table_names():
+        cols = {c['name'] for c in insp.get_columns('bell_programs')}
+        if 'name_en' not in cols:
+            with db.engine.begin() as conn:
+                conn.execute(text('ALTER TABLE bell_programs ADD COLUMN name_en VARCHAR(200)'))
+    if {'grades', 'sections'} <= set(insp.get_table_names()):
+        # English names for grades / sections typed in Arabic only (only confident guesses; never overwrites)
+        with db.engine.begin() as conn:
+            for table, guess in (('grades', grade_en_guess), ('sections', section_en_guess)):
+                rows = conn.execute(text(f"SELECT id, name_ar FROM {table} WHERE name_en IS NULL OR name_en = ''")).fetchall()
+                for rid, ar in rows:
+                    en = guess(ar)
+                    if en:
+                        conn.execute(text(f'UPDATE {table} SET name_en = :en WHERE id = :id'), {'en': en, 'id': rid})
     if 'stages' in insp.get_table_names():
         cols = {c['name'] for c in insp.get_columns('stages')}
         if 'tone_id' not in cols:

@@ -24,6 +24,9 @@ def login_required(f):
     return decorated
 
 
+from i18n import err_text  # noqa: E402
+
+
 def _msg(ar, en):
     return en if session.get('lang') == 'en' else ar
 
@@ -382,9 +385,12 @@ def stage_day_times(stage_id):
 @login_required
 def grade_add(stage_id):
     st = db.get_or_404(Stage, stage_id)
+    from models import grade_en_guess
     names = [n.strip() for n in _form_text('names').replace('،', ',').split(',') if n.strip()]
+    ens = [n.strip() for n in _form_text('names_en').split(',')]
     for i, n in enumerate(names):
-        db.session.add(Grade(stage_id=st.id, name_ar=n, sort_order=len(st.grades) + i))
+        en = (ens[i] if i < len(ens) else '') or grade_en_guess(n)
+        db.session.add(Grade(stage_id=st.id, name_ar=n, name_en=en or None, sort_order=len(st.grades) + i))
     db.session.commit()
     return redirect(url_for('admin.stage_view', stage_id=st.id) + '#grades')
 
@@ -451,9 +457,12 @@ def grade_times(grade_id):
 @login_required
 def section_add(grade_id):
     g = db.get_or_404(Grade, grade_id)
+    from models import section_en_guess
     names = [n.strip() for n in _form_text('names').replace('،', ',').split(',') if n.strip()]
+    ens = [n.strip() for n in _form_text('names_en').split(',')]
     for i, n in enumerate(names):
-        db.session.add(Section(grade_id=g.id, name_ar=n, sort_order=len(g.sections) + i,
+        en = (ens[i] if i < len(ens) else '') or section_en_guess(n)
+        db.session.add(Section(grade_id=g.id, name_ar=n, name_en=en or None, sort_order=len(g.sections) + i,
                                code=generate_code()))
         db.session.flush()   # keeps generate_code() unique within the batch
     db.session.commit()
@@ -551,7 +560,7 @@ def teachers_template(stage_id):
     from teacher_io import build_template
     st = db.get_or_404(Stage, stage_id)
     return send_file(build_template(st), mimetype=XLSX, as_attachment=True,
-                     download_name=f'قالب معلمي {st.name_ar}.xlsx')
+                     download_name=_msg(f'قالب معلمي {st.name_ar}.xlsx', f'Teachers template - {st.name_en or st.name_ar}.xlsx'))
 
 
 @admin_bp.route('/teachers/codes/<int:stage_id>')
@@ -560,7 +569,7 @@ def teachers_codes_export(stage_id):
     from teacher_io import build_codes_export
     st = db.get_or_404(Stage, stage_id)
     return send_file(build_codes_export(st), mimetype=XLSX, as_attachment=True,
-                     download_name=f'أكواد {st.name_ar}.xlsx')
+                     download_name=_msg(f'أكواد {st.name_ar}.xlsx', f'Codes - {st.name_en or st.name_ar}.xlsx'))
 
 
 @admin_bp.route('/teachers/import-members', methods=['POST'])
@@ -599,7 +608,7 @@ def teachers_import_members():
         r = import_members_csv(st, f.stream, sync=bool(request.form.get('sync')))
     except ValueError as e:
         db.session.rollback()
-        flash(str(e), 'error')
+        flash(err_text(e), 'error')
         return redirect(back)
     except Exception as e:                      # never a 500 page for a bad file
         db.session.rollback()
@@ -654,7 +663,7 @@ def teachers_import():
         r = import_template(st, f.stream, sync=bool(request.form.get('sync')))
     except ValueError as e:
         db.session.rollback()
-        flash(str(e), 'error')
+        flash(err_text(e), 'error')
         return redirect(url_for('admin.teachers') + '#import')
     except Exception as e:                      # never a 500 page for a bad file
         db.session.rollback()
@@ -697,7 +706,8 @@ def teacher_add():
             name = display_name_from('', m.group(0))
         t = (by_email.get(email) if email else None) or by_name.get(norm_name(name))
         if t is None:
-            t = Teacher(name_ar=name, email=email, code=generate_code())
+            t = Teacher(name_ar=name, email=email, code=generate_code(),
+                        name_en=None if re.search('[\u0600-\u06FF]', name) else name)
             db.session.add(t)
             db.session.flush()
             by_name[norm_name(name)] = t
@@ -792,7 +802,8 @@ def teacher_delete(teacher_id):
 @login_required
 def programs():
     progs = BellProgram.query.order_by(BellProgram.sort_order, BellProgram.id).all()
-    usage = {p.id: sorted({(a.grade.stage.sort_order, a.grade.sort_order, a.grade.name_ar)
+    usage = {p.id: sorted({(a.grade.stage.sort_order, a.grade.sort_order, a.grade.name_ar,
+                            a.grade.name_en or a.grade.name_ar)
                            for a in p.assignments}) for p in progs}
     import seed_programs as sp
     stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
@@ -808,7 +819,7 @@ def program_add():
     if not name or BellProgram.query.filter_by(name=name).first():
         flash(_msg('اكتب اسماً غير مستخدم للبرنامج', 'Enter an unused program name'), 'error')
         return redirect(url_for('admin.programs'))
-    prog = BellProgram(name=name, sort_order=BellProgram.query.count())
+    prog = BellProgram(name=name, name_en=_form_text('name_en') or None, sort_order=BellProgram.query.count())
     src = db.session.get(BellProgram, request.form.get('copy_from', type=int) or 0)
     for p in (src.periods if src else []):
         prog.periods.append(BellProgramPeriod(number=p.number, kind=p.kind, label_ar=p.label_ar,
@@ -859,6 +870,8 @@ def program_save(program_id):
         flash(_msg('مجموع المدد يتجاوز منتصف الليل', 'Total duration runs past midnight'), 'error')
         return redirect(url_for('admin.program_view', program_id=prog.id))
     prog.name = name
+    if 'name_en' in request.form:
+        prog.name_en = _form_text('name_en') or None
     db.session.commit()
     flash(_msg('تم حفظ البرنامج', 'Program saved'), 'ok')
     return redirect(url_for('admin.program_view', program_id=prog.id))
@@ -973,7 +986,7 @@ def programs_seed():
         r = import_programs(sp.build_workbook(names))
     except ValueError as e:
         db.session.rollback()
-        flash(str(e), 'error')
+        flash(err_text(e), 'error')
         return redirect(url_for('admin.programs') + '#import-tab')
     flash(_msg(f'تم تحميل {sp.TITLE}: {r["programs"]} برامج، و{r["assigned"]} تعيين صف/يوم'
                + (f'، صفوف جديدة {r["grades"]}' if r['grades'] else '')
@@ -987,7 +1000,7 @@ def programs_seed():
 def programs_export():
     from programs_io import export_programs
     return send_file(export_programs(), mimetype=XLSX, as_attachment=True,
-                     download_name='برامج الجرس.xlsx')
+                     download_name=_msg('برامج الجرس.xlsx', 'Bell programs.xlsx'))
 
 
 @admin_bp.route('/programs/import', methods=['POST'])
@@ -1002,7 +1015,7 @@ def programs_import():
         r = import_programs(f.stream)
     except ValueError as e:
         db.session.rollback()
-        flash(str(e), 'error')
+        flash(err_text(e), 'error')
         return redirect(url_for('admin.programs'))
     except Exception as e:                      # never a 500 page for a bad file
         db.session.rollback()
@@ -1016,7 +1029,7 @@ def programs_import():
                + (f' · {r["stages"]} new stages' if r['stages'] else '')
                + (f' · {r["grades"]} new grades' if r['grades'] else '')), 'ok')
     for w in r['warnings'][:5]:
-        flash(w, 'error')
+        flash(_msg(*w) if isinstance(w, tuple) else w, 'error')
     return redirect(url_for('admin.programs'))
 
 
@@ -1135,7 +1148,7 @@ def codes_export_all():
     linked = {t.id for st in stages for t in _stage_teachers(st)}
     unlinked = [t for t in Teacher.query.order_by(Teacher.name_ar) if t.id not in linked]
     return send_file(build_codes_export_all(stages, unlinked), mimetype=XLSX, as_attachment=True,
-                     download_name='أكواد جرس الحصص.xlsx')
+                     download_name=_msg('أكواد جرس الحصص.xlsx', 'Class bell codes.xlsx'))
 
 
 # ── Settings: tone + devices ──────────────────────────────────────────────

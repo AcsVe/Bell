@@ -20,7 +20,7 @@
       {% for wd in week_order if wd in st.weekday_list %}{% set cur = g.program_for(wd) %}
       <td><select name="g{{ g.id }}_d{{ wd }}" style="min-width:150px">
         <option value="">{{ L('— توقيت المرحلة —', '— stage timing —') }}</option>
-        {% for p in progs %}<option value="{{ p.id }}" {{ 'selected' if cur and cur.id == p.id }}>{{ p.name }}</option>{% endfor %}
+        {% for p in progs %}<option value="{{ p.id }}" {{ 'selected' if cur and cur.id == p.id }}>{{ L(p.name, p.title_en) }}</option>{% endfor %}
       </select></td>
       {% endfor %}
     </tr>

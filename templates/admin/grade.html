@@ -21,7 +21,9 @@
   <h2>{{ L('الشعب وأكوادها', 'Sections & codes') }}</h2>
   <form method="post" action="{{ url_for('admin.section_add', grade_id=g.id) }}" class="row" style="margin-bottom:14px">
     <div><label>{{ L('أسماء الشعب (افصل بفاصلة) — يُولَّد لكل شعبة كود تلقائياً', 'Section names (comma-separated) — each gets a code automatically') }}</label>
-      <input type="text" name="names" placeholder="أ، ب، ج" required></div>
+      <input type="text" name="names" placeholder="{{ L('أ، ب، ج', 'Arabic: أ، ب، ج') }}" required></div>
+    <div><label>{{ L('بالإنجليزية (اختياري، بالترتيب نفسه)', 'In English (optional, same order)') }}</label>
+      <input type="text" name="names_en" dir="ltr" placeholder="A, B, C"></div>
     <div class="shrink"><button>{{ L('إضافة', 'Add') }}</button></div>
   </form>
   {% if g.sections %}
@@ -55,7 +57,7 @@
     {% endfor %}
   </div>
   {% if day is not none and program %}
-  <p><span class="chip break">{{ L('يتبع برنامج الجرس', 'Follows bell program') }}: <a href="{{ url_for('admin.program_view', program_id=program.id) }}">{{ program.name }}</a></span>
+  <p><span class="chip break">{{ L('يتبع برنامج الجرس', 'Follows bell program') }}: <a href="{{ url_for('admin.program_view', program_id=program.id) }}">{{ L(program.name, program.title_en) }}</a></span>
      <a class="small" href="{{ url_for('admin.programs_assign') }}">{{ L('تغيير', 'Change') }}</a></p>
   <table class="resp">
     <thead><tr><th>{{ L('الحصة', 'Period') }}</th><th>{{ L('المدة', 'Minutes') }}</th><th>{{ L('التوقيت', 'Time') }}</th></tr></thead>

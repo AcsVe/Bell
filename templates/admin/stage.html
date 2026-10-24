@@ -21,7 +21,7 @@
 {% if with_prog %}
 <div class="card">
   <p style="margin:0">{{ L('صفوف هذه المرحلة تتبع برامج الجرس:', 'Grades of this stage follow bell programs:') }}
-  {% for g in with_prog %}<a class="chip" href="{{ url_for('admin.grade_view', grade_id=g.id) }}">{{ g.name_ar }}</a>{% endfor %}
+  {% for g in with_prog %}<a class="chip" href="{{ url_for('admin.grade_view', grade_id=g.id) }}">{{ L(g.name_ar, g.name_en or g.name_ar) }}</a>{% endfor %}
   — <a href="{{ url_for('admin.programs_assign') }}">{{ L('التوزيع', 'assignments') }}</a>.
   <span class="muted small">{{ L('الحصص أدناه تُستخدم فقط للصفوف والأيام بلا برنامج.', 'The periods below apply only to grades/days without a program.') }}</span></p>
 </div>
@@ -30,7 +30,9 @@
   <h2>{{ L('الصفوف', 'Grades') }}</h2>
   <form method="post" action="{{ url_for('admin.grade_add', stage_id=st.id) }}" class="row" style="margin-bottom:14px">
     <div><label>{{ L('أسماء الصفوف (افصل بفاصلة لإضافة عدة صفوف)', 'Grade names (comma-separate to add several)') }}</label>
-      <input type="text" name="names" placeholder="الصف الأول، الصف الثاني، الصف الثالث" required></div>
+      <input type="text" name="names" placeholder="{{ L('الصف الأول، الصف الثاني، الصف الثالث', 'Arabic: الصف الأول، الصف الثاني') }}" required></div>
+    <div><label>{{ L('بالإنجليزية (اختياري، بالترتيب نفسه)', 'In English (optional, same order)') }}</label>
+      <input type="text" name="names_en" dir="ltr" placeholder="Grade 1, Grade 2, Grade 3"></div>
     <div class="shrink"><button>{{ L('إضافة', 'Add') }}</button></div>
   </form>
   {% if st.grades %}
@@ -41,7 +43,7 @@
     {% for g in st.grades %}
     <tr data-row><td class="chk">{{ bulk_item('grades', g.id) }}</td>
       <td><a href="{{ url_for('admin.grade_view', grade_id=g.id) }}">{{ L(g.name_ar, g.name_en or g.name_ar) }}</a></td>
-      <td class="small">{% for sec in g.sections %}<span class="chip">{{ sec.name_ar }}</span>{% else %}<span class="muted">—</span>{% endfor %}</td></tr>
+      <td class="small">{% for sec in g.sections %}<span class="chip">{{ L(sec.name_ar, sec.name_en or sec.name_ar) }}</span>{% else %}<span class="muted">—</span>{% endfor %}</td></tr>
     {% endfor %}
     </tbody>
   </table>

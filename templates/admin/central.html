@@ -5,9 +5,9 @@
   <h1>📢 {{ L('الجرس المركزي (السمّاعات)', 'Central bell (speakers)') }}</h1>
   <div class="actions">
     {% for d in devices %}
-    {% if d.st.online %}<span class="chip" style="background:#e3f6e8;color:#14632d">● {{ d.name }} {{ L('متصل', 'online') }}</span>
-    {% elif d.st.seen %}<span class="chip" style="background:#fde8e8;color:#9b1c1c">● {{ d.name }} {{ L('غير متصل', 'offline') }}</span>
-    {% else %}<span class="chip">{{ d.name }}: {{ L('لم يُثبَّت بعد', 'not installed yet') }}</span>{% endif %}
+    {% if d.st.online %}<span class="chip" style="background:#e3f6e8;color:#14632d">● {{ tr(d.name) }} {{ L('متصل', 'online') }}</span>
+    {% elif d.st.seen %}<span class="chip" style="background:#fde8e8;color:#9b1c1c">● {{ tr(d.name) }} {{ L('غير متصل', 'offline') }}</span>
+    {% else %}<span class="chip">{{ tr(d.name) }}: {{ L('لم يُثبَّت بعد', 'not installed yet') }}</span>{% endif %}
     {% else %}<span class="chip">{{ L('لم يُثبَّت أي جهاز جرس بعد', 'No bell device installed yet') }}</span>{% endfor %}
   </div>
 </div>
@@ -50,10 +50,10 @@
           <div style="display:grid;gap:2px;margin-top:4px">
           {% for p in gps %}<input type="hidden" name="per_seen" value="{{ p.key }}">
             <label class="small" style="display:flex;gap:6px;align-items:center;font-weight:normal"><input type="checkbox" name="on__{{ p.key }}" value="1" {{ 'checked' if p.key not in cfg.off_periods }}>
-              <span dir="ltr" class="muted">{{ p.t }}</span> {{ '☕ ' if p.kind == 'break' }}{{ p.label }}</label>
+              <span dir="ltr" class="muted">{{ p.t }}</span> {{ '☕ ' if p.kind == 'break' }}{{ L(p.label, p.label_en) }}</label>
           {% endfor %}</div>
         </details>{% endif %}</td>
-      <td class="small">{% for u in g.uses %}<span class="chip">{{ u }}</span>{% endfor %}</td>
+      <td class="small">{% for u in (g.uses_en if lang == 'en' else g.uses) %}<span class="chip">{{ u }}</span>{% endfor %}</td>
       {% for kind in ['class', 'break'] %}
       <td><div class="row" style="flex-wrap:nowrap;gap:6px">
         <select name="{{ kind }}__{{ g.key }}" data-tone-select>
@@ -90,7 +90,7 @@
   <div class="row" style="gap:4px 14px;flex-wrap:wrap;margin-top:6px">
     <b class="shrink small">{{ L('على:', 'On:') }}</b>
     <label class="shrink" style="display:flex;gap:5px;align-items:center;font-weight:700"><input type="checkbox" name="all_devices" value="1" {{ 'checked' if not c or c.devices is none }}> {{ L('كل الأجهزة', 'All devices') }}</label>
-    {% for d in devices %}<label class="shrink" style="display:flex;gap:5px;align-items:center;font-weight:normal"><input type="checkbox" name="devices" value="{{ d.id }}" {{ 'checked' if not c or c.devices is none or d.id in c.devices }}> {{ d.name }}</label>{% endfor %}
+    {% for d in devices %}<label class="shrink" style="display:flex;gap:5px;align-items:center;font-weight:normal"><input type="checkbox" name="devices" value="{{ d.id }}" {{ 'checked' if not c or c.devices is none or d.id in c.devices }}> {{ tr(d.name) }}</label>{% endfor %}
   </div>
   {% endif %}
   <label style="display:flex;gap:6px;align-items:center;font-weight:normal;margin-top:6px"><input type="checkbox" name="enabled" value="1" {{ 'checked' if not c or c.enabled }}> {{ L('مفعّل', 'Enabled') }}</label>
@@ -145,7 +145,7 @@
   <div class="row" style="gap:4px 14px;flex-wrap:wrap;margin-top:6px">
     <b class="shrink small">{{ L('الأجهزة:', 'Devices:') }}</b>
     <label class="shrink" style="font-weight:normal;display:flex;gap:5px;align-items:center"><input type="checkbox" name="all_devices" value="1" checked data-off-all> {{ L('كل الأجهزة', 'All devices') }}</label>
-    {% for d in devices %}<label class="shrink" style="font-weight:normal;display:flex;gap:5px;align-items:center"><input type="checkbox" name="devices" value="{{ d.id }}" checked data-off-dev> {{ d.name }}</label>{% endfor %}
+    {% for d in devices %}<label class="shrink" style="font-weight:normal;display:flex;gap:5px;align-items:center"><input type="checkbox" name="devices" value="{{ d.id }}" checked data-off-dev> {{ tr(d.name) }}</label>{% endfor %}
   </div>
   {% else %}<input type="hidden" name="all_devices" value="1">{% endif %}
   <label style="font-weight:normal;display:flex;gap:6px;align-items:center;margin-top:8px"><input type="checkbox" name="enabled" value="1" checked> {{ L('مفعّل', 'Enabled') }}</label>
@@ -176,11 +176,11 @@
     {% for e in off_events %}{% set info = off_info[e.id] %}
     <tr data-row style="{{ 'opacity:.55' if not e.enabled }}">
       <td><input type="checkbox" class="bulk-item" data-bulk="off" name="ids" value="{{ e.id }}" form="bulk-off" aria-label="{{ L('تحديد', 'Select') }}"></td>
-      <td><b>{{ e.name }}</b></td>
+      <td><b>{{ tr(e.name) }}</b></td>
       <td>{{ L('فترة', 'Period') if e.kind == 'range' else L('أيام محددة', 'Specific days') }}</td>
       <td class="small"><span dir="ltr" style="unicode-bidi:isolate">{% if e.kind == 'range' %}{{ e['from'] }}{% if e.to != e['from'] %} – {{ e.to }}{% endif %}{% else %}{{ e.dates[:6]|join(', ') }}{% if e.dates|length > 6 %} … (+{{ e.dates|length - 6 }}){% endif %}{% endif %}</span></td>
       <td>{{ {'none': L('لا يتكرر', 'No'), 'monthly': L('كل شهر', 'Monthly'), 'yearly': L('كل سنة', 'Yearly')}[e.repeat or 'none'] }}{% if e.until %} <span class="small muted">{{ L('حتى', 'until') }} <span dir="ltr">{{ e.until }}</span></span>{% endif %}</td>
-      {% if devices|length > 1 %}<td>{% if e.devices is none %}{{ L('كل الأجهزة', 'All devices') }}{% else %}{% for d in devices if d.id in e.devices %}{{ d.name }}{{ '، ' if not loop.last }}{% endfor %}{% endif %}</td>{% endif %}
+      {% if devices|length > 1 %}<td>{% if e.devices is none %}{{ L('كل الأجهزة', 'All devices') }}{% else %}{% for d in devices if d.id in e.devices %}{{ tr(d.name) }}{{ '، ' if not loop.last }}{% endfor %}{% endif %}</td>{% endif %}
       <td data-value="{{ info|length }}">{{ info|length }}</td>
       <td dir="ltr" class="small" style="white-space:nowrap">{{ (info|list|first) or '—' }}</td>
       <td data-value="{{ L('مفعّل', 'Enabled') if e.enabled else L('معطّل', 'Disabled') }}">{% if e.enabled %}<span class="chip" style="background:#e3f6e8;color:#14632d">{{ L('مفعّل', 'Enabled') }}</span>{% else %}<span class="chip">{{ L('معطّل', 'Disabled') }}</span>{% endif %}</td>
@@ -216,13 +216,13 @@
 <div class="card">
   <h2>{{ L('اليوم', 'Today') }} — {{ wd_names[now.weekday()] }} <span dir="ltr" class="muted small">{{ now.strftime('%Y-%m-%d %H:%M') }}</span></h2>
   {% if today_off %}<p class="chip" style="background:#fff4e0;color:#8a5a00">{{ L('لا جرس اليوم (معطّل أو يوم مستثنى)', 'No bell today (disabled or a skipped day)') }}</p>{% endif %}
-  {% if next_ring and not today_off %}<p><b>{{ L('الجرس التالي', 'Next ring') }}:</b> <span dir="ltr">{{ next_ring.t }}</span> — {% for r in next_ring.rings %}{{ tone_name(r.tone) }} ({{ r.groups|join('، ') }}){{ ' + ' if not loop.last }}{% endfor %}</p>{% endif %}
+  {% if next_ring and not today_off %}<p><b>{{ L('الجرس التالي', 'Next ring') }}:</b> <span dir="ltr">{{ next_ring.t }}</span> — {% for r in next_ring.rings %}{{ tone_name(r.tone) }} ({{ r.groups|map(tr)|join(L('، ', ', ')) }}){{ ' + ' if not loop.last }}{% endfor %}</p>{% endif %}
   {% if today_rings %}
   <table class="resp">
     <thead><tr><th>{{ L('الوقت', 'Time') }}</th><th>{{ L('الرنين', 'Ring') }}</th></tr></thead>
     <tbody>{% for s in today_rings %}
     <tr style="{{ 'opacity:.5' if s.t <= now.strftime('%H:%M') }}"><td dir="ltr"><b>{{ s.t }}</b></td>
-      <td>{% for r in s.rings %}<div><span class="chip {{ 'break' if r.kind == 'break' }}">{{ tone_name(r.tone) }}</span> <span class="small">{{ r.label }} — {{ r.groups|join('، ') }}</span></div>{% endfor %}</td></tr>
+      <td>{% for r in s.rings %}<div><span class="chip {{ 'break' if r.kind == 'break' }}">{{ tone_name(r.tone) }}</span> <span class="small">{{ tr(r.label) }} — {{ r.groups|map(tr)|join(L('، ', ', ')) }}</span></div>{% endfor %}</td></tr>
     {% endfor %}</tbody>
   </table>
   {% else %}<p class="muted">{{ L('لا رنين اليوم.', 'No rings today.') }}</p>{% endif %}
@@ -250,7 +250,7 @@
       <div class="row" style="gap:4px 16px;flex-wrap:wrap">
         <label class="shrink" style="display:flex;gap:6px;align-items:center;font-weight:700"><input type="checkbox" data-all-devices checked> {{ L('كل الأجهزة', 'All devices') }}</label>
         {% for d in devices %}<label class="shrink" style="display:flex;gap:6px;align-items:center;font-weight:normal"><input type="checkbox" name="players" value="{{ d.id }}" checked data-device-cb>
-          {{ d.name }} {% if d.st.online %}<span style="color:#14632d">●</span>{% else %}<span style="color:#9b1c1c" title="{{ L('غير متصل', 'Offline') }}">●</span>{% endif %}</label>{% endfor %}
+          {{ tr(d.name) }} {% if d.st.online %}<span style="color:#14632d">●</span>{% else %}<span style="color:#9b1c1c" title="{{ L('غير متصل', 'Offline') }}">●</span>{% endif %}</label>{% endfor %}
       </div>
       {% else %}<p class="muted small">{{ L('لا توجد أجهزة جرس بعد — أضفها من تبويب «أجهزة الجرس».', 'No bell devices yet — add them on the “Bell devices” tab.') }}</p>{% endif %}
     </div>
@@ -287,7 +287,7 @@
   'A bell device = a computer connected to a PA amplifier in one building. ONE server for the whole school; each building needs only a small bell device running BellPlayer. Each device has its own key and license, and you choose which timings it rings for.') }}</p>
 {% for d in devices %}{% set st = d.st %}
 <div class="card">
-  <h2>🔊 {{ d.name }} <span class="muted small" dir="ltr">({{ d.id }})</span>
+  <h2>🔊 {{ tr(d.name) }} <span class="muted small" dir="ltr">({{ d.id }})</span>
     {% if st.online %}<span class="chip" style="background:#e3f6e8;color:#14632d">● {{ L('متصل', 'Online') }}</span>{% elif st.seen %}<span class="chip" style="background:#fde8e8;color:#9b1c1c">● {{ L('غير متصل', 'Offline') }}</span>{% else %}<span class="chip">{{ L('لم يتصل بعد', 'Not connected yet') }}</span>{% endif %}</h2>
   {% if new_key and new_key_for == d.id %}
   <div class="flash ok" style="margin:8px 0"><b>{{ L('مفتاح هذا الجهاز (يظهر مرة واحدة — انسخه الآن):', 'This device\'s key (shown once — copy it now):') }}</b>
@@ -316,7 +316,7 @@
     <label style="margin-top:8px">{{ L('يرنّ لـ', 'Rings for') }}</label>
     <label style="font-weight:700;display:flex;gap:6px;align-items:center"><input type="checkbox" name="all_groups" value="1" {{ 'checked' if d.groups is none }} data-all-groups> {{ L('كل التوقيتات (المدرسة كلها)', 'Every timing (the whole school)') }}</label>
     <div class="row" style="gap:4px 14px;flex-wrap:wrap" data-group-list>
-      {% for g in groups %}<label class="shrink" style="display:flex;gap:6px;align-items:center;font-weight:normal"><input type="checkbox" name="groups" value="{{ g.key }}" {{ 'checked' if d.groups is none or g.key in d.groups }}> <bdi>{{ L(g.ar, g.en) }}</bdi> <span class="muted small">({{ g.uses|join('، ') }})</span></label>{% endfor %}
+      {% for g in groups %}<label class="shrink" style="display:flex;gap:6px;align-items:center;font-weight:normal"><input type="checkbox" name="groups" value="{{ g.key }}" {{ 'checked' if d.groups is none or g.key in d.groups }}> <bdi>{{ L(g.ar, g.en) }}</bdi> <span class="muted small">({{ L(g.uses|join('، '), g.uses_en|join(', ')) }})</span></label>{% endfor %}
     </div>
     <div class="row" style="margin-top:10px">
       <div class="shrink"><button>{{ L('حفظ', 'Save') }}</button></div>

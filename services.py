@@ -3,6 +3,7 @@ that devices download and cache for offline use."""
 import re
 import secrets
 
+from models import period_en_guess  # noqa: E402
 from models import (db, AppSetting, GradePeriodTime, Section, Stage,
                     StageDayPeriodTime, Teacher)
 
@@ -144,7 +145,7 @@ def schedule_version():
 
 
 def resolve_program(program):
-    out = [{'n': p.number, 'pid': p.id, 'kind': p.kind, 'ar': p.label_ar, 'en': p.label_en or p.label_ar,
+    out = [{'n': p.number, 'pid': p.id, 'kind': p.kind, 'ar': p.label_ar, 'en': p.label_en or period_en_guess(p.label_ar) or p.label_ar,
             'start': p.start_time, 'end': p.end_time, 'source': 'program',
             'dur': minutes_between(p.start_time, p.end_time)} for p in program.periods]
     out.sort(key=lambda x: x['n'])
@@ -172,7 +173,7 @@ def resolve_grade_day(grade, weekday):
             src, o = 'stage', stage_ovr[p.number]
         out.append({
             'n': p.number, 'pid': p.id, 'kind': p.kind,
-            'ar': p.label_ar, 'en': p.label_en or p.label_ar,
+            'ar': p.label_ar, 'en': p.label_en or period_en_guess(p.label_ar) or p.label_ar,
             'start': o.start_time if o else p.start_time,
             'end': o.end_time if o else p.end_time,
             'source': src,
@@ -191,7 +192,7 @@ def resolve_stage_day(stage, weekday):
     for p in stage.periods:
         o = stage_ovr.get(p.number)
         start, end = (o.start_time, o.end_time) if o else (p.start_time, p.end_time)
-        out.append({'n': p.number, 'pid': p.id, 'kind': p.kind, 'ar': p.label_ar, 'en': p.label_en or p.label_ar,
+        out.append({'n': p.number, 'pid': p.id, 'kind': p.kind, 'ar': p.label_ar, 'en': p.label_en or period_en_guess(p.label_ar) or p.label_ar,
                     'start': start, 'end': end, 'source': 'stage' if o else 'default',
                     'dur': minutes_between(start, end)})
     return out

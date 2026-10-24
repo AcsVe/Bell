@@ -108,6 +108,25 @@ def library_keys(cfg=None):
     return [k for k in all_tone_keys() if k not in hidden]
 
 
+def en_names():
+    """Arabic → English for the names the week view shows (timings, periods, default device/event names),
+    so the admin page reads in English without changing what the devices receive."""
+    from models import BellProgramPeriod, Period
+    out = {'جهاز المكتب': 'Office player', 'أيام بلا جرس (من القائمة السابقة)': 'Days without the bell (earlier list)'}
+    for g in groups():
+        out.setdefault(g['ar'], g['en'])
+    for st in Stage.query.all():
+        out.setdefault(st.name_ar, st.name_en or st.name_ar)
+    from models import period_en_guess
+    for p in list(BellProgramPeriod.query.all()) + list(Period.query.all()):
+        if p.label_en or p.label_ar not in out:
+            out[p.label_ar] = p.label_en or period_en_guess(p.label_ar) or out.get(p.label_ar) or p.label_ar
+    for k in list(out):
+        if k.startswith('☕'):
+            out.setdefault(k, '☕ ' + (period_en_guess(k) or k))
+    return out
+
+
 def tone_uses(key, cfg=None):
     """Where a tone is used: ['<timing> (period)', '<custom ring name>' ...] — a used tone cannot be removed."""
     cfg = cfg or config()
@@ -133,21 +152,23 @@ def groups():
     found = {}
     for st in _active_stages():
         targets = [(g, g.name_ar, g.name_en or g.name_ar) for g in st.grades] or [(None, st.name_ar, st.name_en or st.name_ar)]
-        for g, ar, _en in targets:
+        for g, ar, en in targets:
             for wd in st.weekday_list:
                 prog = g.program_for(wd) if g is not None else None
                 if prog is not None:
                     key = f'program:{prog.id}'
-                    found.setdefault(key, {'key': key, 'kind': 'program', 'ar': prog.name, 'en': prog.name,
-                                           'order': (0, prog.sort_order or 0, prog.id), 'uses': set()})
+                    found.setdefault(key, {'key': key, 'kind': 'program', 'ar': prog.name, 'en': prog.title_en,
+                                           'order': (0, prog.sort_order or 0, prog.id), 'uses': set(), 'uses_en': set()})
                 else:
                     key = f'stage:{st.id}'
                     found.setdefault(key, {'key': key, 'kind': 'stage', 'ar': st.name_ar, 'en': st.name_en or st.name_ar,
-                                           'order': (1, st.sort_order or 0, st.id), 'uses': set()})
+                                           'order': (1, st.sort_order or 0, st.id), 'uses': set(), 'uses_en': set()})
                 found[key]['uses'].add(ar)
+                found[key]['uses_en'].add(en)
     out = sorted(found.values(), key=lambda x: x['order'])
     for g in out:
         g['uses'] = sorted(g['uses'])
+        g['uses_en'] = sorted(g['uses_en'])
         del g['order']
     return out
 
@@ -161,7 +182,9 @@ def group_periods(gkey):
     if owner is None:
         return []
     pre = 'pp:' if kind == 'program' else 'sp:'
-    return [{'key': pre + str(p.id), 'kind': p.kind, 'label': p.label_ar, 't': p.start_time} for p in owner.periods]
+    from models import period_en_guess
+    return [{'key': pre + str(p.id), 'kind': p.kind, 'label': p.label_ar, 't': p.start_time,
+             'label_en': p.label_en or period_en_guess(p.label_ar) or p.label_ar} for p in owner.periods]
 
 
 def effective_tones(cfg=None, group_list=None):

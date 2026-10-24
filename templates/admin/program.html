@@ -1,9 +1,9 @@
 {% extends 'admin/base.html' %}
-{% block title %}{{ prog.name }}{% endblock %}
+{% block title %}{{ L(prog.name, prog.title_en) }}{% endblock %}
 {% block content %}
 <div class="crumbs"><a href="{{ url_for('admin.programs') }}">{{ L('برامج الجرس', 'Bell programs') }}</a></div>
 <div class="page-head">
-  <h1>{{ prog.name }} <span class="muted small" dir="ltr">{{ prog.day_start }} – {{ prog.day_end }}</span></h1>
+  <h1>{{ L(prog.name, prog.title_en) }} <span class="muted small" dir="ltr">{{ prog.day_start }} – {{ prog.day_end }}</span></h1>
   <div class="actions">
     <a class="btn ghost sm" href="#add-row">+ {{ L('حصة/فرصة', 'Period/break') }}</a>
     <form method="post" action="{{ url_for('admin.program_delete', program_id=prog.id) }}" style="display:inline"
@@ -18,6 +18,7 @@
   <form method="post" action="{{ url_for('admin.program_save', program_id=prog.id) }}">
     <div class="row" style="margin-bottom:10px">
       <div><label>{{ L('اسم البرنامج', 'Program name') }}</label><input type="text" name="name" value="{{ prog.name }}" required></div>
+      <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input type="text" name="name_en" value="{{ prog.name_en or '' }}" dir="ltr" placeholder="{{ prog.title_en if prog.title_en != prog.name else 'Grades 3+4 — Tuesday' }}"></div>
       <div class="shrink" style="width:150px"><label>{{ L('بداية الدوام', 'Day starts at') }}</label><input type="time" name="day_start" value="{{ prog.day_start }}" required></div>
     </div>
     {% if prog.periods %}
@@ -65,7 +66,7 @@
   {% for a in prog.assignments %}{% set _ = by_grade.setdefault(a.grade, []).append(a.weekday) %}{% endfor %}
   {% set names = ['الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت','الأحد'] if lang != 'en' else ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
   {% for g, wds in by_grade.items() %}
-    <div><a href="{{ url_for('admin.grade_view', grade_id=g.id) }}"><bdi>{{ g.stage.name_ar }}</bdi> <span class="fwd">›</span> {{ g.name_ar }}</a>
+    <div><a href="{{ url_for('admin.grade_view', grade_id=g.id) }}"><bdi>{{ L(g.stage.name_ar, g.stage.name_en or g.stage.name_ar) }}</bdi> <span class="fwd">›</span> {{ L(g.name_ar, g.name_en or g.name_ar) }}</a>
       <span class="muted small">— {% for wd in [6,0,1,2,3,4,5] if wd in wds %}{{ names[wd] }}{{ '، ' if not loop.last }}{% endfor %}</span></div>
   {% else %}<p class="muted">{{ L('غير مستخدم بعد.', 'Not used yet.') }} <a href="{{ url_for('admin.programs_assign') }}">{{ L('توزيع البرامج', 'Assign programs') }}</a></p>{% endfor %}
 </div>
