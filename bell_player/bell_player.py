@@ -13,6 +13,7 @@
     BellPlayer.exe --tools         (re)create the .bat shortcuts for all of these next to the program
     BellPlayer.exe --audio         choose the sound output (sound card) of this player and play a test tone
     BellPlayer.exe --add           install ANOTHER player on this computer (one per sound card / amplifier)
+    BellPlayer.exe --uninstall     remove THIS player completely (start-up, task, running copy, its folder)
 Double-click, wherever it is:
   • outside the installation (e.g. Downloads) → installs it (asks the folder, default C:\\BellPlayer) or UPDATES the
     installed copy (settings and license kept), closes old copies, tidies leftover files, then runs the check;
@@ -866,6 +867,40 @@ def install_startup():
     subprocess.Popen(['wscript.exe', '//B', '//Nologo', vbs])
 
 
+def uninstall():
+    """--uninstall: this player only — start-up file, scheduled task, running copy, then its whole folder
+    (deleted a few seconds after this window closes). The license key is kept in Documents for a reinstall."""
+    print(f'\n  Uninstall the bell player in {BASE}')
+    others = [os.path.dirname(x) for x in installs() if not _same(os.path.dirname(x), BASE)]
+    if others:
+        print('  The other players on this computer stay: ' + ', '.join(others))
+    if input('  This player will stop ringing. Type YES to uninstall: ').strip() != 'YES':
+        print('  cancelled - nothing changed')
+        return False
+    lic = load_ini().get('license') or ''
+    if lic and not others:
+        try:
+            docs = os.path.join(os.path.expanduser('~'), 'Documents')
+            os.makedirs(docs, exist_ok=True)
+            with open(os.path.join(docs, 'BellPlayer-license.txt'), 'w', encoding='utf-8') as f:
+                f.write(f'Bell player license key (fingerprint {machine_fingerprint()}):\n{lic}\n')
+            print(f'  [OK] license key kept in {docs}\\BellPlayer-license.txt (for a reinstall)')
+        except OSError:
+            pass
+    remove_startup()
+    print('  [OK] stopped and removed from Windows start-up')
+    if IS_WIN and getattr(sys, 'frozen', False):
+        folder = BASE.replace('"', '')
+        # the running exe cannot delete itself: a hidden cmd removes the folder after this process exits
+        # (retries for up to 2 minutes, so it also works while this window waits for Enter)
+        subprocess.Popen(f'cmd /c for /l %i in (1,1,60) do (ping -n 3 127.0.0.1 >nul & rmdir /s /q "{folder}" 2>nul'
+                         f' & if not exist "{folder}" exit)', shell=True,
+                         creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0), cwd=os.path.dirname(folder) or None)
+        print(f'  [OK] the folder {folder} is deleted as soon as this window closes')
+    print('  Also remove this device on the admin page: Central bell > Bell devices > Delete.')
+    return True
+
+
 def remove_startup():
     if not IS_WIN:
         return
@@ -892,6 +927,7 @@ TOOLS = [
     ('11 - Remove from Windows start-up.bat', '--remove', 'Stops it and removes it from start-up'),
     ('12 - Sound output (sound card).bat', '--audio', 'Choose the speakers / sound card of this player'),
     ('13 - Add another player (2nd sound card).bat', '--add', 'Installs one more player on this computer'),
+    ('14 - Uninstall this player.bat', '--uninstall', 'Removes this player and its folder from this computer'),
 ]
 
 
@@ -1308,6 +1344,11 @@ def main():
         if sys.stdin and sys.stdin.isatty():
             input('  Press Enter to close')
         return
+    if '--uninstall' in args:
+        ok = uninstall()
+        if sys.stdin and sys.stdin.isatty():
+            input('  Press Enter to close')
+        sys.exit(0 if ok else 1)
     if '--remove' in args:
         remove_startup()
         print('  removed from Windows start-up')
