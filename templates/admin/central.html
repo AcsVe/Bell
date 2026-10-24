@@ -297,6 +297,7 @@
   <table class="resp"><tbody>
     <tr><td>{{ L('الحالة', 'State') }}</td><td>{% if st.online %}<b style="color:#14632d">● {{ L('متصل', 'Online') }}</b>{% else %}<b style="color:#9b1c1c">● {{ L('غير متصل', 'Offline') }}</b> — {{ L('آخر اتصال قبل', 'last seen') }} {{ (st.age_s // 60) }} {{ L('دقيقة', 'min ago') }}{% endif %}</td></tr>
     <tr><td>{{ L('الجهاز', 'Computer') }}</td><td dir="ltr">{{ st.host }} — {{ st.ip }} — v{{ st.player }}</td></tr>
+    {% if st.audio %}<tr><td>{{ L('مخرج الصوت', 'Sound output') }}</td><td>{% if 'NOT FOUND' in st.audio %}<b style="color:#9b1c1c">{{ L('كرت الصوت المختار غير موجود — يرنّ على المخرج الافتراضي', 'The chosen sound card is missing — ringing on the default output') }}</b> {% endif %}<span dir="ltr">{{ st.audio }}</span></td></tr>{% endif %}
     <tr><td>{{ L('الجدول', 'Schedule') }}</td><td>{{ L('محدّث', 'Up to date') if st.version == dev_versions[d.id] else L('يُحدَّث…', 'Updating…') }} {% if st.cached %}— {{ L('النغمات محفوظة على الجهاز', 'tones cached on the PC') }}{% endif %}</td></tr>
     <tr><td>{{ L('آخر رنين', 'Last ring') }}</td><td dir="ltr">{{ st.last_ring or '—' }}</td></tr>
     <tr><td>{{ L('الرنين التالي', 'Next ring') }}</td><td dir="ltr">{{ st.next_ring or '—' }}</td></tr>

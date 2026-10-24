@@ -91,11 +91,16 @@ tests/                              40 اختباراً
 
 **الإعدادات المخزنة (`app_settings`):** `central_bell` (JSON: enabled, volume, skip_dates, tones)، `central_key_hash`، `central_player` (آخر حالة)، `central_test`، `central_off_events` (أحداث روزنامة الإيقاف).
 
-**BellPlayer.exe (الإصدار 1.5):**
+**BellPlayer.exe (الإصدار 1.6):**
+- **1.6 — أكثر من مشغّل على الكمبيوتر الواحد (كرت صوت لكل مشغّل):** كل مجلد تثبيت (`C:\BellPlayer`، `C:\BellPlayer2`…) مشغّل مستقل بمفتاح مشغّل خاص (= «جهاز جرس» مستقل في صفحة الإدارة بتوقيتاته ومستوى صوته)، وذاكرة وملف بدء تشغيل ومهمة مجدولة خاصة (`BellPlayer-<المجلد>.vbs`، «BELL Office Player (<المجلد>)»)، وقفل تشغيل لكل مجلد.
+  - إضافة مشغّل: `13 - Add another player (2nd sound card).bat` أو تشغيل BellPlayer.exe من التنزيلات ثم `A`. يأخذ عنوان الخادم و**الترخيص** من المشغّل الأول تلقائياً (الترخيص للكمبيوتر)، ويطلب مفتاح الجهاز الجديد فقط.
+  - **مخرج الصوت:** `12 - Sound output (sound card).bat` (`--audio`) يعرض كروت الصوت ويرنّ نغمة تجربة؛ يُحفظ باسم المخرج (`audio` في `bell_player.ini`) فلا يتأثر بتغيّر ترتيب الكروت. نغمات WAV تُعزف على الكرت المختار مع مستوى الصوت؛ نغمات MP3 تُعزف على المخرج الافتراضي (ارفع WAV لنغمات الكرت الثاني). إن فُصل الكرت يرنّ على المخرج الافتراضي ويظهر في صفحة الإدارة «كرت الصوت المختار غير موجود».
+  - التحديث: تشغيل النسخة الجديدة من التنزيلات يحدّث **كل** المشغّلات على الكمبيوتر، ويغلق نسخة كل مشغّل فقط (لا الآخرين).
+  - يرسل المشغّل `audio` في حالته، وتعرضه صفحة الإدارة («مخرج الصوت»).
 - **1.5 — المثبّت يعالج الحالات بنفسه:** خارج التثبيت = تثبيت أو تحديث تلقائي (ينقل الإعدادات المتروكة، ينظّف، يغلق النسخ القديمة) ثم «Check and fix»؛ النسخة المثبّتة = «Check and fix» (يسأل فقط عن المفتاح إن رُفض، والترخيص إن غاب أو انتهى). الأداة الأولى صارت `1 - Check and fix (start here).bat`.
 - **التثبيت والتحديث بنقرتين:** شغّله من أي مكان (مثل Downloads) ← يسأل عن مجلد التثبيت (`C:\BellPlayer` افتراضياً) وينسخ نفسه؛ وإن وجد نسخة مثبّتة يعرض «Update it with this version?» فيستبدلها ويعيد تشغيلها، والإعدادات والترخيص كما هي.
 - **ملفات bat جاهزة في مجلده** بدل كتابة الأوامر: `1 - Setup` … `10 - Remove from Windows start-up` (Setup، License، Status، Network test، Test speakers، Fingerprint، Restart، Stop، Show log، Remove) + `README.txt`.
-- الأوامر: `--setup`، `--license`، `--fingerprint`، `--net-test`، `--test`، `--status`، `--restart`، `--stop`، `--log`، `--tools`، `--remove`، `--run`.
+- الأوامر: `--setup`، `--license`، `--fingerprint`، `--net-test`، `--test`، `--status`، `--restart`، `--stop`، `--log`، `--tools`، `--remove`، `--run`، `--audio`، `--add`.
 - 1.3: شهادات HTTPS مدمجة (certifi) مع شهادات ويندوز — يحل `CERTIFICATE_VERIFY_FAILED` على أجهزة جديدة؛ الإعداد يكمل إن فشل التنزيل الأول؛ يغلق النسخ القديمة العاملة.
 - 1.2: لا نوافذ خطأ من ملف بدء التشغيل، وإزالة علامة «تنزيل من الإنترنت»؛ كل النوافذ بالإنجليزية (العربية تظهر مربعات في نافذة الأوامر).
 
@@ -187,7 +192,7 @@ bash ~/bell/standby/phone.sh configure
 - لا تلمس `app.py` بحيث يعود لـ Postgres: `ops/common.py` يفرض SQLite عند التشغيل على الجهاز.
 - جدول الرنين يُحسب من `resolve_grade_day` / `resolve_stage_day` في `services.py` — نفس ما تستخدمه التطبيقات، فلا يوجد جدول ثانٍ للصيانة.
 - أي تغيير على شكل `player_payload()` يجب أن يبقى متوافقاً مع `bell_player.py` المثبت (الأجهزة لا تتحدث تلقائياً).
-- الاختبارات: `python -m pytest -q tests` (40 اختباراً، منها محاكاة كاملة لجهاز المكتب مع خادم حقيقي: `tests/test_player.py`) + `tests/e2e_browser.py` (Chrome).
+- الاختبارات: `python -m pytest -q tests` (44 اختباراً، منها محاكاة كاملة لجهاز المكتب مع خادم حقيقي: `tests/test_player.py`) + `tests/e2e_browser.py` (Chrome).
 - برنامج ESP32 يُبنى في GitHub فقط (`bell_device.yml`)؛ أخطاء الترجمة تظهر كـ annotations في الـ run.
 - سجلات GitHub Actions لا تُقرأ من الجلسة (محجوبة) — استخدم annotations (`::error::`) لقراءة الأخطاء.
 - رموز الوصول (Cloudflare، GitHub) لا تُكتب في المحادثات ولا في المستودع — `.env` فقط.

@@ -487,7 +487,7 @@ def has_key():
 
 def record_status(pid, data, ip):
     st = {k: data.get(k) for k in ('host', 'version', 'last_ring', 'next_ring', 'player', 'clock_drift', 'cached', 'error',
-                                   'license', 'fingerprint', 'via')}
+                                   'license', 'fingerprint', 'via', 'audio')}
     st['seen'] = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
     st['ip'] = ip
     AppSetting.set(f'central_st:{pid}', json.dumps(st, ensure_ascii=False))

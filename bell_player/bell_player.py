@@ -11,11 +11,17 @@
     BellPlayer.exe --net-test      check the connection to the server (certificates, firewall)
     BellPlayer.exe --restart       restart the hidden player      --stop   stop it      --log   last log lines
     BellPlayer.exe --tools         (re)create the .bat shortcuts for all of these next to the program
+    BellPlayer.exe --audio         choose the sound output (sound card) of this player and play a test tone
+    BellPlayer.exe --add           install ANOTHER player on this computer (one per sound card / amplifier)
 Double-click, wherever it is:
   • outside the installation (e.g. Downloads) → installs it (asks the folder, default C:\\BellPlayer) or UPDATES the
     installed copy (settings and license kept), closes old copies, tidies leftover files, then runs the check;
   • the installed copy → «check and fix»: server, player key (asks again only if refused), license (asks only if
     missing/expired), schedule, start-up, running — then a summary.
+Several players on one computer (1.6): each installed folder (C:\\BellPlayer, C:\\BellPlayer2 …) is an independent
+player with its own player key (= one «bell device» on the admin page, with its own timings and volume), its own
+cache and start-up entry, and its own sound output (--audio). The license is per computer, so one key covers all.
+WAV tones play on the chosen sound card; an MP3 tone plays on the Windows default output (upload WAV for a 2nd card).
 
 Works offline: the schedule and every tone are cached next to the program (player_cache/). The server is needed
 only to receive changes; when it is down or the internet is cut the bell keeps ringing from the cache.
@@ -44,7 +50,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-VERSION = '1.5'
+VERSION = '1.6'
 DEFAULT_SERVER = 'https://5.iajaward.org'
 POLL_SECONDS = 15
 CATCH_UP_SECONDS = 90         # a ring missed by up to 90 s (PC busy/waking up) still plays; later ones are skipped
@@ -60,14 +66,22 @@ def load_ini():
     cp = configparser.ConfigParser(interpolation=None)
     cp.read(INI, encoding='utf-8')
     s = cp['player'] if cp.has_section('player') else {}
-    return {'server': (s.get('server') or '').rstrip('/'), 'key': s.get('key') or '', 'license': s.get('license') or ''}
+    out = {'server': (s.get('server') or '').rstrip('/'), 'key': s.get('key') or '', 'license': s.get('license') or ''}
+    if 'audio' in s:                                    # absent = never chosen; '' = Windows default output
+        out['audio'] = s.get('audio') or ''
+    return out
 
 
-def save_ini(server, key, license_key=None):
+def save_ini(server, key, license_key=None, audio=None):
+    cur = load_ini() if (license_key is None or audio is None) else {}
     if license_key is None:
-        license_key = load_ini().get('license', '')
+        license_key = cur.get('license', '')
+    if audio is None:
+        audio = cur.get('audio')
     cp = configparser.ConfigParser(interpolation=None)
     cp['player'] = {'server': server.rstrip('/'), 'key': key, 'license': license_key}
+    if audio is not None:
+        cp['player']['audio'] = audio
     with open(INI, 'w', encoding='utf-8') as f:
         cp.write(f)
 
@@ -333,8 +347,121 @@ def save_schedule(body):
 
 
 # ── audio ──────────────────────────────────────────────────────────────────
+AUDIO = {'device': '', 'warned_mp3': False, 'missing': False}   # device = output name ('' = Windows default)
+
+
+def audio_devices():
+    """[(id, name)] of the sound outputs (Windows waveOut devices; names are cut at 31 characters)."""
+    if not IS_WIN:
+        return []
+    import ctypes
+    from ctypes import wintypes
+
+    class WAVEOUTCAPSW(ctypes.Structure):
+        _fields_ = [('wMid', wintypes.WORD), ('wPid', wintypes.WORD), ('vDriverVersion', wintypes.UINT),
+                    ('szPname', wintypes.WCHAR * 32), ('dwFormats', wintypes.DWORD), ('wChannels', wintypes.WORD),
+                    ('wReserved1', wintypes.WORD), ('dwSupport', wintypes.DWORD)]
+    w = ctypes.windll.winmm
+    out = []
+    for i in range(w.waveOutGetNumDevs()):
+        caps = WAVEOUTCAPSW()
+        if w.waveOutGetDevCapsW(i, ctypes.byref(caps), ctypes.sizeof(caps)) == 0:
+            out.append((i, caps.szPname))
+    return out
+
+
+def resolve_device(name):
+    """Output name → current device id (ids change when a USB card is plugged elsewhere), or None."""
+    if not name:
+        return None
+    devs = audio_devices()
+    for i, n in devs:
+        if n == name:
+            return i
+    for i, n in devs:
+        if n.lower().startswith(name.lower()[:24]):
+            return i
+    return None
+
+
+def audio_label():
+    d = AUDIO['device']
+    if not d:
+        return 'Windows default'
+    return d + (' (NOT FOUND - Windows default used)' if AUDIO['missing'] else '')
+
+
+def play_wav_on(path, dev_id, volume=100):
+    """PCM WAV → one chosen output (waveOut), with the volume applied to the samples. Raises on any problem."""
+    import array
+    import ctypes
+    import wave
+    from ctypes import wintypes
+    with wave.open(path, 'rb') as wf:
+        nch, sw, rate = wf.getnchannels(), wf.getsampwidth(), wf.getframerate()
+        frames = wf.readframes(wf.getnframes())
+    f = max(0, min(100, int(volume))) / 100.0
+    if f < 1 and sw == 2:
+        a = array.array('h', frames)
+        a = array.array('h', (int(x * f) for x in a))
+        frames = a.tobytes()
+    elif f < 1 and sw == 1:
+        frames = bytes(int(128 + (b - 128) * f) for b in frames)
+
+    class WAVEFORMATEX(ctypes.Structure):
+        _fields_ = [('wFormatTag', wintypes.WORD), ('nChannels', wintypes.WORD), ('nSamplesPerSec', wintypes.DWORD),
+                    ('nAvgBytesPerSec', wintypes.DWORD), ('nBlockAlign', wintypes.WORD),
+                    ('wBitsPerSample', wintypes.WORD), ('cbSize', wintypes.WORD)]
+
+    class WAVEHDR(ctypes.Structure):
+        _fields_ = [('lpData', ctypes.c_char_p), ('dwBufferLength', wintypes.DWORD), ('dwBytesRecorded', wintypes.DWORD),
+                    ('dwUser', ctypes.c_size_t), ('dwFlags', wintypes.DWORD), ('dwLoops', wintypes.DWORD),
+                    ('lpNext', ctypes.c_void_p), ('reserved', ctypes.c_size_t)]
+    w = ctypes.windll.winmm
+    fmt = WAVEFORMATEX(1, nch, rate, rate * nch * sw, nch * sw, sw * 8, 0)
+    hwo = wintypes.HANDLE()
+    if w.waveOutOpen(ctypes.byref(hwo), dev_id, ctypes.byref(fmt), 0, 0, 0) != 0:
+        raise RuntimeError('cannot open the sound output')
+    buf = ctypes.create_string_buffer(frames, len(frames))
+    hdr = WAVEHDR(ctypes.cast(buf, ctypes.c_char_p), len(frames), 0, 0, 0, 0, None, 0)
+    try:
+        if w.waveOutPrepareHeader(hwo, ctypes.byref(hdr), ctypes.sizeof(hdr)) != 0:
+            raise RuntimeError('cannot prepare the sound')
+        try:
+            if w.waveOutWrite(hwo, ctypes.byref(hdr), ctypes.sizeof(hdr)) != 0:
+                raise RuntimeError('cannot play the sound')
+            limit = time.time() + len(frames) / float(rate * nch * sw) + 5
+            while not (hdr.dwFlags & 1) and time.time() < limit:          # WHDR_DONE
+                time.sleep(0.05)
+        finally:
+            w.waveOutReset(hwo)
+            w.waveOutUnprepareHeader(hwo, ctypes.byref(hdr), ctypes.sizeof(hdr))
+    finally:
+        w.waveOutClose(hwo)
+    return True
+
+
 def play_file(path, volume=100):
-    """Plays one file to the end. Windows: MCI (WAV and MP3, with volume); elsewhere a command-line player."""
+    """Plays one file to the end. Windows: the chosen sound card (WAV) or MCI on the default output (WAV and MP3,
+    with volume); elsewhere a command-line player."""
+    if IS_WIN and AUDIO['device']:
+        dev = resolve_device(AUDIO['device'])
+        if dev is None:
+            if not AUDIO['missing']:
+                log.error('sound output «%s» not found (unplugged?) - playing on the Windows default output', AUDIO['device'])
+            AUDIO['missing'] = True
+        else:
+            AUDIO['missing'] = False
+            if path.lower().endswith('.wav'):
+                try:
+                    return play_wav_on(path, dev, volume)
+                except Exception as e:   # noqa: BLE001 — e.g. a compressed WAV: fall back to MCI
+                    log.warning('could not play %s on «%s» (%s) - Windows default output used', os.path.basename(path),
+                                AUDIO['device'], e)
+            elif not AUDIO['warned_mp3']:
+                AUDIO['warned_mp3'] = True
+                log.warning('MP3 tones play on the Windows default output, not on «%s» - upload WAV tones for this '
+                            'sound card, or set BellPlayer.exe to it in Windows Settings > Sound > App volume', AUDIO['device'])
     if IS_WIN:
         import ctypes
         mci = ctypes.windll.winmm.mciSendStringW
@@ -482,7 +609,8 @@ class Player:
         st = {'host': socket.gethostname(), 'version': (self.schedule or {}).get('version'), 'player': VERSION,
               'last_ring': self.last_ring, 'next_ring': self.next_ring_text(), 'clock_drift': self.clock_drift,
               'cached': self.cached_ok(), 'error': self.error[:300], 'license': self.license_text(),
-              'fingerprint': self.fp, 'via': ('internet' if self.server == self.primary else 'school network ') + self.server}
+              'fingerprint': self.fp, 'via': ('internet' if self.server == self.primary else 'school network ') + self.server,
+              'audio': audio_label() + (f' - {BASE}' if inst_tag() else '')}
         data, t0, t1 = self.call('POST', '/api/central/poll', st)
         r = json.loads(data.decode('utf-8'))
         self.sync_clock(r, t0, t1)
@@ -595,7 +723,7 @@ class Player:
                 self.last_ring = what
 
     def run(self):
-        log.info('Bell player %s started — server %s, cache %s', VERSION, self.server, CACHE)
+        log.info('Bell player %s started — server %s, cache %s, sound output: %s', VERSION, self.server, CACHE, audio_label())
         if not self.schedule:
             log.warning('no saved schedule yet — waiting for the server')
         for target in (self.sync_loop, self.audio_loop):
@@ -605,13 +733,15 @@ class Player:
 
 # ── single instance ─────────────────────────────────────────────────────────
 def single_instance():
+    """One running copy per installed folder (several folders = several players on this computer)."""
+    tag = hashlib.sha1(os.path.normcase(os.path.abspath(BASE)).encode()).hexdigest()[:10]
     if IS_WIN:
         import ctypes
-        ctypes.windll.kernel32.CreateMutexW(None, False, 'Global\\IAJ_BellPlayer')
+        ctypes.windll.kernel32.CreateMutexW(None, False, 'Global\\IAJ_BellPlayer_' + tag)
         return ctypes.windll.kernel32.GetLastError() != 183          # ERROR_ALREADY_EXISTS
     try:
         s = socket.socket()
-        s.bind(('127.0.0.1', 47811))
+        s.bind(('127.0.0.1', 47811 + int(tag[:4], 16) % 1000))
         single_instance.sock = s
         return True
     except OSError:
@@ -621,6 +751,79 @@ def single_instance():
 # ── Windows start-up ────────────────────────────────────────────────────────
 def startup_dir():
     return os.path.join(os.environ.get('APPDATA', ''), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
+
+
+def _vbs_target(vbs):
+    try:
+        import re
+        m = re.search(r'FileExists\("([^"]+)"\)', open(vbs, encoding='utf-8').read())
+        return m.group(1) if m else None
+    except OSError:
+        return None
+
+
+_TAG = {}
+
+
+def inst_tag():
+    """'' for the first player of this computer (start-up file BellPlayer.vbs, task «BELL Office Player»);
+    otherwise a short name of its folder, used in the start-up file and task names of the other players."""
+    if BASE in _TAG:
+        return _TAG[BASE]
+    main_vbs = os.path.join(startup_dir(), 'BellPlayer.vbs')
+    target = _vbs_target(main_vbs)
+    if target and os.path.isfile(target) and not _same(os.path.dirname(target), BASE):
+        tag = ''.join(ch for ch in os.path.basename(os.path.normpath(BASE)) if ch.isalnum())[:20] or \
+            hashlib.sha1(BASE.encode()).hexdigest()[:6]
+    else:
+        tag = ''
+    _TAG[BASE] = tag
+    return tag
+
+
+def vbs_path():
+    t = inst_tag()
+    return os.path.join(startup_dir(), f'BellPlayer-{t}.vbs' if t else 'BellPlayer.vbs')
+
+
+def task_name():
+    t = inst_tag()
+    return f'BELL Office Player ({t})' if t else 'BELL Office Player'
+
+
+def all_installs():
+    """Every installed BellPlayer.exe on this computer (one per start-up file), the first player first."""
+    out = []
+    try:
+        names = sorted(f for f in os.listdir(startup_dir()) if f.lower().startswith('bellplayer') and f.lower().endswith('.vbs'))
+    except OSError:
+        names = []
+    names.sort(key=lambda f: f.lower() != 'bellplayer.vbs')
+    for f in names:
+        t = _vbs_target(os.path.join(startup_dir(), f))
+        if t and os.path.isfile(t) and not any(_same(t, x) for x in out):
+            out.append(t)
+    return out
+
+
+def pids_of(exe):
+    """Running BellPlayer.exe processes started from this exact file (not the other players), except this one."""
+    if not IS_WIN:
+        return []
+    out = _run_quiet(['powershell', '-NoProfile', '-Command',
+                      "Get-CimInstance Win32_Process -Filter \"Name='BellPlayer.exe'\" | "
+                      "ForEach-Object { \"$($_.ProcessId)|$($_.ExecutablePath)\" }"])
+    res = []
+    for ln in out.splitlines():
+        pid, _, path = ln.partition('|')
+        if pid.strip().isdigit() and path.strip() and _same(path.strip(), exe) and int(pid) != os.getpid():
+            res.append(int(pid))
+    return res
+
+
+def kill_same(exe):
+    for pid in pids_of(exe):
+        subprocess.run(['taskkill', '/f', '/pid', str(pid)], capture_output=True)
 
 
 def launch_cmd():
@@ -644,7 +847,7 @@ def install_startup():
         return
     exe = sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(__file__)
     _unblock(exe)
-    vbs = os.path.join(startup_dir(), 'BellPlayer.vbs')
+    vbs = vbs_path()
     os.makedirs(startup_dir(), exist_ok=True)
     # Hidden window, starts at every sign-in. Never shows an error box: if the program is missing or blocked it
     # just does nothing (the log and the admin page show the player as offline).
@@ -654,12 +857,11 @@ def install_startup():
         f.write('On Error Resume Next\n'
                 'Set fso = CreateObject("Scripting.FileSystemObject")\n'
                 f'If fso.FileExists("{exe_v}") Then CreateObject("WScript.Shell").Run "{cmd}", 0, False\n')
-    # Close any copy that is already running (it may hold an old key) — not this one.
+    # Close the copy of THIS player that is already running (it may hold an old key) — not the other players.
     if getattr(sys, 'frozen', False):
-        subprocess.run(['taskkill', '/f', '/fi', f'PID ne {os.getpid()}', '/im', os.path.basename(sys.executable)],
-                       capture_output=True)
+        kill_same(sys.executable)
     # Every 5 minutes: start it again if it was closed or crashed (a second copy exits at once).
-    subprocess.run(['schtasks', '/create', '/f', '/tn', 'BELL Office Player', '/sc', 'minute', '/mo', '5',
+    subprocess.run(['schtasks', '/create', '/f', '/tn', task_name(), '/sc', 'minute', '/mo', '5',
                     '/tr', f'wscript.exe //B //Nologo "{vbs}"'], capture_output=True)
     subprocess.Popen(['wscript.exe', '//B', '//Nologo', vbs])
 
@@ -668,12 +870,12 @@ def remove_startup():
     if not IS_WIN:
         return
     try:
-        os.remove(os.path.join(startup_dir(), 'BellPlayer.vbs'))
+        os.remove(vbs_path())
     except OSError:
         pass
-    subprocess.run(['schtasks', '/delete', '/f', '/tn', 'BELL Office Player'], capture_output=True)
-    subprocess.run(['taskkill', '/f', '/im', os.path.basename(sys.executable)] if getattr(sys, 'frozen', False) else ['cmd', '/c', 'echo'],
-                   capture_output=True)
+    subprocess.run(['schtasks', '/delete', '/f', '/tn', task_name()], capture_output=True)
+    if getattr(sys, 'frozen', False):
+        kill_same(sys.executable)
 
 
 TOOLS = [
@@ -688,6 +890,8 @@ TOOLS = [
     ('9 - Stop player.bat', '--stop', 'Stops the player until the next sign-in (it does NOT ring)'),
     ('10 - Show log.bat', '--log', 'Last lines of bell_player.log'),
     ('11 - Remove from Windows start-up.bat', '--remove', 'Stops it and removes it from start-up'),
+    ('12 - Sound output (sound card).bat', '--audio', 'Choose the speakers / sound card of this player'),
+    ('13 - Add another player (2nd sound card).bat', '--add', 'Installs one more player on this computer'),
 ]
 
 
@@ -711,20 +915,16 @@ def write_tools(folder=None):
     try:
         with open(os.path.join(folder, 'README.txt'), 'w', encoding='utf-8', newline='\r\n') as f:
             f.write('Bell player - double-click a .bat file:\n\n' + '\n'.join(f'  {n:<44} {w}' for n, _a, w in TOOLS) +
-                    '\n\nUpdate: download the new BellPlayer.exe and run it - it offers to update this copy.\n')
+                    '\n\nUpdate: download the new BellPlayer.exe and run it - it updates every player on this computer.\n'
+                    'Two sound cards: 13 - Add another player, give it its own player key, then 12 - Sound output.\n')
     except OSError:
         pass
 
 
 def installed_exe():
-    """The BellPlayer.exe that Windows start-up launches (an existing installation), or None."""
-    vbs = os.path.join(startup_dir(), 'BellPlayer.vbs')
-    try:
-        import re
-        m = re.search(r'FileExists\("([^"]+)"\)', open(vbs, encoding='utf-8').read())
-        return m.group(1) if m and os.path.isfile(m.group(1)) else None
-    except OSError:
-        return None
+    """The BellPlayer.exe that Windows start-up launches (the first player), or None."""
+    t = _vbs_target(os.path.join(startup_dir(), 'BellPlayer.vbs'))
+    return t if t and os.path.isfile(t) else None
 
 
 DEFAULT_DIR = r'C:\BellPlayer'
@@ -743,43 +943,84 @@ def find_install():
     return d if os.path.isfile(d) else None
 
 
-def kill_others():
+def installs():
+    """All installed players (the first one first), including C:\\BellPlayer when it is not in start-up yet."""
+    out = all_installs()
+    d = os.path.join(DEFAULT_DIR, 'BellPlayer.exe')
+    if os.path.isfile(d) and not any(_same(d, x) for x in out):
+        out.insert(0, d)
+    return out
+
+
+def next_folder():
+    n = 2
+    while os.path.exists(f'{DEFAULT_DIR}{n}'):
+        n += 1
+    return f'{DEFAULT_DIR}{n}'
+
+
+def kill_others(exe=None):
+    """Stop the running copies of one installed player (exe), or of every BellPlayer.exe."""
     if IS_WIN:
-        subprocess.run(['taskkill', '/f', '/fi', f'PID ne {os.getpid()}', '/im', 'BellPlayer.exe'], capture_output=True)
+        if exe:
+            kill_same(exe)
+        else:
+            subprocess.run(['taskkill', '/f', '/fi', f'PID ne {os.getpid()}', '/im', 'BellPlayer.exe'], capture_output=True)
         time.sleep(1.5)
 
 
-def install_flow():
-    """Run from Downloads (or anywhere that is not the installation): install or update, clean up, then check."""
-    me = os.path.abspath(sys.executable)
-    here = os.path.dirname(me)
-    cur = find_install()
-    print(f'\n  Bell player {VERSION}\n')
-    if cur:
-        folder = os.path.dirname(cur)
-        print(f'  Updating the bell player installed in {folder}')
-    else:
-        folder = input(f'  Install folder [{DEFAULT_DIR}]: ').strip().strip('"') or DEFAULT_DIR
-    try:
-        os.makedirs(folder, exist_ok=True)
-    except OSError as e:
-        print(f'  [X] cannot create {folder}: {e}')
-        return False
-    dest = os.path.join(folder, 'BellPlayer.exe')
-    kill_others()
-    for _ in range(6):
+def _copy_exe(me, dest):
+    kill_others(dest)
+    for i in range(6):
         try:
             shutil.copyfile(me, dest)
-            break
+            return True
         except OSError:
-            kill_others()
+            kill_others(dest if i < 2 else None)      # still locked: stop every copy (start-up restarts them)
+    print(f'  [X] could not write {dest} - is it open somewhere? Restart the computer and run this again.')
+    return False
+
+
+def install_flow(add=False):
+    """Run from Downloads (or anywhere that is not the installation): install or update every player on this
+    computer, or (add=True / answer A) install one more player for another sound card; clean up, then check."""
+    me = os.path.abspath(sys.executable)
+    here = os.path.dirname(me)
+    found = installs()
+    print(f'\n  Bell player {VERSION}\n')
+    if found and not add:
+        print('  Installed on this computer:')
+        for i, x in enumerate(found, 1):
+            print(f'    {i}. {os.path.dirname(x)}')
+        ans = input('  Enter = update them;  A = add ANOTHER player (for another sound card): ').strip().lower()
+        add = ans == 'a'
+    if add:
+        folder = input(f'  Folder for the new player [{next_folder()}]: ').strip().strip('"') or next_folder()
+        if any(_same(os.path.join(folder, 'BellPlayer.exe'), x) for x in found):
+            print('  [X] a player is already installed in that folder - choose another folder')
+            return False
+        targets = [folder]
+    elif found:
+        targets = [os.path.dirname(x) for x in found]
+        print('  Updating ' + ', '.join(targets))
     else:
-        print(f'  [X] could not write {dest} - is it open somewhere? Restart the computer and run this again.')
-        return False
+        targets = [input(f'  Install folder [{DEFAULT_DIR}]: ').strip().strip('"') or DEFAULT_DIR]
+    for folder in targets:
+        try:
+            os.makedirs(folder, exist_ok=True)
+        except OSError as e:
+            print(f'  [X] cannot create {folder}: {e}')
+            return False
+        if _same(os.path.join(folder, 'BellPlayer.exe'), me):
+            continue
+        if not _copy_exe(me, os.path.join(folder, 'BellPlayer.exe')):
+            return False
+    folder = targets[0]
+    cur = found and not add
     # settings: keep the installed ones; bring along a settings file left next to this download if there are none
     stray_ini = os.path.join(here, 'bell_player.ini')
-    if not _same(here, folder):
-        if os.path.isfile(stray_ini) and not os.path.isfile(os.path.join(folder, 'bell_player.ini')):
+    if not any(_same(here, t) for t in targets):
+        if not add and os.path.isfile(stray_ini) and not os.path.isfile(os.path.join(folder, 'bell_player.ini')):
             shutil.copyfile(stray_ini, os.path.join(folder, 'bell_player.ini'))
             if os.path.isdir(os.path.join(here, 'player_cache')) and not os.path.isdir(os.path.join(folder, 'player_cache')):
                 shutil.copytree(os.path.join(here, 'player_cache'), os.path.join(folder, 'player_cache'))
@@ -790,8 +1031,11 @@ def install_flow():
             except OSError:
                 pass
         shutil.rmtree(os.path.join(here, 'player_cache'), ignore_errors=True)
-    print(f'  [OK] {"updated" if cur else "installed"} in {folder}')
-    return subprocess.call([dest, '--check']) == 0
+    ok = True
+    for folder in targets:
+        print(f'  [OK] {"updated" if cur else "installed"} in {folder}')
+        ok = subprocess.call([os.path.join(folder, 'BellPlayer.exe'), '--check']) == 0 and ok
+    return ok
 
 
 def try_server(server, key):
@@ -814,7 +1058,12 @@ def doctor(force=False):
     print(f'\n  Bell player {VERSION} - checking this computer ({BASE})\n')
     os.makedirs(CACHE, exist_ok=True)
     cfg = load_ini()
-    server, key, lic = cfg['server'] or DEFAULT_SERVER, cfg['key'], cfg['license']
+    others = other_settings()
+    server, key, lic = cfg['server'] or (others[0]['server'] if others and others[0]['server'] else DEFAULT_SERVER), \
+        cfg['key'], cfg['license']
+    if inst_tag() and not cfg['key']:
+        print('  This is an ADDITIONAL player on this computer: on the admin page add a new bell device for it\n'
+              '  (Central bell > Bell devices > Add), choose its timings, and paste its player key here.\n')
     if force or not cfg['server']:
         server = input(f'  Server address [{server}]: ').strip() or server
     if not server.startswith('http'):
@@ -845,11 +1094,31 @@ def doctor(force=False):
     load_clock()
     fp = machine_fingerprint()
     ok, expired, exp = check_license(lic, fp, amman_now().date())
+    if not (ok and not expired):                # the license is per computer: take it from another player here
+        for o in others:
+            v, e, _x = check_license(o['license'], fp, amman_now().date())
+            if v and not e:
+                lic = o['license']
+                cfg2 = load_ini()
+                save_ini(cfg2['server'], cfg2['key'], lic)
+                print(f'  [OK] license taken from the player in {o["folder"]}')
+                ok, expired, exp = check_license(lic, fp, amman_now().date())
+                break
     if ok and not expired and not force:
         print('  [OK] license ' + ('permanent' if exp == 'PERMANENT' else f'valid until {exp}') + f'  (fingerprint {fp})')
     else:
         ask_license()
-    # 3) schedule
+    # 3) sound output (asked once when this computer has more than one)
+    cfg3 = load_ini()
+    if audio_devices()[1:] and (force or 'audio' not in cfg3):
+        choose_audio(test=False)
+    AUDIO['device'] = load_ini().get('audio') or ''
+    if audio_devices()[1:]:
+        print(f'  [OK] sound output: {audio_label()}')
+        for o in others:
+            if AUDIO['device'] and (o.get('audio') or '') == AUDIO['device']:
+                print(f'  [!] the player in {o["folder"]} uses the same sound output - choose another one: 12 - Sound output.bat')
+    # 4) schedule
     p = Player(load_ini())
     if state == 'ok':
         try:
@@ -862,12 +1131,11 @@ def doctor(force=False):
               + ('' if p.cached_ok() else ' (some tones still downloading)'))
     else:
         print('  [!] no schedule on this computer yet - it arrives as soon as the server is reached')
-    # 4) start-up + running
+    # 5) start-up + running
     write_tools()
     install_startup()
     time.sleep(3)
-    running = (not IS_WIN) or 'BellPlayer.exe' in subprocess.run(['tasklist', '/fi', 'imagename eq BellPlayer.exe'],
-                                                                 capture_output=True, text=True).stdout
+    running = (not IS_WIN) or (bool(pids_of(sys.executable)) if getattr(sys, 'frozen', False) else True)
     print('  [OK] starts with Windows' + (' - running now' if running else ''))
     print(f'  Next ring: {p.next_ring_text() or "-"}')
     good = state == 'ok' and p.licensed() and bool(s)
@@ -879,6 +1147,64 @@ def doctor(force=False):
 def setup():
     """--setup: ask for everything again (Enter keeps the current value)."""
     return doctor(force=True)
+
+
+def other_settings():
+    """Settings of the OTHER players installed on this computer: [{folder, server, key, license, audio}]."""
+    out = []
+    for exe in installs():
+        folder = os.path.dirname(exe)
+        if _same(folder, BASE):
+            continue
+        cp = configparser.ConfigParser(interpolation=None)
+        try:
+            cp.read(os.path.join(folder, 'bell_player.ini'), encoding='utf-8')
+        except (OSError, configparser.Error):
+            continue
+        s = cp['player'] if cp.has_section('player') else {}
+        out.append({'folder': folder, 'server': (s.get('server') or '').rstrip('/'), 'key': s.get('key') or '',
+                    'license': s.get('license') or '', 'audio': s.get('audio')})
+    return out
+
+
+def choose_audio(test=True):
+    """--audio: pick the sound output of THIS player (number), Enter = Windows default; then a test tone."""
+    devs = audio_devices()
+    cur = load_ini()
+    print('\n  -- Sound output of this player --')
+    if not devs:
+        print('  (no sound outputs found - Windows default is used)')
+        return False
+    used = {o.get('audio') or '': o['folder'] for o in other_settings()}
+    for i, (_d, name) in enumerate(devs, 1):
+        mark = ' <- now' if name == (cur.get('audio') or '') else ''
+        other = f'   (used by {used[name]})' if name in used and name else ''
+        print(f'    {i}. {name}{mark}{other}')
+    print(f'    0. Windows default output{" <- now" if not cur.get("audio") else ""}')
+    while True:
+        a = input('  Number [Enter = keep]: ').strip()
+        if not a:
+            name = cur.get('audio') or ''
+            break
+        if a.isdigit() and 0 <= int(a) <= len(devs):
+            name = '' if a == '0' else devs[int(a) - 1][1]
+            break
+        print('  - type one of the numbers above')
+    save_ini(cur['server'], cur['key'], cur['license'], audio=name)
+    AUDIO['device'] = name
+    print(f'  [OK] sound output: {name or "Windows default"}')
+    if test:
+        path = os.path.join(CACHE, 'tones')
+        files = sorted(f for f in os.listdir(path) if f.lower().endswith('.wav')) if os.path.isdir(path) else []
+        if files:
+            print('  playing a test tone on it ...')
+            try:
+                play_file(os.path.join(path, files[0]), (load_cached_schedule() or {}).get('volume', 100))
+            except Exception as e:   # noqa: BLE001
+                print(f'  [X] {e}')
+        if IS_WIN and getattr(sys, 'frozen', False) and cur.get('server'):
+            install_startup()          # the running player takes the new output
+    return True
 
 
 def ask_license():
@@ -924,6 +1250,8 @@ def status_report():
     print(f'  enabled: {(s or {}).get("enabled")}  volume: {(s or {}).get("volume")}')
     print(f'  next ring: {p.next_ring_text() or "-"}')
     print(f'  license: {p.license_text()}  (fingerprint {p.fp})')
+    AUDIO['device'] = load_ini().get('audio') or ''
+    print(f'  sound output: {audio_label()}' + (f'   (one of {len(installs())} players on this computer)' if len(installs()) > 1 else ''))
     print(f'  server clock offset: {CLOCK.get("offset", 0):+.1f} s  (synced {CLOCK.get("synced") or "never"})  school network: {", ".join(CLOCK.get("lan") or []) or "-"}')
 
 
@@ -931,6 +1259,19 @@ def main():
     args = sys.argv[1:]
     if IS_WIN and getattr(sys, 'frozen', False):
         _unblock(sys.executable)
+    AUDIO['device'] = load_ini().get('audio') or ''
+    if '--audio' in args:
+        choose_audio()
+        if sys.stdin and sys.stdin.isatty():
+            input('  Press Enter to close')
+        return
+    if '--add' in args:
+        ok = install_flow(add=True) if (IS_WIN and getattr(sys, 'frozen', False)) else False
+        if not (IS_WIN and getattr(sys, 'frozen', False)):
+            print('  --add works with BellPlayer.exe on Windows')
+        if sys.stdin and sys.stdin.isatty():
+            input('  Press Enter to close')
+        sys.exit(0 if ok else 1)
     if '--tools' in args:
         write_tools()
         print('  shortcut .bat files written to', BASE)
@@ -941,9 +1282,8 @@ def main():
         return
     if '--stop' in args:
         if IS_WIN:
-            subprocess.run(['schtasks', '/change', '/tn', 'BELL Office Player', '/disable'], capture_output=True)
-            subprocess.run(['taskkill', '/f', '/fi', f'PID ne {os.getpid()}', '/im', os.path.basename(sys.executable)],
-                           capture_output=True)
+            subprocess.run(['schtasks', '/change', '/tn', task_name(), '/disable'], capture_output=True)
+            kill_same(sys.executable)
         print('  stopped - it does NOT ring now. It starts again at the next sign-in, or with: 8 - Restart player.bat')
         return
     if '--log' in args:
@@ -960,9 +1300,8 @@ def main():
         sys.exit(0 if ok else 1)
     if not args and IS_WIN and getattr(sys, 'frozen', False):
         # double-click: outside the installation → install/update; the installed copy → check and fix
-        cur = find_install()
         me = os.path.abspath(sys.executable)
-        if (cur and _same(cur, me)) or (not cur and _same(os.path.dirname(me), DEFAULT_DIR)):
+        if any(_same(x, me) for x in installs()) or (not installs() and _same(os.path.dirname(me), DEFAULT_DIR)):
             doctor()
         else:
             install_flow()

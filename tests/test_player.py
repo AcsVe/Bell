@@ -230,3 +230,27 @@ def test_check_and_fix_asks_only_for_what_is_wrong(env, monkeypatch):
     # server down → not stuck: warns and keeps the settings
     bp.save_ini('http://127.0.0.1:9', key, lic)
     assert not bp.doctor() and asked == [] and bp.load_ini()['key'] == key
+
+
+def test_several_players_share_the_license_and_keep_their_sound_output(env, monkeypatch, tmp_path):
+    """A second player on the same computer takes the license of the first one and keeps its own sound output."""
+    bp, admin, key, server, played = env
+    lic = bp.sign(FP)
+    first = tmp_path / 'first'
+    first.mkdir()
+    (first / 'bell_player.ini').write_text(f'[player]\nserver = {server}\nkey = OTHER\nlicense = {lic}\naudio = Speakers (USB A)\n',
+                                           encoding='utf-8')
+    (first / 'BellPlayer.exe').write_bytes(b'')
+    monkeypatch.setattr(bp, 'installs', lambda: [str(first / 'BellPlayer.exe')])
+    monkeypatch.setattr(bp, 'inst_tag', lambda: 'player')
+    bp.save_ini(server, key, '')
+    monkeypatch.setattr('builtins.input', lambda prompt='': (_ for _ in ()).throw(AssertionError('asked: ' + prompt)))
+    assert bp.doctor()                                   # nothing asked: server + key fine, license from the first player
+    assert bp.load_ini()['license'] == lic
+    # the sound output is kept by every later save
+    bp.save_ini(server, key, lic, audio='Speakers (USB B)')
+    bp.save_ini(server, key)
+    assert bp.load_ini()['audio'] == 'Speakers (USB B)'
+    assert [o['audio'] for o in bp.other_settings()] == ['Speakers (USB A)']
+    # one running copy per folder: the lock name depends on the folder
+    assert bp.single_instance()
