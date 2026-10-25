@@ -216,13 +216,13 @@
 <div class="card">
   <h2>{{ L('اليوم', 'Today') }} — {{ wd_names[now.weekday()] }} <span dir="ltr" class="muted small">{{ now.strftime('%Y-%m-%d %H:%M') }}</span></h2>
   {% if today_off %}<p class="chip" style="background:#fff4e0;color:#8a5a00">{{ L('لا جرس اليوم (معطّل أو يوم مستثنى)', 'No bell today (disabled or a skipped day)') }}</p>{% endif %}
-  {% if next_ring and not today_off %}<p><b>{{ L('الجرس التالي', 'Next ring') }}:</b> <span dir="ltr">{{ next_ring.t }}</span> — {% for r in next_ring.rings %}{{ tone_name(r.tone) }} ({{ r.groups|map(tr)|join(L('، ', ', ')) }}){{ ' + ' if not loop.last }}{% endfor %}</p>{% endif %}
+  {% if next_ring and not today_off %}<p><b>{{ L('الجرس التالي', 'Next ring') }}:</b> <span dir="ltr">{{ next_ring.t }}</span> — {% for r in next_ring.rings %}{{ tone_name(r.tone) }} ({% for g in r.groups %}{{ tr(g) }}{% if not loop.last %}{{ L('، ', ', ') }}{% endif %}{% endfor %}){{ ' + ' if not loop.last }}{% endfor %}</p>{% endif %}
   {% if today_rings %}
   <table class="resp">
     <thead><tr><th>{{ L('الوقت', 'Time') }}</th><th>{{ L('الرنين', 'Ring') }}</th></tr></thead>
     <tbody>{% for s in today_rings %}
     <tr style="{{ 'opacity:.5' if s.t <= now.strftime('%H:%M') }}"><td dir="ltr"><b>{{ s.t }}</b></td>
-      <td>{% for r in s.rings %}<div><span class="chip {{ 'break' if r.kind == 'break' }}">{{ tone_name(r.tone) }}</span> <span class="small">{{ tr(r.label) }} — {{ r.groups|map(tr)|join(L('، ', ', ')) }}</span></div>{% endfor %}</td></tr>
+      <td>{% for r in s.rings %}<div><span class="chip {{ 'break' if r.kind == 'break' }}">{{ tone_name(r.tone) }}</span> <span class="small">{{ tr(r.label) }} — {% for g in r.groups %}{{ tr(g) }}{% if not loop.last %}{{ L('، ', ', ') }}{% endif %}{% endfor %}</span></div>{% endfor %}</td></tr>
     {% endfor %}</tbody>
   </table>
   {% else %}<p class="muted">{{ L('لا رنين اليوم.', 'No rings today.') }}</p>{% endif %}
