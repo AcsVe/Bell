@@ -939,3 +939,28 @@ def test_stage_tone(tmp_path):
     c.post('/admin/stages/1/tone', data={'reset': '1'})
     with app.app_context():
         assert db.session.get(Stage, 1).tone is None and MediaFile.query.count() == 0
+
+
+def test_export_periods_for_sas(admin, app):
+    """The SAS export lists the effective periods of every grade and school day (grade 4 on the «3+4»
+    program, grade 5 on «5+6», Tuesday shorter)."""
+    import io
+    import openpyxl
+    for n in ('Primary1-3', 'Primary 4-6', 'Secondary'):
+        admin.post('/admin/stages/add', data={'name_ar': n})
+    with app.app_context():
+        ids = {s.name_ar: s.id for s in Stage.query.all()}
+    admin.post('/admin/programs/seed', data={'g13': ids['Primary1-3'], 'g46': ids['Primary 4-6'],
+                                             'g712': ids['Secondary']})
+    r = admin.get('/admin/programs/export-sas')
+    assert r.status_code == 200 and r.data[:2] == b'PK'
+    ws = openpyxl.load_workbook(io.BytesIO(r.data)).active
+    rows = list(ws.iter_rows(values_only=True))
+    assert rows[0][0] == 'المرحلة' and rows[0][-1] == 'تنتهي'
+    g4_sun = [r for r in rows[1:] if r[2] == 'الصف الرابع' and r[4] == 6]
+    g5_sun = [r for r in rows[1:] if r[2] == 'الصف الخامس' and r[4] == 6]
+    assert [r[7] for r in g4_sun].count('استراحة') == 2 and g4_sun[0][10] == '08:00'
+    assert g4_sun[7][7] == 'استراحة' and g5_sun[3][7] == 'استراحة'          # different break positions
+    g5_tue = [r for r in rows[1:] if r[2] == 'الصف الخامس' and r[4] == 1]
+    assert g5_tue[-1][11] == '13:20'
+    assert 'export-sas' in admin.get('/admin/programs').get_data(as_text=True)

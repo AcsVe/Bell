@@ -72,6 +72,11 @@
       </div>
     </form>
   </div>
+  <div class="card">
+    <h2>{{ L('تصدير الحصص لنظام الغياب', 'Export the periods for SAS') }}</h2>
+    <p class="muted small">{{ L('الحصص والأوقات الفعلية لكل صف في كل يوم (بعد البرامج والتعديلات)، لتُستورد في نظام غياب الطلبة (8.iajaward.org) من «الهيكل المدرسي ← الحصص ← استيراد».', 'The actual periods and times of every grade on every day (after programs and overrides), to import in the student-absence system (8.iajaward.org): School structure → Periods → Import.') }}</p>
+    <a class="btn ghost" href="{{ url_for('admin.programs_export_sas') }}">⬇ {{ L('تصدير الحصص لنظام الغياب', 'Export periods for SAS') }}</a>
+  </div>
 
 </section>
 <section class="tabpane" data-pane="new-tab">

@@ -1003,6 +1003,15 @@ def programs_export():
                      download_name=_msg('برامج الجرس.xlsx', 'Bell programs.xlsx'))
 
 
+@admin_bp.route('/programs/export-sas')
+@login_required
+def programs_export_sas():
+    """The effective periods of every grade and day, for the student-absence system (SAS)."""
+    from sas_export import export_xlsx
+    return send_file(export_xlsx(), mimetype=XLSX, as_attachment=True,
+                     download_name=_msg('الحصص لنظام الغياب.xlsx', 'Periods for SAS.xlsx'))
+
+
 @admin_bp.route('/programs/import', methods=['POST'])
 @login_required
 def programs_import():
