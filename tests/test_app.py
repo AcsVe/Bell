@@ -1030,3 +1030,10 @@ def test_graph_status_and_test_mail(app):
     c.get('/lang/en')
     h = c.get('/admin/system').get_data(as_text=True)
     assert 'Send a test email' in h and 'Not configured' in h and 'Email log' in h
+
+
+def test_bidi_fix_leaves_device_keys_intact():
+    from app import bidi_fix
+    key = 'Ab3-5xYz_9-1QwErTy7-8uIoP'
+    assert bidi_fix(key) == key
+    assert bidi_fix('Primary1-3') == '\u2066Primary1-3\u2069'

@@ -17,7 +17,13 @@ _NUM_RANGE = _re.compile(r'(?<![\u2066\d:./\-])(\d+\s*[-+–]\s*\d+)(?![\d\u2069
 _ARABIC = _re.compile('[\u0600-\u06FF]')
 
 
+_TOKEN = _re.compile(r'[A-Za-z0-9_\-]{20,}')
+
+
 def bidi_fix(value):
+    # A long key/token (e.g. a bell device key from secrets.token_urlsafe) is never a number range: leave it intact.
+    if isinstance(value, str) and _TOKEN.fullmatch(value):
+        return value
     if isinstance(value, str) and _NUM_RANGE.search(value) and '\u2066' not in value:
         from markupsafe import Markup
         if _ARABIC.search(value) or '<' in value:
