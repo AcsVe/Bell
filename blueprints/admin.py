@@ -36,7 +36,7 @@ def _bump_on_change(resp):
     """Every successful admin write bumps the schedule version so devices
     pick up the change on their next silent sync."""
     if request.method == 'POST' and session.get('admin_logged_in') \
-            and request.endpoint not in ('admin.login',) and resp.status_code < 400:
+            and request.endpoint not in ('admin.login', 'admin.system_settings', 'admin.system_test_mail') and resp.status_code < 400:
         bump_schedule_version()
         db.session.commit()
     return resp
@@ -105,6 +105,7 @@ def dashboard():
         'sections': Section.query.count(),
         'teachers': Teacher.query.count(),
         'devices': Device.query.count(),
+        'programs': BellProgram.query.count(),
     }
     return render_template('admin/dashboard.html', stages=stages, stats=stats,
                            dupes=duplicate_stages(stages))
@@ -1190,6 +1191,72 @@ def settings():
             owners[d.id] = t.name_ar if t else '—'
     stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
     return render_template('admin/settings.html', tone=tone, devices=devices, owners=owners, stages=stages)
+
+
+# ── Settings: identity (names, accent, logo) + Microsoft Graph mail ──────
+HEX_COLOR = re.compile(r'#[0-9A-Fa-f]{6}')
+LOGO_TYPES = ('image/png', 'image/jpeg', 'image/webp')
+
+
+@admin_bp.route('/system', methods=['GET', 'POST'])
+@login_required
+def system_settings():
+    from mail import graph_status
+    from models import EmailLog
+    logo_id = AppSetting.get('org_logo_id')
+    logo = db.session.get(MediaFile, int(logo_id)) if logo_id else None
+    if request.method == 'POST':
+        AppSetting.set('org_name_ar', _form_text('org_name_ar')[:300])
+        AppSetting.set('org_name_en', _form_text('org_name_en')[:300])
+        accent = (request.form.get('accent') or '').strip()
+        AppSetting.set('accent', accent if HEX_COLOR.fullmatch(accent) and accent.upper() != '#0C67EC' else '')
+        if request.form.get('remove_logo'):
+            if logo:
+                db.session.delete(logo)
+            AppSetting.set('org_logo_id', '')
+        else:
+            f = request.files.get('logo')
+            if f and f.filename:
+                if (f.mimetype or '') not in LOGO_TYPES:
+                    flash(_msg('نوع ملف الشعار غير مدعوم (PNG أو JPG أو WEBP)',
+                               'Unsupported logo type (PNG, JPG or WEBP)'), 'error')
+                else:
+                    m, _changed = _save_upload('logo', 'org_logo', 'image/', logo)
+                    AppSetting.set('org_logo_id', m.id)
+        db.session.commit()
+        flash(_msg('حُفظت الإعدادات', 'Settings saved'), 'ok')
+        return redirect(url_for('admin.system_settings'))
+    logs = EmailLog.query.order_by(EmailLog.id.desc()).limit(50).all()
+    return render_template('admin/system.html', logo=logo, graph=graph_status(), logs=logs,
+                           org_ar=AppSetting.get('org_name_ar') or '', org_en=AppSetting.get('org_name_en') or '',
+                           accent_value=AppSetting.get('accent') or '#0C67EC', amman=_amman)
+
+
+def _amman(dt):
+    """UTC (as stored) → Asia/Amman, as 2026-12-31 08:15."""
+    if not dt:
+        return ''
+    from datetime import timezone
+    try:
+        from zoneinfo import ZoneInfo
+        dt = dt.replace(tzinfo=timezone.utc).astimezone(ZoneInfo('Asia/Amman'))
+    except Exception:
+        pass
+    return dt.strftime('%Y-%m-%d %H:%M')
+
+
+@admin_bp.route('/system/test-mail', methods=['POST'])
+@login_required
+def system_test_mail():
+    from mail import graph_status, send_email
+    to = (request.form.get('to') or '').strip() or graph_status()['sender']
+    html = render_template('admin/email_test.html')
+    res = send_email(to, _msg('رسالة تجريبية — جرس الحصص', 'Test message — School Bell'), html, kind='test')
+    if res.ok:
+        flash(_msg('أُرسلت الرسالة التجريبية إلى ', 'The test message was sent to ') + ', '.join(res.recipients), 'ok')
+    else:
+        flash(_msg('تعذّر إرسال الرسالة التجريبية: ', 'The test message could not be sent: ') + (res.error or ''), 'error')
+    return redirect(url_for('admin.system_settings') + '#mail-tab')
 
 
 @admin_bp.route('/devices/<int:device_id>/delete', methods=['POST'])

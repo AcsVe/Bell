@@ -1,7 +1,7 @@
 /* Service worker — served from /sw.js so its scope is the whole site.
  * The display page and its assets are cached so the screen keeps working with
  * no network. The schedule itself lives in IndexedDB (managed by display.js). */
-const VERSION = 'bell-v2';
+const VERSION = 'bell-v3';
 const SHELL = [
   '/app',
   '/static/css/display.css',

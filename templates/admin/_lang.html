@@ -1,0 +1,3 @@
+{# The language switch: the other language, written in itself. #}
+{% if lang == 'en' %}<a class="lang-switch" href="{{ url_for('set_lang', code='ar', next=lang_next or request.full_path) }}" lang="ar" hreflang="ar">العربية</a>
+{% else %}<a class="lang-switch" href="{{ url_for('set_lang', code='en', next=lang_next or request.full_path) }}" lang="en" hreflang="en">English</a>{% endif %}

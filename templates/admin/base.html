@@ -1,14 +1,9 @@
 <!doctype html>
 <html lang="{{ lang }}" dir="{{ dir }}">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+{% include 'admin/_head.html' %}
 <title>{% block title %}{{ L('لوحة الإدارة', 'Admin') }}{% endblock %} · {{ L('جرس الحصص', 'School Bell') }}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ asset('css/admin.css') }}">
 <script src="{{ asset('js/table.js') }}" defer></script>
-<link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
 <script>
 // Arabic-aware search text (used by page scripts): أ/إ/آ→ا, ة→ه, ى→ي, no diacritics or bidi marks.
 window.normText = (v) => String(v || '').toLowerCase()
@@ -16,49 +11,61 @@ window.normText = (v) => String(v || '').toLowerCase()
   .replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/\s+/g, ' ').trim();
 </script>
 </head>
-<body>
-<header class="top">
-  <a class="brand" href="{{ url_for('admin.dashboard') if session.admin_logged_in else '#' }}"><span aria-hidden="true">🔔</span><span>{{ L('جرس الحصص', 'School Bell') }}</span></a>
-  {% if session.admin_logged_in %}
-  {% set ep = request.endpoint or '' %}
-  {% set nav = [
-      ('admin.dashboard', ['admin.dashboard','admin.stage_view','admin.grade_view','admin.section_view'], 'المراحل والصفوف', 'Stages & grades'),
-      ('admin.programs', ['admin.programs','admin.program_view','admin.programs_assign'], 'برامج الجرس', 'Bell programs'),
-      ('admin.teachers', ['admin.teachers','admin.teacher_view'], 'المعلمون', 'Teachers'),
-      ('admin.codes', ['admin.codes'], 'الأكواد', 'Codes'),
-      ('central.page', ['central.page'], 'الجرس المركزي', 'Central bell'),
-      ('admin.settings', ['admin.settings'], 'النغمة والأجهزة', 'Tone & devices')] %}
-  {% set ns = namespace(cur=None) %}{% for item in nav if ep in item[1] %}{% set ns.cur = item %}{% endfor %}{% set current = ns.cur %}
-  <button type="button" class="menu-btn" aria-expanded="false" aria-controls="mainnav">
-    <span class="menu-ico" aria-hidden="true">☰</span><span class="menu-current">{{ L(current[2], current[3]) if current else L('القائمة', 'Menu') }}</span>
-  </button>
-  <nav id="mainnav">
-    {% for endpoint, eps, ar, en in nav %}
-    <a href="{{ url_for(endpoint) }}" class="{{ 'on' if ep in eps }}"><span class="step">{{ loop.index }}</span>{{ L(ar, en) }}</a>
-    {% endfor %}
-    <span class="side">
-      <a href="{{ url_for('set_lang', code='en' if lang == 'ar' else 'ar', next=request.full_path) }}">{{ 'English' if lang == 'ar' else 'العربية' }}</a>
-      <a href="{{ url_for('admin.logout') }}">{{ L('خروج', 'Log out') }}</a>
-    </span>
+{% set ep = request.endpoint or '' %}
+{% macro item(endpoint, eps, icon, ar, en) %}
+  {% set on = ep in eps %}
+  <a class="nav-item{{ ' active' if on }}" href="{{ url_for(endpoint) }}"{% if on %} aria-current="page"{% endif %}>
+    <i class="fa-solid {{ icon }}" aria-hidden="true"></i><span>{{ L(ar, en) }}</span></a>
+{% endmacro %}
+<body class="app">
+{% if session.admin_logged_in %}
+<div class="nav-overlay" data-nav-close></div>
+<aside class="sidebar" id="sidebar" aria-label="{{ L('القائمة الرئيسية', 'Main menu') }}">
+  <a class="side-brand" href="{{ url_for('admin.dashboard') }}">
+    {% include 'admin/_brand_logo.html' %}
+    <span class="org" title="{{ org_name or L('جرس الحصص', 'School Bell') }}">{{ org_name or L('جرس الحصص', 'School Bell') }}</span>
+    <span class="sys">{{ L('نظام جرس الحصص', 'School bell system') if org_name else L('لوحة الإدارة', 'Administration') }}</span>
+  </a>
+  <nav class="side-nav">
+    <div class="nav-group">{{ L('الجرس اليومي', 'Daily bell') }}</div>
+    {{ item('admin.dashboard', ['admin.dashboard','admin.stage_view','admin.grade_view','admin.section_view'], 'fa-house', 'المراحل والصفوف', 'Stages & grades') }}
+    {{ item('central.page', ['central.page','central.device_page'], 'fa-bullhorn', 'الجرس المركزي', 'Central bell') }}
+    <div class="nav-group">{{ L('البرامج والقوائم', 'Programs & lists') }}</div>
+    {{ item('admin.programs', ['admin.programs','admin.program_view','admin.programs_assign'], 'fa-clock', 'برامج الجرس', 'Bell programs') }}
+    {{ item('admin.teachers', ['admin.teachers','admin.teacher_view'], 'fa-chalkboard-user', 'المعلمون', 'Teachers') }}
+    {{ item('admin.codes', ['admin.codes'], 'fa-key', 'الأكواد', 'Codes') }}
+    <div class="nav-group">{{ L('الإدارة', 'Administration') }}</div>
+    {{ item('admin.settings', ['admin.settings'], 'fa-music', 'النغمة والأجهزة', 'Tone & devices') }}
+    {{ item('admin.system_settings', ['admin.system_settings'], 'fa-gear', 'الإعدادات', 'Settings') }}
   </nav>
-  {% else %}
-  <span class="side" style="margin-inline-start:auto"><a href="{{ url_for('set_lang', code='en' if lang == 'ar' else 'ar', next=request.full_path) }}">{{ 'English' if lang == 'ar' else 'العربية' }}</a></span>
+</aside>
+{% endif %}
+<div class="shell">
+  {% if session.admin_logged_in %}
+  <header class="topbar">
+    <button class="icon-btn nav-toggle" type="button" data-nav-toggle aria-controls="sidebar" aria-label="{{ L('القائمة', 'Menu') }}"><i class="fa-solid fa-bars" aria-hidden="true"></i></button>
+    <div class="page-title">{% block heading %}{{ self.title() }}{% endblock %}</div>
+    <div class="top-actions">
+      {% include 'admin/_lang.html' %}
+      <details class="user-menu">
+        <summary><span class="avatar" aria-hidden="true">{{ admin_name[:1]|upper }}</span><span class="uname">{{ admin_name }}</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></summary>
+        <div class="menu">
+          <div class="menu-head"><b>{{ admin_name }}</b><small>{{ L('مسؤول النظام', 'System administrator') }}</small></div>
+          <a href="{{ url_for('admin.system_settings') }}"><i class="fa-solid fa-gear" aria-hidden="true"></i> {{ L('الإعدادات', 'Settings') }}</a>
+          <a class="out" href="{{ url_for('admin.logout') }}"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> {{ L('تسجيل الخروج', 'Sign out') }}</a>
+        </div>
+      </details>
+    </div>
+  </header>
   {% endif %}
-</header>
-<main>
-  {% with msgs = get_flashed_messages(with_categories=true) %}
-    {% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}
-  {% endwith %}
-  {% block content %}{% endblock %}
-</main>
+  <main>
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+      {% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
 <script>
-// Phone menu
-(function () {
-  const b = document.querySelector('.menu-btn'), n = document.getElementById('mainnav');
-  if (!b || !n) return;
-  b.addEventListener('click', () => { const o = n.classList.toggle('open'); b.setAttribute('aria-expanded', o); });
-})();
-
 // Tabs inside a page: <nav class="tabbar"><a data-tab="x">…</a></nav> … <section class="tabpane" data-pane="x">.
 // The URL hash picks the tab (#x, or the id of anything inside a pane), so links and redirects land on the right tab.
 (function () {

@@ -22,6 +22,8 @@ if not exist .env (
   "%PY%" ops\setup_local.py || (pause & exit /b 1)
 ) else (
   echo .env already exists - keeping it. To change settings run: venv\Scripts\python ops\setup_local.py
+  echo Checking the optional Microsoft Graph mail settings...
+  "%PY%" ops\setup_local.py --mail
 )
 
 echo.

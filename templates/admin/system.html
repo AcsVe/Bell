@@ -1,0 +1,80 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ L('الإعدادات', 'Settings') }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1>{{ L('إعدادات النظام', 'System settings') }}</h1></div>
+<nav class="tabbar" data-tabs>
+  <a href="#identity-tab" data-tab="identity-tab"><i class="fa-solid fa-building" aria-hidden="true"></i> {{ L('الهوية', 'Identity') }}</a>
+  <a href="#mail-tab" data-tab="mail-tab"><i class="fa-solid fa-envelope" aria-hidden="true"></i> {{ L('البريد', 'Mail') }}<span class="count">{{ logs|length }}</span></a>
+</nav>
+
+<section class="tabpane" data-pane="identity-tab">
+<form method="post" enctype="multipart/form-data" class="card">
+  <h2><i class="fa-solid fa-building" aria-hidden="true"></i> {{ L('الهوية', 'Identity') }}</h2>
+  <div class="form-grid">
+    <div><label for="org_name_ar">{{ L('اسم المدرسة بالعربية', 'School name in Arabic') }}</label>
+      <input type="text" id="org_name_ar" name="org_name_ar" value="{{ org_ar }}">
+      <p class="note">{{ L('الاسم الطويل يظهر تحت الشعار على عدة أسطر.', 'A long name wraps under the logo on several lines.') }}</p></div>
+    <div><label for="org_name_en">{{ L('اسم المدرسة بالإنجليزية', 'School name in English') }}</label>
+      <input type="text" id="org_name_en" name="org_name_en" value="{{ org_en }}" dir="ltr"></div>
+    <div><label for="accent">{{ L('اللون الأساسي', 'Main colour') }}</label>
+      <input type="color" id="accent" name="accent" value="{{ accent_value }}">
+      <p class="note">{{ L('الافتراضي:', 'Default:') }} <span class="mono">#0C67EC</span></p></div>
+  </div>
+  <div class="form-grid">
+    <div><label for="logo">{{ L('الشعار', 'Logo') }}</label>
+      <div class="logo-pick">
+        <img src="{{ logo.url if logo else url_for('static', filename='brand/system.svg') }}" alt="">
+        <div><input type="file" id="logo" name="logo" accept="image/png,image/jpeg,image/webp">
+        {% if logo %}<label class="check"><input type="checkbox" name="remove_logo" value="1"> {{ L('إزالة الشعار', 'Remove the logo') }}</label>{% endif %}</div>
+      </div>
+      <p class="note">{{ L('إلى أن يُرفع شعار تظهر أيقونة النظام في القائمة الجانبية وصفحات الدخول.', 'Until a logo is uploaded the system icon is shown in the sidebar and on the sign-in pages.') }}</p></div>
+  </div>
+  <button type="submit"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> {{ L('حفظ', 'Save') }}</button>
+</form>
+</section>
+
+<section class="tabpane" data-pane="mail-tab">
+<div class="card">
+  <h2><i class="fa-solid fa-envelope" aria-hidden="true"></i> {{ L('البريد (Microsoft Graph)', 'Mail (Microsoft Graph)') }}</h2>
+  <div class="graph-status">
+    <b><i class="fa-brands fa-microsoft" aria-hidden="true"></i> Microsoft Graph</b>
+    {% if graph.ready %}<span class="badge ok">{{ L('مضبوط', 'Configured') }}</span>{% else %}<span class="badge bad">{{ L('غير مضبوط', 'Not configured') }}</span>{% endif %}
+    <span class="badge {{ 'ok' if graph.tenant else 'bad' }}">Tenant ID</span>
+    <span class="badge {{ 'ok' if graph.client else 'bad' }}">Client ID</span>
+    <span class="badge {{ 'ok' if graph.secret else 'bad' }}">Client Secret</span>
+    <span class="badge {{ 'ok' if graph.sender else 'bad' }}">{{ L('المرسل', 'Sender') }}</span>
+    <span class="muted">{{ L('المرسل:', 'Sender:') }} <span class="mono">{{ graph.sender or '—' }}</span></span>
+    <p class="note">{{ L('تُضبط هذه القيم في ملف ‎.env عند التثبيت (1_setup.bat) ولا تُعرض هنا. يمكن تخطيها، ثم إكمالها بتشغيل 1_setup.bat مرة أخرى.',
+      'These values are set in .env during setup (1_setup.bat) and are never shown here. They can be skipped and completed later by running 1_setup.bat again.') }}</p>
+  </div>
+  <form method="post" action="{{ url_for('admin.system_test_mail') }}" class="row" style="margin-top:14px">
+    <div><label for="to">{{ L('إرسال إلى', 'Send to') }}</label>
+      <input type="email" id="to" name="to" dir="ltr" placeholder="{{ graph.sender or 'name@school.edu' }}"></div>
+    <div class="shrink"><button type="submit" {{ 'disabled' if not graph.ready }}><i class="fa-solid fa-paper-plane" aria-hidden="true"></i> {{ L('إرسال بريد تجريبي', 'Send a test email') }}</button></div>
+  </form>
+  <p class="muted small" style="margin-top:8px">{{ L('لا يرسل النظام حالياً إلا البريد التجريبي؛ إن تُرك الحقل فارغاً أُرسلت الرسالة إلى بريد المرسل نفسه.',
+    'The system currently sends only the test email; with the field empty the message goes to the sender mailbox itself.') }}</p>
+</div>
+
+<div class="card">
+  <h2><i class="fa-solid fa-envelope-open-text" aria-hidden="true"></i> {{ L('سجل البريد', 'Email log') }} <span class="count-pill">{{ logs|length }}</span></h2>
+  <div class="dt-wrap">
+  <table data-table>
+    <thead><tr><th data-filter="text">{{ L('الوقت', 'Time') }}</th><th data-filter="text">{{ L('إلى', 'To') }}</th><th data-filter="text">{{ L('الموضوع', 'Subject') }}</th><th data-filter="select">{{ L('الحالة', 'Status') }}</th><th data-nosort>{{ L('الخطأ', 'Error') }}</th></tr></thead>
+    <tbody>
+    {% for e in logs %}
+    <tr>
+      <td class="small" dir="ltr" style="white-space:nowrap">{{ amman(e.created_at) }}</td>
+      <td class="small" dir="ltr">{{ e.recipients }}</td>
+      <td>{{ e.subject }}</td>
+      <td>{% if e.status == 'sent' %}<span class="badge ok">{{ L('أُرسل', 'Sent') }}</span>{% elif e.status == 'skipped' %}<span class="badge warn">{{ L('تُخطّي', 'Skipped') }}</span>{% else %}<span class="badge bad">{{ L('فشل', 'Failed') }}</span>{% endif %}</td>
+      <td class="small muted" style="max-width:320px;overflow-wrap:anywhere">{{ e.error or '' }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if not logs %}<p class="muted" style="margin-top:10px">{{ L('لا توجد رسائل بعد.', 'No messages yet.') }}</p>{% endif %}
+</div>
+</section>
+{% endblock %}

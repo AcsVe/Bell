@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>{% include 'admin/_head.html' %}{% block head %}{% endblock %}<title>{% block title %}{% endblock %} — {{ org_name or L('جرس الحصص', 'School Bell') }}</title></head>
+<body class="auth">
+<div class="auth-wrap"><div class="auth-card"{% block card_attrs %}{% endblock %}>
+  <div class="auth-lang">{% include 'admin/_lang.html' %}</div>
+  <div class="logo-circle">{% include 'admin/_brand_logo.html' %}</div>
+  <div class="brand-title">{{ org_name or L('جرس الحصص', 'School Bell') }}</div>
+  <div class="brand-sub">{{ L('نظام جرس الحصص', 'School bell system') }}</div>
+  <h1>{% block heading %}{% endblock %}</h1>
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, m in msgs %}<div class="alert {{ 'success' if cat == 'ok' else 'danger' }}">{{ m }}</div>{% endfor %}
+  {% endwith %}
+  {% block body %}{% endblock %}
+</div></div>
+<footer class="auth-foot">© {{ now_year }} <b>{{ org_name or L('جرس الحصص', 'School Bell') }}</b></footer>
+{% block scripts %}{% endblock %}
+</body></html>

@@ -2,7 +2,7 @@
 {% block title %}{{ L('الجرس المركزي', 'Central bell') }}{% endblock %}
 {% block content %}
 <div class="page-head">
-  <h1>📢 {{ L('الجرس المركزي (السمّاعات)', 'Central bell (speakers)') }}</h1>
+  <h1><i class="fa-solid fa-bullhorn" aria-hidden="true"></i> {{ L('الجرس المركزي (السمّاعات)', 'Central bell (speakers)') }}</h1>
   <div class="actions">
     {% for d in devices %}
     {% if d.st.online %}<span class="chip" style="background:#e3f6e8;color:#14632d">● {{ tr(d.name) }} {{ L('متصل', 'online') }}</span>
@@ -15,12 +15,12 @@
   'A school-wide bell through the office speakers, independent of the apps and the teacher codes. It rings at the start of every period and every break; each timing (bell program or stage) has two tones — period and break — so students recognise their bell. The office player keeps the schedule and tones and rings even without internet or with the server down.') }}</p>
 
 <nav class="tabbar" data-tabs>
-  <a href="#ring-tab" data-tab="ring-tab">🔔 {{ L('النغمات لكل توقيت', 'Tones per timing') }}<span class="count">{{ groups|length }}</span></a>
-  <a href="#off-tab" data-tab="off-tab">📅 {{ L('روزنامة إيقاف الجرس', 'Days without the bell') }}<span class="count">{{ off_events|length }}</span></a>
-  <a href="#custom-tab" data-tab="custom-tab">⏰ {{ L('رنّات حسب الوقت', 'Rings at set times') }}<span class="count">{{ custom|length }}</span></a>
-  <a href="#today-tab" data-tab="today-tab">🕘 {{ L('اليوم والأسبوع', 'Today & week') }}</a>
-  <a href="#tones-tab" data-tab="tones-tab">🎵 {{ L('مكتبة النغمات والتجربة', 'Tone library & test') }}</a>
-  <a href="#player-tab" data-tab="player-tab">💻 {{ L('أجهزة الجرس', 'Bell devices') }}<span class="count">{{ devices|length }}</span></a>
+  <a href="#ring-tab" data-tab="ring-tab"><i class="fa-solid fa-bell" aria-hidden="true"></i> {{ L('النغمات لكل توقيت', 'Tones per timing') }}<span class="count">{{ groups|length }}</span></a>
+  <a href="#off-tab" data-tab="off-tab"><i class="fa-solid fa-calendar-xmark" aria-hidden="true"></i> {{ L('روزنامة إيقاف الجرس', 'Days without the bell') }}<span class="count">{{ off_events|length }}</span></a>
+  <a href="#custom-tab" data-tab="custom-tab"><i class="fa-solid fa-clock" aria-hidden="true"></i> {{ L('رنّات حسب الوقت', 'Rings at set times') }}<span class="count">{{ custom|length }}</span></a>
+  <a href="#today-tab" data-tab="today-tab"><i class="fa-solid fa-calendar-week" aria-hidden="true"></i> {{ L('اليوم والأسبوع', 'Today & week') }}</a>
+  <a href="#tones-tab" data-tab="tones-tab"><i class="fa-solid fa-music" aria-hidden="true"></i> {{ L('مكتبة النغمات والتجربة', 'Tone library & test') }}</a>
+  <a href="#player-tab" data-tab="player-tab"><i class="fa-solid fa-desktop" aria-hidden="true"></i> {{ L('أجهزة الجرس', 'Bell devices') }}<span class="count">{{ devices|length }}</span></a>
 </nav>
 
 <section class="tabpane" data-pane="ring-tab">

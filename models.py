@@ -347,6 +347,18 @@ class AppSetting(db.Model):
             db.session.add(AppSetting(key=key, value=str(value)))
 
 
+class EmailLog(db.Model):
+    """Every email attempt through Microsoft Graph (mail.py), with its error — shown in Settings."""
+    __tablename__ = 'email_logs'
+    id         = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    recipients = db.Column(db.String(1000), nullable=False)
+    subject    = db.Column(db.String(500), nullable=False)
+    kind       = db.Column(db.String(40))
+    status     = db.Column(db.String(20), nullable=False)        # sent | failed | skipped
+    error      = db.Column(db.Text)
+
+
 def ensure_schema():
     """create_all() adds new tables but never new columns on existing ones.
     Add the columns introduced after the first deploy (idempotent)."""

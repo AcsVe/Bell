@@ -71,6 +71,9 @@ def create_app(test_config=None):
     app.config['SECRET_KEY'] = _secret_key()
     app.config['ADMIN_USER'] = os.environ.get('ADMIN_USER', 'admin')
     app.config['ADMIN_PASS'] = os.environ.get('ADMIN_PASS', 'admin')
+    # Microsoft Graph mail (mail.py) — written to .env by ops/setup_local.py; all optional.
+    for key in ('MS_TENANT_ID', 'MS_CLIENT_ID', 'MS_CLIENT_SECRET', 'MS_SENDER_EMAIL'):
+        app.config[key] = os.environ.get(key, '')
     # Long-lived session (same pattern as the venues print station): a
     # classroom tablet logs in once with its code and stays logged in.
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)
@@ -133,6 +136,31 @@ def create_app(test_config=None):
         def L(ar, en):
             return en if lang == 'en' else ar
         return {'lang': lang, 'L': L, 'dir': 'ltr' if lang == 'en' else 'rtl'}
+
+    @app.context_processor
+    def inject_brand():
+        """The organization's identity (Settings ← الهوية): names, accent colour and logo. Until a logo is
+        uploaded the system icon (static/brand/system.svg) is shown everywhere."""
+        from datetime import datetime
+        from models import AppSetting
+        try:
+            org_ar = AppSetting.get('org_name_ar') or ''
+            org_en = AppSetting.get('org_name_en') or ''
+            accent = AppSetting.get('accent') or ''
+            logo_id = AppSetting.get('org_logo_id') or ''
+            logo = db.session.get(MediaFile, int(logo_id)) if logo_id else None
+        except Exception:
+            db.session.rollback()
+            org_ar = org_en = accent = ''
+            logo = None
+        lang = session.get('lang', 'ar')
+        org = (org_en or org_ar) if lang == 'en' else (org_ar or org_en)
+        return {'org_name': org,
+                'accent': accent if _re.fullmatch(r'#[0-9A-Fa-f]{6}', accent or '') else '#0C67EC',
+                'brand_logo_url': logo.url if logo else url_for('static', filename='brand/system.svg'),
+                'brand_is_icon': not logo,
+                'now_year': datetime.now().year,
+                'admin_name': app.config.get('ADMIN_USER') or 'admin'}
 
     @app.route('/lang/<code>')
     def set_lang(code):

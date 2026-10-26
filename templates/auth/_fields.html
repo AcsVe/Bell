@@ -1,0 +1,8 @@
+{# An input with an icon; a password gets a show/hide eye (static/js/app.js). #}
+{% macro field(id, text, icon, type='text', autocomplete='', autofocus=False, ltr=True) %}
+<div class="field"><label for="{{ id }}">{{ text }}</label>
+  <div class="input-group"><i class="fa-solid {{ icon }}" aria-hidden="true"></i>
+    <input type="{{ type }}" id="{{ id }}" name="{{ id }}"{% if autocomplete %} autocomplete="{{ autocomplete }}"{% endif %}{% if ltr %} dir="ltr"{% endif %} required{% if autofocus %} autofocus{% endif %}{% if type == 'password' %} class="has-eye"{% endif %}>
+    {% if type == 'password' %}<button type="button" class="eye" data-eye="{{ id }}" aria-pressed="false" aria-label="{{ L('إظهار كلمة المرور', 'Show password') }}"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>{% endif %}
+  </div></div>
+{% endmacro %}

@@ -1,16 +1,19 @@
 {% extends 'admin/base.html' %}
+{% block title %}{{ L('المراحل والصفوف', 'Stages & grades') }}{% endblock %}
 {% block content %}
 {% from 'admin/_bulk.html' import bulk_bar, bulk_all, bulk_item with context %}
 <div class="page-head">
   <h1>{{ L('المراحل والصفوف', 'Stages & grades') }}</h1>
   <div class="actions">
-    <a class="btn" href="#add-tab">+ {{ L('مرحلة جديدة', 'New stage') }}</a>
+    <a class="btn" href="#add-tab"><i class="fa-solid fa-plus" aria-hidden="true"></i> {{ L('مرحلة جديدة', 'New stage') }}</a>
   </div>
 </div>
-<div class="grid" style="margin-bottom:18px">
-  <div class="card"><div class="muted small">{{ L('الشعب', 'Sections') }}</div><div class="stat">{{ stats.sections }}</div></div>
-  <div class="card"><div class="muted small">{{ L('المعلمون', 'Teachers') }}</div><div class="stat">{{ stats.teachers }}</div></div>
-  <div class="card"><div class="muted small">{{ L('الأجهزة المسجلة', 'Registered devices') }}</div><div class="stat">{{ stats.devices }}</div></div>
+<div class="kpis">
+  <a class="kpi{{ ' zero' if not stages }}" href="#stages-tab"><div class="l"><i class="fa-solid fa-layer-group" aria-hidden="true"></i> {{ L('المراحل', 'Stages') }}</div><div class="n">{{ stages|length }}</div><small>{{ L('الحصص والصفوف لكل مرحلة', 'Periods and grades per stage') }}</small></a>
+  <a class="kpi ok{{ ' zero' if not stats.sections }}" href="{{ url_for('admin.codes') }}"><div class="l"><i class="fa-solid fa-chalkboard" aria-hidden="true"></i> {{ L('الشعب', 'Sections') }}</div><div class="n">{{ stats.sections }}</div><small>{{ L('أكواد شاشات الصفوف', 'Classroom screen codes') }}</small></a>
+  <a class="kpi violet{{ ' zero' if not stats.teachers }}" href="{{ url_for('admin.teachers') }}"><div class="l"><i class="fa-solid fa-chalkboard-user" aria-hidden="true"></i> {{ L('المعلمون', 'Teachers') }}</div><div class="n">{{ stats.teachers }}</div><small>{{ L('القائمة والأكواد', 'List and codes') }}</small></a>
+  <a class="kpi warn{{ ' zero' if not stats.programs }}" href="{{ url_for('admin.programs') }}"><div class="l"><i class="fa-solid fa-clock" aria-hidden="true"></i> {{ L('برامج الجرس', 'Bell programs') }}</div><div class="n">{{ stats.programs }}</div><small>{{ L('التوقيتات الموزعة على الصفوف', 'Timings assigned to grades') }}</small></a>
+  <a class="kpi{{ ' zero' if not stats.devices }}" href="{{ url_for('admin.settings') }}#devices-tab"><div class="l"><i class="fa-solid fa-tablet-screen-button" aria-hidden="true"></i> {{ L('الأجهزة المسجلة', 'Registered devices') }}</div><div class="n">{{ stats.devices }}</div><small>{{ L('آخر مزامنة لكل جهاز', 'Last sync per device') }}</small></a>
 </div>
 <nav class="tabbar" data-tabs>
   <a href="#stages-tab" data-tab="stages-tab">{{ L('المراحل', 'Stages') }}<span class="count">{{ stages|length }}</span></a>

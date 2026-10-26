@@ -837,7 +837,7 @@ def test_manual_add_teachers_emails_duplicates_and_new_on_top(admin, app):
                 '/admin/codes', f'/admin/teachers/{new_ids[0]}']:
         h = admin.get(url).get_data(as_text=True)
         assert 'class="page-head' in h, url
-        assert 'id="mainnav"' in h and 'class="step"' in h, url
+        assert 'id="sidebar"' in h and 'nav-item active' in h and 'class="nav-group"' in h, url
 
 
 def test_seed_programs_into_english_named_stages_and_codes_export(admin, app):
@@ -964,3 +964,69 @@ def test_export_periods_for_sas(admin, app):
     g5_tue = [r for r in rows[1:] if r[2] == 'الصف الخامس' and r[4] == 1]
     assert g5_tue[-1][11] == '13:20'
     assert 'export-sas' in admin.get('/admin/programs').get_data(as_text=True)
+
+
+def test_sidebar_identity_logo_and_signin(admin, app):
+    # sign-in pages use the appace card with the system icon until a logo is uploaded
+    anon = app.test_client()
+    for url in ('/admin/login', '/login'):
+        h = anon.get(url).get_data(as_text=True)
+        assert 'class="auth-card"' in h and 'brand/system.svg' in h and 'lang-switch' in h, url
+    assert anon.get('/static/brand/system.svg').status_code == 200
+    h = admin.get('/admin/').get_data(as_text=True)
+    assert 'class="sidebar"' in h and 'brand/system.svg' in h and 'class="kpis"' in h and 'user-menu' in h
+    # identity: names, accent, logo, then remove the logo
+    png = (b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89'
+           b'\x00\x00\x00\rIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82')
+    r = admin.post('/admin/system', data={'org_name_ar': 'مدرسة الاختبار الثانوية', 'org_name_en': 'Test School',
+                                         'accent': '#123456', 'logo': (io.BytesIO(png), 'logo.png', 'image/png')},
+                   content_type='multipart/form-data')
+    assert r.status_code == 302
+    h = admin.get('/admin/').get_data(as_text=True)
+    assert 'مدرسة الاختبار الثانوية' in h and '--accent:#123456' in h and '/media/' in h
+    assert 'مدرسة الاختبار الثانوية' in anon.get('/admin/login').get_data(as_text=True)
+    admin.post('/admin/system', data={'org_name_ar': 'مدرسة الاختبار الثانوية', 'remove_logo': '1', 'accent': 'bad'})
+    h = admin.get('/admin/').get_data(as_text=True)
+    assert 'brand/system.svg' in h and '--accent:#0C67EC' in h
+    # an unsupported logo type is refused
+    admin.post('/admin/system', data={'logo': (io.BytesIO(b'<svg/>'), 'x.svg', 'image/svg+xml')},
+               content_type='multipart/form-data')
+    assert 'brand/system.svg' in admin.get('/admin/').get_data(as_text=True)
+    # the identity form does not make every device resync
+    from models import AppSetting
+    with app.app_context():
+        v = AppSetting.get('schedule_version')
+    admin.post('/admin/system', data={'org_name_ar': 'x'})
+    with app.app_context():
+        assert AppSetting.get('schedule_version') == v
+    assert admin.get('/admin/logout').status_code == 302
+
+
+def test_graph_status_and_test_mail(app):
+    from models import EmailLog
+    app.config.update(MS_TENANT_ID='tenant-x', MS_CLIENT_ID='client-x', MS_CLIENT_SECRET='secret-value-x',
+                      MS_SENDER_EMAIL='bell@school.example', MAIL_BACKEND='memory')
+    c = app.test_client()
+    c.post('/admin/login', data={'username': 'admin', 'password': 'admin'})
+    h = c.get('/admin/system').get_data(as_text=True)
+    assert 'Tenant ID' in h and 'badge ok' in h and 'إرسال بريد تجريبي' in h
+    for secret in ('tenant-x', 'client-x', 'secret-value-x'):
+        assert secret not in h            # values are never shown
+    r = c.post('/admin/system/test-mail', data={'to': 'it@school.example'})
+    assert r.status_code == 302 and app.config['MAIL_OUTBOX'][-1]['to'] == ['it@school.example']
+    c.post('/admin/system/test-mail', data={'to': ''})          # empty: goes to the sender itself
+    assert app.config['MAIL_OUTBOX'][-1]['to'] == ['bell@school.example']
+    with app.app_context():
+        assert EmailLog.query.filter_by(status='sent').count() == 2
+    h = c.get('/admin/system').get_data(as_text=True)
+    assert 'it@school.example' in h
+    # not configured: badges say so and a send is logged as failed, not raised
+    app.config.update(MS_TENANT_ID='', MAIL_BACKEND='graph')
+    h = c.get('/admin/system').get_data(as_text=True)
+    assert 'غير مضبوط' in h
+    c.post('/admin/system/test-mail', data={'to': 'it@school.example'})
+    with app.app_context():
+        assert EmailLog.query.filter_by(status='failed').count() == 1
+    c.get('/lang/en')
+    h = c.get('/admin/system').get_data(as_text=True)
+    assert 'Send a test email' in h and 'Not configured' in h and 'Email log' in h
