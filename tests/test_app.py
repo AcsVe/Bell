@@ -1009,7 +1009,7 @@ def test_graph_status_and_test_mail(app):
     c = app.test_client()
     c.post('/admin/login', data={'username': 'admin', 'password': 'admin'})
     h = c.get('/admin/system').get_data(as_text=True)
-    assert 'Tenant ID' in h and 'badge ok' in h and 'إرسال بريد تجريبي' in h
+    assert 'Tenant ID' not in h and '.env' not in h and 'badge ok' in h and 'إرسال بريد تجريبي' in h
     for secret in ('tenant-x', 'client-x', 'secret-value-x'):
         assert secret not in h            # values are never shown
     r = c.post('/admin/system/test-mail', data={'to': 'it@school.example'})
@@ -1023,13 +1023,13 @@ def test_graph_status_and_test_mail(app):
     # not configured: badges say so and a send is logged as failed, not raised
     app.config.update(MS_TENANT_ID='', MAIL_BACKEND='graph')
     h = c.get('/admin/system').get_data(as_text=True)
-    assert 'غير مضبوط' in h
+    assert 'غير جاهز' in h
     c.post('/admin/system/test-mail', data={'to': 'it@school.example'})
     with app.app_context():
         assert EmailLog.query.filter_by(status='failed').count() == 1
     c.get('/lang/en')
     h = c.get('/admin/system').get_data(as_text=True)
-    assert 'Send a test email' in h and 'Not configured' in h and 'Email log' in h
+    assert 'Send a test email' in h and 'Not ready' in h and 'Email log' in h
 
 
 def test_bidi_fix_leaves_device_keys_intact():

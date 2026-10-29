@@ -35,17 +35,12 @@
 
 <section class="tabpane" data-pane="mail-tab">
 <div class="card">
-  <h2><i class="fa-solid fa-envelope" aria-hidden="true"></i> {{ L('البريد (Microsoft Graph)', 'Mail (Microsoft Graph)') }}</h2>
+  <h2><i class="fa-solid fa-envelope" aria-hidden="true"></i> {{ L('البريد الإلكتروني', 'Email') }}</h2>
   <div class="graph-status">
-    <b><i class="fa-brands fa-microsoft" aria-hidden="true"></i> Microsoft Graph</b>
-    {% if graph.ready %}<span class="badge ok">{{ L('مضبوط', 'Configured') }}</span>{% else %}<span class="badge bad">{{ L('غير مضبوط', 'Not configured') }}</span>{% endif %}
-    <span class="badge {{ 'ok' if graph.tenant else 'bad' }}">Tenant ID</span>
-    <span class="badge {{ 'ok' if graph.client else 'bad' }}">Client ID</span>
-    <span class="badge {{ 'ok' if graph.secret else 'bad' }}">Client Secret</span>
-    <span class="badge {{ 'ok' if graph.sender else 'bad' }}">{{ L('المرسل', 'Sender') }}</span>
+    <b><i class="fa-solid fa-paper-plane" aria-hidden="true"></i> {{ L('إرسال البريد الإلكتروني', 'Sending email') }}</b>
+    {% if graph.ready %}<span class="badge ok">{{ L('جاهز', 'Ready') }}</span>{% else %}<span class="badge bad">{{ L('غير جاهز', 'Not ready') }}</span>{% endif %}
     <span class="muted">{{ L('المرسل:', 'Sender:') }} <span class="mono">{{ graph.sender or '—' }}</span></span>
-    <p class="note">{{ L('تُضبط هذه القيم في ملف ‎.env عند التثبيت (1_setup.bat) ولا تُعرض هنا. يمكن تخطيها، ثم إكمالها بتشغيل 1_setup.bat مرة أخرى.',
-      'These values are set in .env during setup (1_setup.bat) and are never shown here. They can be skipped and completed later by running 1_setup.bat again.') }}</p>
+    {% if not graph.ready %}<p class="note">{{ L('لا تُرسَل رسائل البريد حالياً. تواصل مع مسؤول تقنية المعلومات لربط حساب بريد المؤسسة.', "Emails are not being sent at the moment. Contact the IT administrator to connect the school's mail account.") }}</p>{% endif %}
   </div>
   <form method="post" action="{{ url_for('admin.system_test_mail') }}" class="row" style="margin-top:14px">
     <div><label for="to">{{ L('إرسال إلى', 'Send to') }}</label>
