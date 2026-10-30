@@ -24,9 +24,10 @@ BELL_REMOTE="${BELL_REMOTE:-$REMOTE/bell}"
 [ -f "$HOME/.bell_standby" ] && . "$HOME/.bell_standby"
 TOKEN_FILE="$HOME/.bell_tunnel_token"
 export PYTHONUTF8=1
-LANG_UI="${LANG_UI:-en}"   # Termux cannot join or right-to-left Arabic: English unless chosen
+LANG_UI="${LANG_UI:-ar}"
 export IAJ_LANG="$LANG_UI"
 T() { if [ "$LANG_UI" = "en" ]; then printf '%s' "$2"; else printf '%s' "$1"; fi; }
+[ -f "$HOME/iaj/standby/arabic.sh" ] && . "$HOME/iaj/standby/arabic.sh"   # readable Arabic in Termux
 say() { printf '\n\033[1;36m» %s\033[0m\n' "$*"; }
 die() { printf '\n\033[1;31m✖ %s\033[0m\n' "$*"; exit 1; }
 guard() {
