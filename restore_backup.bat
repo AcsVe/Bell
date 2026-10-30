@@ -16,7 +16,7 @@ if not "%CH%"=="1" if not "%CH%"=="2" (echo   Cancelled. & pause & exit /b 0)
 set /p OK=Type YES to continue: 
 if /i not "%OK%"=="YES" (echo   Cancelled. & pause & exit /b 0)
 schtasks /end /tn "BELL Website" >nul 2>nul
-timeout /t 2 >nul
+"%SystemRoot%\System32\timeout.exe" /t 2 >nul
 "%PY%" ops\restore.py --latest auto %TAG% --yes
 if errorlevel 1 (schtasks /run /tn "BELL Website" >nul 2>nul & echo. & echo   [X] Restore failed & pause & exit /b 1)
 schtasks /run /tn "BELL Website" >nul 2>nul

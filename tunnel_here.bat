@@ -44,14 +44,14 @@ REM ---------- install it as a Windows service with the tunnel token ----------
 "%PY%" ops\cf.py main-token > "%TEMP%\iaj_tok.txt" || (del "%TEMP%\iaj_tok.txt" >nul 2>nul & echo [X] Could not get the tunnel token from Cloudflare & pause & exit /b 1)
 set /p TOK=<"%TEMP%\iaj_tok.txt"
 del "%TEMP%\iaj_tok.txt" >nul 2>nul
-sc query cloudflared >nul 2>nul && ("%CFD%" service uninstall >nul 2>nul & timeout /t 3 >nul)
+sc query cloudflared >nul 2>nul && ("%CFD%" service uninstall >nul 2>nul & "%SystemRoot%\System32\timeout.exe" /t 3 >nul)
 "%CFD%" service install %TOK% || (set "TOK=" & echo [X] Could not install the cloudflared service & pause & exit /b 1)
 set "TOK="
 sc config cloudflared start= auto >nul 2>nul
 sc start cloudflared >nul 2>nul
 echo.
 echo   Waiting for the tunnel to connect...
-timeout /t 15 /nobreak >nul
+"%SystemRoot%\System32\timeout.exe" /t 15 /nobreak >nul
 "%PY%" ops\cf.py connectors 2>nul > "%TEMP%\iaj_conn.txt"
 set /p NCONN=<"%TEMP%\iaj_conn.txt"
 echo   Connectors online now: %NCONN%

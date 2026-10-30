@@ -25,7 +25,7 @@ schtasks /query /tn "BELL Website" >nul 2>nul
 if errorlevel 1 goto manual
 net session >nul 2>nul || (echo. & echo [!] To restart automatically, run this file as administrator. Or restart the PC. & pause & exit /b 0)
 schtasks /end /tn "BELL Website" >nul 2>nul
-timeout /t 2 >nul
+"%SystemRoot%\System32\timeout.exe" /t 2 >nul
 schtasks /run /tn "BELL Website" >nul 2>nul
 if errorlevel 1 (
   echo.
