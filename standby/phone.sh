@@ -13,7 +13,7 @@
 #   bash ~/bell/standby/phone.sh backup       # رفع بيانات الهاتف إلى Drive
 #   bash ~/bell/standby/phone.sh try          # تجربة على الهاتف فقط: http://127.0.0.1:8005
 #
-#  القفل واللغة مشتركان مع أزرار IAJ (IAJ 0 / IAJ 9).
+#  القفل واللغة مشتركان مع زرّي «★ قفل أو فتح الأزرار» و«★ English - عربي» (standby/widgets.sh في IAJ).
 # ================================================================
 set -e
 SITE="$HOME/bell"
@@ -31,7 +31,7 @@ say() { printf '\n\033[1;36m» %s\033[0m\n' "$*"; }
 die() { printf '\n\033[1;31m✖ %s\033[0m\n' "$*"; exit 1; }
 guard() {
   if [ -f "$HOME/.iaj_lock" ] && [ -z "$IAJ_NOGUARD" ]; then
-    die "$(T "🔒 الأزرار الحساسة مقفلة — اضغط «IAJ 0 - قفل أو فتح الأزرار» لفتحها" "🔒 Sensitive buttons are locked - press IAJ 0 to unlock")"
+    die "$(T "🔒 الأزرار الحساسة مقفلة — اضغط «★ قفل أو فتح الأزرار» لفتحها" "🔒 Sensitive buttons are locked - press Â«â ÙÙÙ Ø£Ù ÙØªØ­ Ø§ÙØ£Ø²Ø±Ø§Ø±Â» to unlock")"
   fi
 }
 need_code() { [ -f "$SITE/serve.py" ] || die "$(T "الكود غير موجود — شغّل: bash phone.sh update-code" "Code not found - run: bash phone.sh update-code")"; }
@@ -118,6 +118,8 @@ case "$1" in
     mk "BELL 3 - أين يعمل نظام الجرس" "bash ~/bell/standby/phone.sh status"
     mk "BELL 4 - تحديث كود الجرس" "bash ~/bell/standby/phone.sh update-code && bash ~/bell/standby/phone.sh configure"
     mk "BELL 5 - نسخ بيانات الجرس إلى Drive" "bash ~/bell/standby/phone.sh backup"
+    # one button per system instead of one per action (when the award site is on this phone): ~/iaj/standby/widgets.sh
+    [ -f "$HOME/iaj/standby/widgets.sh" ] && WIDGETS_QUIET=1 bash "$HOME/iaj/standby/widgets.sh"
         say "$(T "تم. حدّث أداة Termux:Widget لتظهر أزرار BELL" "Done. Refresh the Termux:Widget to see the BELL buttons")"
     cd "$SITE" && python ops/cf.py status || true
     ;;
@@ -192,7 +194,7 @@ case "$1" in
     else
       die "$(T "لم يتم التحويل" "Switch failed")"
     fi
-    say "$(T "✅ الهاتف يشغّل 5.iajaward.org — لا تغلق النافذة. للإنهاء: زر «BELL 1 - إنهاء» أو Ctrl+C" "✅ The phone serves 5.iajaward.org - keep this window. To finish: BELL 1 - Stop, or Ctrl+C")"
+    say "$(T "✅ الهاتف يشغّل 5.iajaward.org — لا تغلق النافذة. للإنهاء: زر «BELL» ← إنهاء الطوارئ أو Ctrl+C" "✅ The phone serves 5.iajaward.org - keep this window. To finish: the BELL button > End emergency mode, or Ctrl+C")"
     while kill -0 $WEB 2>/dev/null && kill -0 $CF 2>/dev/null; do sleep 5; done
     say "$(T "توقف النظام أو النفق على الهاتف" "The system or tunnel stopped on the phone")"
     exit 0
