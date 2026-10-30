@@ -59,8 +59,42 @@ def uploads_dir():
     return os.path.join(data_dir(), 'uploads')
 
 
+DRIVE_FOLDER = 'bell'      # this system's folder inside IAJ-backups (the standby phone reads it there)
+
+
+def _drive_backups():
+    """IAJ-backups in Google Drive for desktop on this computer: the award site's BACKUP_DIR (C:\\IAJ\\.env),
+    else the usual Drive folders. None when Drive is not on this computer."""
+    if os.name != 'nt':
+        return None
+    try:
+        with open(r'C:\IAJ\.env', encoding='utf-8-sig', errors='ignore') as fh:
+            for line in fh:
+                if line.strip().startswith('BACKUP_DIR='):
+                    d = line.split('=', 1)[1].strip().strip('"')
+                    if d and os.path.isdir(d):
+                        return d
+    except OSError:
+        pass
+    for letter in 'GHIJKLMNOPDEF':
+        for sub in ('My Drive', 'Mon Drive', 'محرّك الأقراص', 'محرك الأقراص الخاص بي'):
+            d = f'{letter}:\\{sub}\\IAJ-backups'
+            if os.path.isdir(d):
+                return d
+    return None
+
+
 def backup_root():
-    return os.environ.get('BACKUP_DIR') or os.path.join(BASE, 'backups')
+    """BACKUP_DIR when it points to a folder that exists; otherwise this system's folder in the Google Drive
+    backup folder (IAJ-backups/<system>) so the standby phone always finds the backups; otherwise ./backups."""
+    d = os.environ.get('BACKUP_DIR', '').strip().strip('"')
+    drive = _drive_backups()
+    usable = d and (os.path.isdir(d) or os.path.isdir(os.path.dirname(d.rstrip('\\/'))))
+    if usable and (drive is None or 'IAJ-backups' in d):
+        return d
+    if drive:          # BACKUP_DIR empty, missing, or a local folder the phone cannot reach
+        return os.path.join(drive, DRIVE_FOLDER)
+    return os.path.join(BASE, 'backups')
 
 
 def stamp():
