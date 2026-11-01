@@ -181,7 +181,7 @@ def test_import_render_copies_everything(tmp_path):
 
 
 def test_export_all_then_import(tmp_path):
-    """Settings → «تنزيل كل البيانات» on the old server, then import_render.py with that file on the PC."""
+    """Settings → «تحميل كل البيانات» on the old server, then import_render.py with that file on the PC."""
     import subprocess
     import sqlite3
     root = os.path.dirname(os.path.dirname(__file__))

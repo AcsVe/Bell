@@ -1,6 +1,6 @@
 """ربط 5.iajaward.org (جرس الحصص) بالكمبيوتر أو بالهاتف عبر Cloudflare API (بدون لوحة Cloudflare).
 
-    python ops/cf.py setup      # مرة واحدة: سجل DNS + ربط الاسم بنفق السيرفر + إنشاء نفق الهاتف bell-standby
+    python ops/cf.py setup      # مرة واحدة: سجل DNS + ربط الاسم بنفق الخادم + إنشاء نفق الهاتف bell-standby
     python ops/cf.py status     # أين يعمل 5.iajaward.org الآن + تشخيص
     python ops/cf.py phone      # 5.iajaward.org ← الهاتف
     python ops/cf.py server     # 5.iajaward.org ← الكمبيوتر

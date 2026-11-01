@@ -1271,7 +1271,7 @@ def device_delete(device_id):
 @admin_bp.route('/export/all')
 @login_required
 def export_all():
-    """«تنزيل كل البيانات»: نسخة كاملة من القاعدة (أياً كان نوعها) في ملف bell.db واحد — يُنقل للجهاز الجديد
+    """«تحميل كل البيانات»: نسخة كاملة من القاعدة (أياً كان نوعها) في ملف bell.db واحد — يُنقل للجهاز الجديد
     بـ import_render.bat. للقراءة فقط، لا يغيّر شيئاً هنا."""
     import os
     import tempfile

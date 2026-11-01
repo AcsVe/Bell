@@ -45,7 +45,7 @@ def main():
             print(t('  تثبيت مكتبة PostgreSQL (مرة واحدة)...', '  Installing the PostgreSQL driver (once)...'))
             r = subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', '--disable-pip-version-check', 'psycopg[binary]'])
             if r.returncode != 0:
-                die(t('تعذّر تثبيت مكتبة PostgreSQL على هذا الجهاز. البديل: من الموقع القديم «الإعدادات ← تنزيل كل البيانات» ثم أعطِ مسار الملف هنا.',
+                die(t('تعذّر تثبيت مكتبة PostgreSQL على هذا الجهاز. البديل: من الموقع القديم «الإعدادات ← تحميل كل البيانات» ثم أعطِ مسار الملف هنا.',
                       'Could not install the PostgreSQL driver on this PC. Instead: on the old site use Settings > Download all data, then give that file path here.'))
         if src_url.startswith('postgresql://'):
             src_url = 'postgresql+psycopg://' + src_url[len('postgresql://'):]
