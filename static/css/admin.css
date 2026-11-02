@@ -178,6 +178,12 @@ body.auth::before{content:'';position:fixed;inset:0;pointer-events:none;opacity:
   cursor:pointer;border-radius:8px;box-shadow:none}
 .input-group .eye:hover{color:var(--primary);background:var(--primary-soft);filter:none}
 .input-group input.has-eye{padding-inline-end:42px!important}
+/* أيقونة الحقل في جهة بداية الصفحة، والحشوة تتبعها مهما كان اتجاه كتابة الحقل نفسه: حقل اسم المستخدم وكلمة المرور يُكتب من اليسار، فكانت الحشوة المنطقية تذهب إلى الجهة الأخرى ويقع النص تحت الأيقونة. */
+html[dir=rtl] .input-group input{padding-right:36px!important;padding-left:12px!important}
+html[dir=rtl] .input-group input.has-eye{padding-left:42px!important}
+html[dir=ltr] .input-group input{padding-left:36px!important;padding-right:12px!important}
+html[dir=ltr] .input-group input.has-eye{padding-right:42px!important}
+
 html[dir=rtl] .input-group input[dir=ltr]{text-align:right}
 .auth-card .btn{width:100%;padding:11px;margin-top:4px;font-size:.98rem;min-height:44px;
   background:linear-gradient(135deg,var(--primary),var(--primary-dark));border:0}
