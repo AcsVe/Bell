@@ -164,14 +164,20 @@ def test_server_clock_lan_fallback_and_license(env, monkeypatch):
     p.poll()
     assert p.server == server and p.schedule
     assert bp.CLOCK['tz_min'] == 180 and abs(bp.CLOCK['offset']) < 2
-    # rings follow the server clock, not this PC: pretend the server is 1 h ahead
-    before = bp.amman_now()
-    p.sync_clock({'server_ms': (_t.time() + 3600) * 1000, 'tz_offset_min': 180}, _t.time(), _t.time())
-    assert 3590 < (bp.amman_now() - before).total_seconds() < 3610 and p.clock_drift == -3600
-    # the offset is kept for offline use
-    bp.CLOCK['offset'] = 0
-    bp.load_clock()
-    assert abs(bp.CLOCK['offset'] - 3600) < 2
+    # 1.8: rings by THIS PC's clock (the school's choice): a server 1 h ahead does not move the bell, it only warns
+    p.sync_clock({'server_ms': (_t.time() + 3600) * 1000, 'tz_offset_min': 240}, _t.time(), _t.time())
+    assert abs((bp.amman_now() - datetime.now()).total_seconds()) < 2 and p.clock_drift == -3600
+    assert '60 min behind' in bp.clock_warning()
+    st = {'clock_drift': p.clock_drift}                                  # what the player reports with its poll
+    import central
+    with admin.application.app_context():
+        pid = next(iter(central.players()))
+        central.record_status(pid, st, '127.0.0.1')
+        from models import db
+        db.session.commit()
+    assert 'الجرس يرنّ بساعة هذا الجهاز' in admin.get('/admin/central').get_data(as_text=True)
+    bp.CLOCK['offset'] = 0.3
+    assert bp.clock_warning() == ''
     # license reported to the admin page
     p.sync_clock({'server_ms': _t.time() * 1000, 'tz_offset_min': 180}, _t.time(), _t.time())
     p.poll()

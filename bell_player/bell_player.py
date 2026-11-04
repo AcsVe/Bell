@@ -26,8 +26,8 @@ WAV tones play on the chosen sound card; an MP3 tone plays on the Windows defaul
 
 Works offline: the schedule and every tone are cached next to the program (player_cache/). The server is needed
 only to receive changes; when it is down or the internet is cut the bell keeps ringing from the cache.
-Time: rings by the SERVER's clock, not this PC's. Every poll measures the difference between this PC and the server
-(and the school time zone) and keeps it (player_cache/clock.json), so it stays right while offline too.
+Time (1.8): rings by THIS PC's clock (Windows date, time and time zone), not the server's. Every poll still measures
+the difference to the server clock, only to warn (log, admin page, Check and fix) when this PC's clock is wrong.
 The server is reached at its public address, or on the school network (addresses it reports) when the internet is down.
 License: a signed key (ECDSA P-256) tied to this computer's fingerprint; without a valid key it does not ring.
 Python standard library only (also runs as `python bell_player.py`).
@@ -51,7 +51,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-VERSION = '1.7'
+VERSION = '1.8'
 DEFAULT_SERVER = 'https://5.iajaward.org'
 POLL_SECONDS = 15
 CATCH_UP_SECONDS = 90         # a ring missed by up to 90 s (PC busy/waking up) still plays; later ones are skipped
@@ -127,16 +127,18 @@ def save_clock():
 
 
 def amman_now():
-    """School time by the SERVER's clock: this PC's UTC + the measured offset to the server + the school's UTC
-    offset reported by the server. Before the first sync: the Amman zone (or this PC's local time)."""
-    utc = datetime.now(timezone.utc) + timedelta(seconds=CLOCK.get('offset') or 0)
-    if CLOCK.get('tz_min') is not None:
-        return (utc + timedelta(minutes=CLOCK['tz_min'])).replace(tzinfo=None)
-    try:
-        from zoneinfo import ZoneInfo
-        return utc.astimezone(ZoneInfo('Asia/Amman')).replace(tzinfo=None)
-    except Exception:   # noqa: BLE001
-        return datetime.now() + timedelta(seconds=CLOCK.get('offset') or 0)
+    """School time = THIS PC's local clock (Windows date, time and time zone), as the school asked (1.8).
+    The difference to the server clock is measured (CLOCK['offset']) only to warn when this clock is wrong."""
+    return datetime.now()
+
+
+def clock_warning(offset=None):
+    """'' when this PC's clock matches the server (within a minute), else a plain warning."""
+    off = CLOCK.get('offset') if offset is None else offset
+    if not CLOCK.get('synced') or off is None or abs(off) <= 60:
+        return ''
+    return (f"this PC's clock is {abs(off) / 60:.0f} min {'behind' if off > 0 else 'ahead of'} the server - "
+            "the bell rings by THIS PC's clock: correct the Windows date, time and time zone")
 
 
 # ── license (ECDSA P-256, same key pair and key format as the desktop analysis program) ──
@@ -657,8 +659,7 @@ class Player:
         offset = r['server_ms'] / 1000.0 + (t1 - t0) / 2 - t1
         changed = abs(offset - (CLOCK.get('offset') or 0)) > 0.5 or CLOCK.get('tz_min') != r.get('tz_offset_min') \
             or (r.get('lan') and r['lan'] != CLOCK.get('lan'))
-        if abs(offset - (CLOCK.get('offset') or 0)) > 5 and CLOCK.get('synced'):
-            log.info('server clock: this PC is %+.1f s off — ringing by the server time', -offset)
+        warn_now = abs(offset) > 60 and (abs(offset - (CLOCK.get('offset') or 0)) > 30 or not CLOCK.get('synced'))
         CLOCK['offset'] = offset
         if r.get('tz_offset_min') is not None:
             CLOCK['tz_min'] = int(r['tz_offset_min'])
@@ -666,6 +667,8 @@ class Player:
             CLOCK['lan'] = list(r['lan'])
         CLOCK['synced'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
         self.clock_drift = int(round(-offset))
+        if warn_now:
+            log.warning(clock_warning(offset))
         if changed or time.time() - self._clock_saved > 600:
             save_clock()
             self._clock_saved = time.time()
@@ -706,9 +709,9 @@ class Player:
                 if e.code == 401:
                     log.error('the server refused the key — a new key was created? run: BellPlayer.exe --setup')
                     backoff = 300
-            except Exception as e:   # noqa: BLE001 — offline: keep ringing from the cache (and the last server offset)
+            except Exception as e:   # noqa: BLE001 — offline: keep ringing from the cache (by this PC's clock)
                 if not self.error:
-                    log.warning('server not reachable (%s) — ringing from the saved schedule by the last known server time', e)
+                    log.warning('server not reachable (%s) — ringing from the saved schedule by this PC\'s clock', e)
                 self.error = str(e)
                 backoff = min(backoff * 2, 120)
             time.sleep(backoff)
@@ -1225,6 +1228,9 @@ def doctor(force=False):
         print(f'  [!] the server is not reachable right now ({why}) - saved; it keeps trying by itself')
         break
     save_ini(server, key, lic)
+    if state == 'ok':                          # the bell rings by this PC's clock: say so if it is wrong
+        print(f'  [!] {clock_warning()}' if clock_warning() else
+              f"  [OK] this PC's clock matches the server ({datetime.now().strftime('%Y-%m-%d %H:%M')}) - the bell rings by it")
     # 2) license
     load_clock()
     fp = machine_fingerprint()
@@ -1392,7 +1398,8 @@ def status_report():
     print(f'  license: {p.license_text()}  (fingerprint {p.fp})')
     AUDIO['device'] = load_ini().get('audio') or ''
     print(f'  sound output: {audio_label()}' + (f'   (one of {len(installs())} players on this computer)' if len(installs()) > 1 else ''))
-    print(f'  server clock offset: {CLOCK.get("offset", 0):+.1f} s  (synced {CLOCK.get("synced") or "never"})  school network: {", ".join(CLOCK.get("lan") or []) or "-"}')
+    print(f'  rings by this PC\'s clock: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}' + (f'  [!] {clock_warning()}' if clock_warning() else ''))
+    print(f'  difference to the server clock: {CLOCK.get("offset", 0):+.1f} s  (synced {CLOCK.get("synced") or "never"})  school network: {", ".join(CLOCK.get("lan") or []) or "-"}')
 
 
 def main():
