@@ -17,21 +17,21 @@
   <h2>{{ L('الأجهزة المسجلة', 'Registered devices') }}</h2>
   <p class="muted small">{{ L('آخر مزامنة لكل جهاز. الشاشة العاملة تتزامن كل 5 دقائق تقريباً عند توفر الإنترنت.', 'Last sync per device. A running screen syncs about every 5 minutes when online.') }}</p>
   {% if devices %}{{ bulk_bar('devices', [('delete', 'حذف', 'Delete', true)]) }}{% endif %}
-  <table class="resp">
-    <thead><tr><th class="chk">{{ bulk_all('devices') }}</th><th>{{ L('مرتبط بـ', 'Linked to') }}</th><th>{{ L('النوع', 'Type') }}</th><th>{{ L('آخر مزامنة (UTC)', 'Last sync (UTC)') }}</th><th>{{ L('المتصفح', 'Browser') }}</th><th></th></tr></thead>
+  <div class="dt-wrap"><table class="resp" data-table>
+    <thead><tr><th class="chk" data-nosort>{{ bulk_all('devices') }}</th><th data-filter="text">{{ L('مرتبط بـ', 'Linked to') }}</th><th data-filter="select">{{ L('النوع', 'Type') }}</th><th data-filter="text">{{ L('آخر مزامنة', 'Last sync') }}</th><th data-filter="select">{{ L('المتصفح', 'Browser') }}</th><th data-nosort></th></tr></thead>
     <tbody>
     {% for d in devices %}
     <tr data-row>
       <td class="chk">{{ bulk_item('devices', d.id) }}</td>
       <td>{{ owners[d.id] }}</td>
       <td>{{ L('شاشة صف', 'Classroom') if d.code_type == 'section' else L('معلم', 'Teacher') }}</td>
-      <td class="small" dir="ltr">{{ d.last_sync.strftime('%Y-%m-%d %H:%M') if d.last_sync }}</td>
-      <td class="small muted" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ d.user_agent }}</td>
+      <td><bdi dir="ltr">{{ amman(d.last_sync) }}</bdi></td>
+      <td>{{ browser(d.user_agent) }}</td>
       <td><form method="post" action="{{ url_for('admin.device_delete', device_id=d.id) }}" class="inline"><button class="danger sm">✕</button></form></td>
     </tr>
     {% else %}<tr><td class="muted" colspan="6">{{ L('لا توجد أجهزة بعد.', 'No devices yet.') }}</td></tr>{% endfor %}
     </tbody>
-  </table>
+  </table></div>
 </div>
 </section>
 <section class="tabpane" data-pane="tone-tab">
@@ -52,7 +52,7 @@
 
 <div class="card">
   <h2>{{ L('نغمة خاصة لكل مرحلة', 'A tone per stage') }}</h2>
-  <p class="muted small">{{ L('اختياري: ارفع نغمة لمرحلة معيّنة لتميّز تنبيهاتها. الأفضل ملف WAV قصير (أقل من 30 ثانية) ليعمل على الكمبيوتر وAndroid وiPhone؛ ملفات MP3 تعمل على الكمبيوتر وAndroid، وiPhone يستخدم النغمة الافتراضية بدلاً منها.',
+  <p class="muted small">{{ L('اختياري: ارفع نغمة لمرحلة معيّنة لتميّز تنبيهاتها. الأفضل ملف WAV قصير (أقل من 30 ثانية) ليعمل على الحاسوب وAndroid وiPhone؛ ملفات MP3 تعمل على الحاسوب وAndroid، وiPhone يستخدم النغمة الافتراضية بدلاً منها.',
     'Optional: give a stage its own tone to tell its alerts apart. Best: a short WAV file (under 30 s) — works on computers, Android and iPhone; MP3 works on computers and Android, iPhone falls back to the default tone.') }}</p>
   <div class="tone-list">
   {% for st in stages %}
@@ -74,7 +74,7 @@
 </div>
 <div class="card">
   <h2>{{ L('تحميل كل البيانات', 'Download all data') }}</h2>
-  <p class="muted small">{{ L('ملف واحد يتضمّن كل البيانات: المراحل والحصص والبرامج والصفوف والشعب والمعلمين والأكواد والنغمات والشعارات والإعدادات. وللنقل إلى جهاز آخر: شغِّل عليه import_render.bat وحدِّد مسار هذا الملف.',
+  <p class="muted small">{{ L('ملف واحد يتضمّن كل البيانات: المراحل والحصص والبرامج والصفوف والشعب والمعلمين والرموز والنغمات والشعارات والإعدادات. وللنقل إلى جهاز آخر: شغِّل عليه import_render.bat وحدِّد مسار هذا الملف.',
     'One file with everything: stages, periods, programs, grades, sections, teachers, codes, tones, logos and settings. To move to another computer run import_render.bat there and give it this file.') }}</p>
   <a class="btn" href="{{ url_for('admin.export_all') }}">{{ L('تحميل bell.db', 'Download bell.db') }}</a>
 </div>

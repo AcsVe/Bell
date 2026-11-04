@@ -33,7 +33,7 @@ window.normText = (v) => String(v || '').toLowerCase()
     <div class="nav-group">{{ L('البرامج والقوائم', 'Programs & lists') }}</div>
     {{ item('admin.programs', ['admin.programs','admin.program_view','admin.programs_assign'], 'fa-clock', 'برامج الجرس', 'Bell programs') }}
     {{ item('admin.teachers', ['admin.teachers','admin.teacher_view'], 'fa-chalkboard-user', 'المعلمون', 'Teachers') }}
-    {{ item('admin.codes', ['admin.codes'], 'fa-key', 'الأكواد', 'Codes') }}
+    {{ item('admin.codes', ['admin.codes'], 'fa-key', 'الرموز', 'Codes') }}
     <div class="nav-group">{{ L('الإدارة', 'Administration') }}</div>
     {{ item('admin.settings', ['admin.settings'], 'fa-music', 'النغمة والأجهزة', 'Tone & devices') }}
     {{ item('admin.system_settings', ['admin.system_settings'], 'fa-gear', 'الإعدادات', 'Settings') }}
@@ -100,6 +100,20 @@ window.normText = (v) => String(v || '').toLowerCase()
   show(fromHash());
 })();
 
+
+// File inputs: a button and the chosen file name in the page language (the browser's own control is English).
+document.querySelectorAll('input[type=file]').forEach((inp) => {
+  if (inp.closest('.file-pick')) return;
+  const wrap = document.createElement('span'); wrap.className = 'file-pick';
+  const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'ghost sm';
+  btn.innerHTML = '<i class="fa-solid fa-paperclip" aria-hidden="true"></i> ' + (inp.multiple ? '{{ L("اختر الملفات", "Choose files") }}' : '{{ L("اختر ملفاً", "Choose a file") }}');
+  const name = document.createElement('span'); name.className = 'file-name'; name.textContent = '{{ L("لم يُختر ملف", "No file chosen") }}';
+  inp.parentNode.insertBefore(wrap, inp); wrap.append(btn, name, inp);
+  btn.addEventListener('click', () => inp.click());
+  inp.addEventListener('change', () => {
+    name.textContent = inp.files.length ? [...inp.files].map((f) => f.name).join('، ') : '{{ L("لم يُختر ملف", "No file chosen") }}';
+  });
+});
 
 // Copy-to-clipboard for any element with data-copy.
 document.addEventListener('click', async (e) => {

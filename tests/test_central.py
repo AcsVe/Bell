@@ -109,7 +109,8 @@ def test_player_api_key_version_and_test_ring(admin, app):
     p = c.post('/api/central/poll', headers=h, json={'host': 'OFFICE-PC'}).get_json()
     assert p['test']['tone'] == 'class-2' and p['test']['url'].endswith('class-2.wav')
     html = admin.get('/admin/central').get_data(as_text=True)
-    assert 'OFFICE-PC' in html and 'جهاز المكتب متصل' in html
+    assert 'متصل ويعمل' in html and 'dev-chip on' in html
+    assert 'OFFICE-PC' not in html                                       # no technical details on the page
     # changing the bell changes the version the player sees
     admin.post('/admin/central/save', data={'volume': '50'})
     assert c.post('/api/central/poll', headers=h, json={}).get_json()['version'] != v
@@ -256,7 +257,7 @@ def test_multiple_bell_devices(admin, app):
     c.post('/api/central/poll', headers={'X-Bell-Key': k1}, json={'host': 'PC-A'})
     c.post('/api/central/poll', headers={'X-Bell-Key': k2}, json={'host': 'PC-B'})
     html = admin.get('/admin/central').get_data(as_text=True)
-    assert 'PC-A' in html and 'PC-B' in html and 'المبنى الأول متصل' in html and 'المبنى الثاني متصل' in html
+    assert html.count('dev-chip on') == 2 and 'المبنى الأول' in html and 'المبنى الثاني' in html and 'PC-A' not in html
     # test ring for building 2 only
     admin.post('/admin/central/test', data={'tone': 'kids-3', 'player': 'p2'})
     assert c.post('/api/central/poll', headers={'X-Bell-Key': k1}, json={}).get_json()['test'] is None
@@ -331,7 +332,7 @@ def test_device_page_and_bluetooth_endpoints(admin, app):
     assert admin.post('/admin/central/players/p1/ble_status', json={'host': 'BELL-ABC123', 'license': 'PERMANENT',
                                                                       'fingerprint': 'ABCDEF0123456789'}).get_json()['ok']
     html = admin.get('/admin/central').get_data(as_text=True)
-    assert 'BELL-ABC123' in html and 'bluetooth' in html and 'central/device' in html
+    assert 'متصل ويعمل' in html and 'central/device' in html and 'BELL-ABC123' not in html
     assert admin.get('/admin/central/players/zz/payload.json').status_code == 404
     assert app.test_client().get('/admin/central/players/p1/payload.json').status_code == 302   # admins only
 

@@ -501,7 +501,7 @@ def section_regen(section_id):
     s.code = generate_code()
     Device.query.filter_by(code_type='section', owner_id=s.id).delete()
     db.session.commit()
-    flash(_msg('تم توليد كود جديد — الأجهزة القديمة ستحتاج الكود الجديد',
+    flash(_msg('تم توليد رمز جديد — الأجهزة القديمة ستحتاج الرمز الجديد',
                'New code generated — old devices will need the new code'), 'ok')
     return redirect(request.referrer or url_for('admin.section_view', section_id=s.id))
 
@@ -570,7 +570,7 @@ def teachers_codes_export(stage_id):
     from teacher_io import build_codes_export
     st = db.get_or_404(Stage, stage_id)
     return send_file(build_codes_export(st), mimetype=XLSX, as_attachment=True,
-                     download_name=_msg(f'أكواد {st.name_ar}.xlsx', f'Codes - {st.name_en or st.name_ar}.xlsx'))
+                     download_name=_msg(f'رموز {st.name_ar}.xlsx', f'Codes - {st.name_en or st.name_ar}.xlsx'))
 
 
 @admin_bp.route('/teachers/import-members', methods=['POST'])
@@ -784,7 +784,7 @@ def teacher_regen(teacher_id):
     t.code = generate_code()
     Device.query.filter_by(code_type='teacher', owner_id=t.id).delete()
     db.session.commit()
-    flash(_msg('تم توليد كود جديد', 'New code generated'), 'ok')
+    flash(_msg('تم توليد رمز جديد', 'New code generated'), 'ok')
     return redirect(request.referrer or url_for('admin.teacher_view', teacher_id=t.id))
 
 
@@ -1093,7 +1093,7 @@ BULK = {
 }
 BULK_DONE = {
     'delete': ('تم حذف {n}', '{n} deleted'), 'unlink': ('تمت إزالة {n}', '{n} removed'), 'deactivate': ('تم إيقاف {n}', '{n} disabled'),
-    'activate': ('تم تفعيل {n}', '{n} enabled'), 'regen': ('تم توليد أكواد جديدة لـ {n}', 'New codes for {n}'),
+    'activate': ('تم تفعيل {n}', '{n} enabled'), 'regen': ('تم توليد رموز جديدة لـ {n}', 'New codes for {n}'),
     'link_stage': ('تم ربط {n} بالمرحلة', '{n} linked to the stage'),
     'unlink_stage': ('تمت إزالة {n} من المرحلة', '{n} removed from the stage'),
 }
@@ -1158,7 +1158,7 @@ def codes_export_all():
     linked = {t.id for st in stages for t in _stage_teachers(st)}
     unlinked = [t for t in Teacher.query.order_by(Teacher.name_ar) if t.id not in linked]
     return send_file(build_codes_export_all(stages, unlinked), mimetype=XLSX, as_attachment=True,
-                     download_name=_msg('أكواد جرس الحصص.xlsx', 'Class bell codes.xlsx'))
+                     download_name=_msg('رموز جرس الحصص.xlsx', 'Class bell codes.xlsx'))
 
 
 # ── Settings: tone + devices ──────────────────────────────────────────────
@@ -1190,7 +1190,20 @@ def settings():
             t = db.session.get(Teacher, d.owner_id)
             owners[d.id] = t.name_ar if t else '—'
     stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
-    return render_template('admin/settings.html', tone=tone, devices=devices, owners=owners, stages=stages)
+    return render_template('admin/settings.html', tone=tone, devices=devices, owners=owners, stages=stages,
+                           amman=_amman, browser=_browser_name)
+
+
+def _browser_name(ua):
+    """A short, plain name for a device's browser line (e.g. «Chrome — Android») instead of the raw text."""
+    ua = ua or ''
+    app = next((n for k, n in (('Edg/', 'Edge'), ('OPR/', 'Opera'), ('SamsungBrowser', 'Samsung Internet'),
+                                ('Firefox/', 'Firefox'), ('Chrome/', 'Chrome'), ('Safari/', 'Safari')) if k in ua), '')
+    os_ = next((n for k, n in (('Android', 'Android'), ('iPhone', 'iPhone'), ('iPad', 'iPad'), ('Windows', 'Windows'),
+                               ('Mac OS', 'Mac'), ('CrOS', 'Chromebook'), ('Linux', 'Linux')) if k in ua), '')
+    if 'BellDesktop' in ua or 'Electron' in ua:
+        app = 'تطبيق الحاسوب'
+    return ' — '.join(x for x in (app, os_) if x) or '—'
 
 
 # ── Settings: identity (names, accent, logo) + Microsoft Graph mail ──────

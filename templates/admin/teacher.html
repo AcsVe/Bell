@@ -10,14 +10,14 @@
   </div>
 </div>
 <div class="card">
-  <h2>{{ L('كود المعلم', 'Teacher code') }}</h2>
+  <h2>{{ L('رمز المعلم', 'Teacher code') }}</h2>
   <p><span class="code copy" data-copy="{{ t.code }}">{{ t.code }}</span>
     <button class="ghost sm" data-copy="{{ t.code }}">{{ L('نسخ', 'Copy') }}</button></p>
-  <p class="muted small">{{ L('كود واحد يغطي كل الشعب أدناه، يُدخله المعلم على هاتفه أو حاسوبه المحمول.', 'One code covering all sections below; the teacher enters it on their phone or laptop.') }}
+  <p class="muted small">{{ L('رمز واحد يغطي كل الشعب أدناه، يُدخله المعلم على هاتفه أو حاسوبه المحمول.', 'One code covering all sections below; the teacher enters it on their phone or laptop.') }}
     {% if devices %}· {{ L('أجهزة مسجلة:', 'Registered devices:') }} {{ devices|length }}{% endif %}</p>
   <form method="post" action="{{ url_for('admin.teacher_regen', teacher_id=t.id) }}" class="inline"
-        data-confirm="{{ L('سيتوقف الكود الحالي عن العمل. متابعة؟', 'The current code will stop working. Continue?') }}">
-    <button class="ghost sm">{{ L('توليد كود جديد', 'Regenerate code') }}</button>
+        data-confirm="{{ L('سيتوقف الرمز الحالي عن العمل. متابعة؟', 'The current code will stop working. Continue?') }}">
+    <button class="ghost sm">{{ L('توليد رمز جديد', 'Regenerate code') }}</button>
   </form>
 </div>
 <nav class="tabbar" data-tabs>
@@ -70,11 +70,11 @@
       <div><label>{{ L('البريد الإلكتروني', 'Email') }}</label><input type="text" name="email" dir="ltr" value="{{ t.email or '' }}"></div>
     </div>
     <div class="row" style="margin-top:10px;align-items:center">
-      <label class="shrink" style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" name="active" {{ 'checked' if t.active }}> {{ L('الكود فعّال', 'Code active') }}</label>
+      <label class="shrink" style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" name="active" {{ 'checked' if t.active }}> {{ L('الرمز فعّال', 'Code active') }}</label>
       <div class="shrink"><button>{{ L('حفظ', 'Save') }}</button></div>
     </div>
   </form>
-  <form method="post" action="{{ url_for('admin.teacher_delete', teacher_id=t.id) }}" style="margin-top:14px" data-confirm="{{ L('حذف المعلم وكوده؟', 'Delete this teacher and their code?') }}">
+  <form method="post" action="{{ url_for('admin.teacher_delete', teacher_id=t.id) }}" style="margin-top:14px" data-confirm="{{ L('حذف المعلم ورمزه؟', 'Delete this teacher and their code?') }}">
     <button class="danger sm">{{ L('حذف المعلم', 'Delete teacher') }}</button>
   </form>
 </div>

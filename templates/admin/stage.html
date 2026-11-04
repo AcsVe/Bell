@@ -214,7 +214,7 @@
 
 <div class="card">
   <h2>{{ L('حذف المرحلة', 'Delete stage') }}</h2>
-<form method="post" action="{{ url_for('admin.stage_delete', stage_id=st.id) }}" data-confirm="{{ L('حذف المرحلة بكل صفوفها وشعبها وأكوادها؟ لا يمكن التراجع.', 'Delete this stage with all grades, sections and codes? This cannot be undone.') }}">
+<form method="post" action="{{ url_for('admin.stage_delete', stage_id=st.id) }}" data-confirm="{{ L('حذف المرحلة بكل صفوفها وشعبها ورموزها؟ لا يمكن التراجع.', 'Delete this stage with all grades, sections and codes? This cannot be undone.') }}">
   <button class="danger">{{ L('حذف المرحلة', 'Delete stage') }}</button>
 </form>
 </div>

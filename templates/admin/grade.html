@@ -12,24 +12,24 @@
   </div>
 </div>
 <nav class="tabbar" data-tabs>
-  <a href="#sections-tab" data-tab="sections-tab">{{ L('الشعب والأكواد', 'Sections & codes') }}<span class="count">{{ g.sections|length }}</span></a>
+  <a href="#sections-tab" data-tab="sections-tab">{{ L('الشعب والرموز', 'Sections & codes') }}<span class="count">{{ g.sections|length }}</span></a>
   <a href="#times-tab" data-tab="times-tab">{{ L('التوقيت', 'Timing') }}</a>
   <a href="#settings-tab" data-tab="settings-tab">{{ L('الإعدادات', 'Settings') }}</a>
 </nav>
 <section class="tabpane" data-pane="sections-tab">
 <div class="card" id="sections">
-  <h2>{{ L('الشعب وأكوادها', 'Sections & codes') }}</h2>
+  <h2>{{ L('الشعب ورموزها', 'Sections & codes') }}</h2>
   <form method="post" action="{{ url_for('admin.section_add', grade_id=g.id) }}" class="row" style="margin-bottom:14px">
-    <div><label>{{ L('أسماء الشعب (افصل بفاصلة) — يُولَّد لكل شعبة كود تلقائياً', 'Section names (comma-separated) — each gets a code automatically') }}</label>
+    <div><label>{{ L('أسماء الشعب (افصل بفاصلة) — يُولَّد لكل شعبة رمز تلقائياً', 'Section names (comma-separated) — each gets a code automatically') }}</label>
       <input type="text" name="names" placeholder="{{ L('أ، ب، ج', 'Arabic: أ، ب، ج') }}" required></div>
     <div><label>{{ L('بالإنجليزية (اختياري، بالترتيب نفسه)', 'In English (optional, same order)') }}</label>
       <input type="text" name="names_en" dir="ltr" placeholder="A, B, C"></div>
     <div class="shrink"><button>{{ L('إضافة', 'Add') }}</button></div>
   </form>
   {% if g.sections %}
-  {{ bulk_bar('sections', [('regen', 'أكواد جديدة', 'New codes', true), ('delete', 'حذف', 'Delete', true)]) }}
+  {{ bulk_bar('sections', [('regen', 'رموز جديدة', 'New codes', true), ('delete', 'حذف', 'Delete', true)]) }}
   <table class="resp">
-    <thead><tr><th class="chk">{{ bulk_all('sections') }}</th><th>{{ L('الشعبة', 'Section') }}</th><th>{{ L('كود الصف', 'Section code') }}</th><th>{{ L('المعلمون', 'Teachers') }}</th><th></th></tr></thead>
+    <thead><tr><th class="chk">{{ bulk_all('sections') }}</th><th>{{ L('الشعبة', 'Section') }}</th><th>{{ L('رمز الصف', 'Section code') }}</th><th>{{ L('المعلمون', 'Teachers') }}</th><th></th></tr></thead>
     <tbody>
     {% for s in g.sections %}
     <tr data-row>
@@ -103,7 +103,7 @@
 </div>
 <div class="card">
   <h2>{{ L('حذف الصف', 'Delete grade') }}</h2>
-<form method="post" action="{{ url_for('admin.grade_delete', grade_id=g.id) }}" data-confirm="{{ L('حذف الصف بكل شعبه وأكوادها؟', 'Delete this grade with all its sections and codes?') }}">
+<form method="post" action="{{ url_for('admin.grade_delete', grade_id=g.id) }}" data-confirm="{{ L('حذف الصف بكل شعبه ورموزها؟', 'Delete this grade with all its sections and codes?') }}">
   <button class="danger">{{ L('حذف الصف', 'Delete grade') }}</button>
 </form>
 </div>

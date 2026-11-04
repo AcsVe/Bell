@@ -1,19 +1,19 @@
 {% extends 'admin/base.html' %}
-{% block title %}{{ L('الأكواد', 'Codes') }}{% endblock %}
+{% block title %}{{ L('الرموز', 'Codes') }}{% endblock %}
 {% block content %}
 <div class="page-head noprint">
-  <h1>{{ L('الأكواد', 'Codes') }}</h1>
+  <h1>{{ L('الرموز', 'Codes') }}</h1>
   <div class="actions">
     <a class="btn" href="{{ url_for('admin.codes_export_all') }}">⬇ {{ L('تصدير Excel', 'Export Excel') }}</a>
     <button type="button" class="ghost" onclick="window.print()">🖨 {{ L('طباعة المعروض', 'Print shown') }}</button>
   </div>
 </div>
-<p class="muted small noprint">{{ L('التصدير: ملف واحد فيه ورقة لكل مرحلة. اضغط أي كود لنسخه. رابط الدخول:', 'Export: one file with a sheet per stage. Tap any code to copy it. Sign-in link:') }}
+<p class="muted small noprint">{{ L('التصدير: ملف واحد فيه ورقة لكل مرحلة. اضغط أي رمز لنسخه. رابط الدخول:', 'Export: one file with a sheet per stage. Tap any code to copy it. Sign-in link:') }}
   <span class="code copy" style="font-size:13px;letter-spacing:0" data-copy="{{ request.host_url }}login">{{ request.host_url }}login</span></p>
 
 <div class="list-tools noprint" style="background:var(--bg)">
   <div class="filters">
-    <div class="search"><input type="search" id="cq" autocomplete="off" placeholder="{{ L('ابحث عن معلم أو شعبة أو كود…', 'Search a teacher, section or code…') }}"></div>
+    <div class="search"><input type="search" id="cq" autocomplete="off" placeholder="{{ L('ابحث عن معلم أو شعبة أو رمز…', 'Search a teacher, section or code…') }}"></div>
     <select id="cstage">
       <option value="">{{ L('كل المراحل', 'All stages') }}</option>
       {% for st in stages %}<option value="st{{ st.id }}">{{ L(st.name_ar, st.name_en or st.name_ar) }}</option>{% endfor %}
@@ -35,7 +35,7 @@
   </div>
   <div class="code-cols">
     <div>
-      <h3>{{ L('أكواد المعلمين', 'Teacher codes') }}</h3>
+      <h3>{{ L('رموز المعلمين', 'Teacher codes') }}</h3>
       <table>
         {% for t in ts %}
         <tr><td>{{ L(t.name_ar, t.name_en or t.name_ar) }}{% if not t.active %} <span class="chip">{{ L('موقوف', 'Disabled') }}</span>{% endif %}</td>
@@ -44,7 +44,7 @@
       </table>
     </div>
     <div>
-      <h3>{{ L('أكواد الصفوف (الشاشات الثابتة)', 'Section codes (fixed screens)') }}</h3>
+      <h3>{{ L('رموز الصفوف (الشاشات الثابتة)', 'Section codes (fixed screens)') }}</h3>
       <table>
         {% for sec in secs %}
         <tr><td>{{ sec.full_name(lang) }}</td><td style="text-align:end"><span class="code copy" data-copy="{{ sec.code }}">{{ sec.code }}</span></td></tr>
@@ -67,7 +67,7 @@
   </table>
 </div>
 {% endif %}
-{% if not stages and not unlinked %}<div class="card muted">{{ L('لا توجد أكواد بعد.', 'No codes yet.') }}</div>{% endif %}
+{% if not stages and not unlinked %}<div class="card muted">{{ L('لا توجد رموز بعد.', 'No codes yet.') }}</div>{% endif %}
 
 <script>
 (function () {

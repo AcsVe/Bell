@@ -21,7 +21,7 @@
   {% if teachers %}
   <div class="list-tools">
   <div class="filters">
-    <div class="search"><input type="search" id="tq" data-autofocus autocomplete="off" placeholder="{{ L('ابحث بالاسم أو البريد أو الكود…', 'Search name, email or code…') }}"></div>
+    <div class="search"><input type="search" id="tq" data-autofocus autocomplete="off" placeholder="{{ L('ابحث بالاسم أو البريد أو الرمز…', 'Search name, email or code…') }}"></div>
     <select id="tstage">
       <option value="">{{ L('كل المعلمين', 'All teachers') }}</option>
       {% for st in stages %}<option value="s{{ st.id }}">{{ L(st.name_ar, st.name_en or st.name_ar) }}</option>{% endfor %}
@@ -35,11 +35,11 @@
       ('unlink_stage', 'إزالة من المرحلة', 'Remove from stage', false),
       ('deactivate', 'إيقاف', 'Disable', false),
       ('activate', 'تفعيل', 'Enable', false),
-      ('regen', 'أكواد جديدة', 'New codes', true),
+      ('regen', 'رموز جديدة', 'New codes', true),
       ('delete', 'حذف', 'Delete', true)]) }}
   </div>
   <table class="resp">
-    <thead><tr><th class="chk">{{ bulk_all('teachers') }}</th><th>{{ L('المعلم', 'Teacher') }}</th><th>{{ L('كود المعلم', 'Teacher code') }}</th><th>{{ L('مرتبط بـ', 'Linked to') }}</th><th></th></tr></thead>
+    <thead><tr><th class="chk">{{ bulk_all('teachers') }}</th><th>{{ L('المعلم', 'Teacher') }}</th><th>{{ L('رمز المعلم', 'Teacher code') }}</th><th>{{ L('مرتبط بـ', 'Linked to') }}</th><th></th></tr></thead>
     <tbody>
     {% for t in (teachers|selectattr('id', 'in', new_ids)|list) + (teachers|rejectattr('id', 'in', new_ids)|list) %}
     {% set tags = [] %}{% for st in t.stages %}{% set _ = tags.append('s' ~ st.id) %}{% endfor %}{% for s in t.sections %}{% set _ = tags.append('s' ~ s.grade.stage_id) %}{% endfor %}
@@ -132,7 +132,7 @@
 <section class="tabpane" data-pane="members">
 <div class="card" id="members-card">
   <h2>{{ L('استيراد قوائم المعلمين من Microsoft 365 (CSV)', 'Import staff lists from Microsoft 365 (CSV)') }}</h2>
-  <p class="hint">{{ L('ارفع ملف أعضاء مجموعة المرحلة (Name, PrimarySmtpAddress). يُنشأ كل معلم بكود ويُربط بالمرحلة كاملة، فيستقبل تنبيهات كل صفوفها. المعلم الموجود في أكثر من مجموعة يُعرَف ببريده ويبقى له كود واحد. الأسماء تُؤخذ من الحساب ويمكن تعريبها لاحقاً من قالب Excel.',
+  <p class="hint">{{ L('ارفع ملف أعضاء مجموعة المرحلة (Name, PrimarySmtpAddress). يُنشأ كل معلم برمز ويُربط بالمرحلة كاملة، فيستقبل تنبيهات كل صفوفها. المعلم الموجود في أكثر من مجموعة يُعرَف ببريده ويبقى له رمز واحد. الأسماء تُؤخذ من الحساب ويمكن تعريبها لاحقاً من قالب Excel.',
     'Upload the stage group’s member export (Name, PrimarySmtpAddress). Each teacher gets a code and is linked to the whole stage, receiving alerts for all its grades. A teacher in several groups is matched by email and keeps one code. Names come from the account and can be changed later via the Excel template.') }}</p>
   <form method="post" action="{{ url_for('admin.teachers_import_members') }}" enctype="multipart/form-data">
     <div class="row">
@@ -173,7 +173,7 @@
 <section class="tabpane" data-pane="import">
 <div class="card">
   <h2>{{ L('استيراد المعلمين حسب المرحلة (Excel)', 'Import teachers by stage (Excel)') }}</h2>
-  <p class="hint">{{ L('حمِّل قالب المرحلة، واكتب أسماء المعلمين، وضع ✓ تحت شعب كل معلم، ثم ارفعه. يُنشأ المعلم الجديد بكوده تلقائياً، والمعلم المشترك بين مراحل يُكتب بنفس الاسم في قالب كل مرحلة فيبقى له كود واحد. ويُحمَّل القالب معبّأً بالمعلمين الحاليين لتعدّله ثم تعيد رفعه.',
+  <p class="hint">{{ L('حمِّل قالب المرحلة، واكتب أسماء المعلمين، وضع ✓ تحت شعب كل معلم، ثم ارفعه. يُنشأ المعلم الجديد برمزه تلقائياً، والمعلم المشترك بين مراحل يُكتب بنفس الاسم في قالب كل مرحلة فيبقى له رمز واحد. ويُحمَّل القالب معبّأً بالمعلمين الحاليين لتعدّله ثم تعيد رفعه.',
     'Download the stage template, enter teacher names and put ✓ under each teacher’s sections, then upload it. New teachers get a code automatically; a teacher shared across stages is written with the same name in each stage template and keeps one code. The template comes pre-filled with current teachers so you can edit and re-upload it.') }}</p>
   {% if stages %}
   <table class="resp">
@@ -185,7 +185,7 @@
         <div class="muted small">{{ st.grades|map(attribute='sections')|map('length')|sum }} {{ L('شعبة', 'sections') }}</div></td>
       <td>
         <a class="btn ghost sm" href="{{ url_for('admin.teachers_template', stage_id=st.id) }}">⬇ {{ L('تحميل القالب', 'Download template') }}</a>
-        <a class="btn ghost sm" href="{{ url_for('admin.teachers_codes_export', stage_id=st.id) }}">⬇ {{ L('الأكواد', 'Codes') }}</a>
+        <a class="btn ghost sm" href="{{ url_for('admin.teachers_codes_export', stage_id=st.id) }}">⬇ {{ L('الرموز', 'Codes') }}</a>
       </td>
       <td>
         <form method="post" action="{{ url_for('admin.teachers_import') }}" enctype="multipart/form-data" class="row" style="align-items:center">

@@ -115,7 +115,7 @@ def test_player_end_to_end(env, monkeypatch):
     assert p.audio.empty()
     # status reached the server
     html = admin.get('/admin/central').get_data(as_text=True)
-    assert 'جهاز المكتب متصل' in html
+    assert 'متصل ويعمل' in html
     # disabling the bell → no slots
     admin.post('/admin/central/save', data={'volume': '60'})
     p.poll()
@@ -175,7 +175,7 @@ def test_server_clock_lan_fallback_and_license(env, monkeypatch):
         central.record_status(pid, st, '127.0.0.1')
         from models import db
         db.session.commit()
-    assert 'الجرس يرنّ بساعة هذا الجهاز' in admin.get('/admin/central').get_data(as_text=True)
+    assert 'الجرس يرنّ بساعة الجهاز' in admin.get('/admin/central').get_data(as_text=True)
     bp.CLOCK['offset'] = 0.3
     assert bp.clock_warning() == ''
     # license reported to the admin page

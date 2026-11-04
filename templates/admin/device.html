@@ -1,18 +1,18 @@
 {% extends 'admin/base.html' %}
-{% block title %}{{ L('جهاز جرس بدون كمبيوتر', 'Bell device (no PC)') }}{% endblock %}
+{% block title %}{{ L('جهاز جرس بدون حاسوب', 'Bell device (no PC)') }}{% endblock %}
 {% block content %}
 <div class="crumbs"><a href="{{ url_for('central.page') }}#player-tab">{{ L('الجرس المركزي', 'Central bell') }}</a></div>
-<div class="page-head"><h1>📟 {{ L('جهاز جرس بدون كمبيوتر (ESP32)', 'Bell device without a PC (ESP32)') }}</h1></div>
-<p class="hint">{{ L('علبة صغيرة موصولة بجهاز الصوت بدلاً من الكمبيوتر: تتصل بالخادم عبر Wi-Fi مثل BellPlayer، أو تُبرمج من هنا عبر Bluetooth في المباني التي لا شبكة فيها. ترنّ من ذاكرتها وساعتها حتى دون إنترنت. القطع وطريقة التوصيل: docs/Bell_Hardware.md.',
+<div class="page-head"><h1>📟 {{ L('جهاز جرس بدون حاسوب (ESP32)', 'Bell device without a PC (ESP32)') }}</h1></div>
+<p class="hint">{{ L('علبة صغيرة موصولة بجهاز الصوت بدلاً من الحاسوب: تتصل بالخادم عبر Wi-Fi مثل BellPlayer، أو تُبرمج من هنا عبر Bluetooth في المباني التي لا شبكة فيها. ترنّ من ذاكرتها وساعتها حتى دون إنترنت. القطع وطريقة التوصيل: docs/Bell_Hardware.md.',
   'A small box connected to the amplifier instead of a PC: it talks to the server over Wi-Fi like BellPlayer, or is programmed from here over Bluetooth where a building has no network. It rings from its own memory and clock, even without internet. Parts and wiring: docs/Bell_Hardware.md.') }}</p>
 
 <div class="card">
   <h2>1) {{ L('تحميل البرنامج على الجهاز (مرة واحدة، بسلك USB)', 'Install the firmware (once, with a USB cable)') }}</h2>
   {% if fw_version %}
-  <p class="small">{{ L('الإصدار المتوفر:', 'Available version:') }} <b dir="ltr">{{ fw_version }}</b> — {{ L('يعمل في متصفح Chrome أو Edge على الكمبيوتر. صِل الجهاز بسلك USB في المنفذ المكتوب عليه USB (لا UART)، ثم اضغط:', 'Works in Chrome or Edge on a computer. Connect the board by its USB port (marked USB, not UART), then press:') }}</p>
+  <p class="small">{{ L('الإصدار المتوفر:', 'Available version:') }} <b dir="ltr">{{ fw_version }}</b> — {{ L('يعمل في متصفح Chrome أو Edge على الحاسوب. صِل الجهاز بسلك USB في المنفذ المكتوب عليه USB (لا UART)، ثم اضغط:', 'Works in Chrome or Edge on a computer. Connect the board by its USB port (marked USB, not UART), then press:') }}</p>
   <esp-web-install-button manifest="{{ url_for('static', filename='firmware/manifest.json') }}">
     <button slot="activate">{{ L('تثبيت / تحديث برنامج الجهاز', 'Install / update the device firmware') }}</button>
-    <span slot="unsupported">{{ L('هذا المتصفح لا يدعم التثبيت عبر USB — استخدم Chrome أو Edge على كمبيوتر.', 'This browser cannot install over USB — use Chrome or Edge on a computer.') }}</span>
+    <span slot="unsupported">{{ L('هذا المتصفح لا يدعم التثبيت عبر USB — استخدم Chrome أو Edge على حاسوب.', 'This browser cannot install over USB — use Chrome or Edge on a computer.') }}</span>
   </esp-web-install-button>
   <p class="muted small">{{ L('عند السؤال عن «Erase device»: اختر نعم في أول تثبيت فقط؛ في التحديث اختر لا لتبقى الإعدادات والترخيص والنغمات.', 'When asked “Erase device”: yes only for the first install; for an update choose no to keep settings, license and tones.') }}</p>
   <script type="module" src="https://unpkg.com/esp-web-tools@10.2.1/dist/web/install-button.js?module"></script>
@@ -23,7 +23,7 @@
 
 <div class="card">
   <h2>2) {{ L('البرمجة عبر Bluetooth', 'Program over Bluetooth') }}</h2>
-  <p class="muted small">{{ L('يعمل في متصفح Chrome على أندرويد، أو على كمبيوتر مزوَّد بـ Bluetooth (لا يعمل على iPhone). اقترب من الجهاز ثم اضغط «اتصال».', 'Works in Chrome on Android or on a computer with Bluetooth (not on iPhone). Stand near the device, then “Connect”.') }}</p>
+  <p class="muted small">{{ L('يعمل في متصفح Chrome على أندرويد، أو على حاسوب مزوَّد بـ Bluetooth (لا يعمل على iPhone). اقترب من الجهاز ثم اضغط «اتصال».', 'Works in Chrome on Android or on a computer with Bluetooth (not on iPhone). Stand near the device, then “Connect”.') }}</p>
   {% if not devices %}<p class="chip" style="background:#fff4e0;color:#8a5a00">{{ L('أضف الجهاز أولاً في تبويب «أجهزة الجرس» ثم عد هنا.', 'Add the device on the “Bell devices” tab first, then come back.') }}</p>{% endif %}
   <div class="row">
     <div><label>{{ L('هذا الجهاز هو', 'This device is') }}</label>

@@ -4,13 +4,13 @@
 {% block head %}<link rel="manifest" href="/manifest.webmanifest">{% endblock %}
 {% block title %}{{ L('دخول الشاشة', 'Screen sign-in') }}{% endblock %}
 {% block card_attrs %}{% if error %} data-error="{{ error }}"{% endif %}{% endblock %}
-{% block heading %}{{ L('أدخل كود الصف أو كود المعلم', 'Enter the section code or teacher code') }}{% endblock %}
+{% block heading %}{{ L('أدخل رمز الصف أو رمز المعلم', 'Enter the section code or teacher code') }}{% endblock %}
 {% block body %}
-{% if error %}<div class="alert danger">{{ L('الكود غير صحيح. تأكد منه وأعد المحاولة.', 'Invalid code. Check it and try again.') }}</div>{% endif %}
+{% if error %}<div class="alert danger">{{ L('الرمز غير صحيح. تأكد منه وأعد المحاولة.', 'Invalid code. Check it and try again.') }}</div>{% endif %}
 <div id="offline" class="alert warning" hidden>{{ L('لا يوجد اتصال بالإنترنت. تسجيل الدخول لأول مرة يحتاج اتصالاً؛ التنبيهات على الأجهزة المسجلة تستمر بدونه.',
   'No internet connection. First sign-in needs a connection; already registered devices keep alerting without it.') }}</div>
 <form method="post" id="f">
-  <div class="field"><label for="code">{{ L('الكود', 'Code') }}</label>
+  <div class="field"><label for="code">{{ L('الرمز', 'Code') }}</label>
     <div class="input-group"><i class="fa-solid fa-key" aria-hidden="true"></i>
       <input type="text" class="code-input" name="code" id="code" maxlength="9" autocomplete="off" autocapitalize="characters"
              spellcheck="false" inputmode="text" placeholder="XXXXXX" dir="ltr" required autofocus></div></div>

@@ -174,6 +174,12 @@ def create_app(test_config=None):
         session.permanent = True
         return redirect(request.args.get('next') or url_for('client.app_page'))
 
+    # Browsers ask for /favicon.ico on their own: answer with the app icon (no 404 in the console).
+    @app.route('/favicon.ico')
+    def favicon():
+        return send_from_directory(os.path.join(app.root_path, 'static', 'icons'), 'icon-192.png', mimetype='image/png',
+                                   max_age=86400)
+
     # Service worker served from the root so its scope covers the whole site.
     @app.route('/sw.js')
     def service_worker():
