@@ -51,10 +51,13 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-VERSION = '1.6'
+VERSION = '1.7'
 DEFAULT_SERVER = 'https://5.iajaward.org'
 POLL_SECONDS = 15
 CATCH_UP_SECONDS = 90         # a ring missed by up to 90 s (PC busy/waking up) still plays; later ones are skipped
+GAP_SECONDS = 60              # the ring loop runs every 0.5 s: a longer jump means Windows slept (lid, power button)
+ALIVE_SAVE_SECONDS = 30       # how often «still running» is written, to name the rings lost while the PC was off
+LID_ACTION = '5ca83367-6e45-459f-a27b-476b1d01c936'      # Power buttons and lid > Lid close action (hidden alias)
 BASE = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
 CACHE = os.path.join(BASE, 'player_cache')
 INI = os.path.join(BASE, 'bell_player.ini')
@@ -331,6 +334,66 @@ def download(server, key, url, dest):
     return dest
 
 
+def fired_file():
+    return os.path.join(CACHE, 'fired.json')
+
+
+def load_fired():
+    """-> (rings already played, last time the player was seen running), kept on disk across restarts."""
+    try:
+        with open(fired_file(), encoding='utf-8') as f:
+            d = json.load(f)
+        alive = datetime.strptime(d['alive'], '%Y-%m-%d %H:%M:%S') if d.get('alive') else None
+        return set(d.get('fired') or []), alive
+    except (OSError, ValueError, KeyError, TypeError):
+        return set(), None
+
+
+def save_fired(fired, alive):
+    try:
+        os.makedirs(CACHE, exist_ok=True)
+        with open(fired_file() + '.part', 'w', encoding='utf-8') as f:
+            json.dump({'fired': sorted(fired), 'alive': alive.strftime('%Y-%m-%d %H:%M:%S')}, f)
+        os.replace(fired_file() + '.part', fired_file())
+    except OSError:
+        pass
+
+
+# ── power: a sleeping PC cannot ring (2026-11-03: the lid was closed twice during the school day) ──
+def keep_awake():
+    """Tell Windows this program needs the PC awake (no idle sleep) for as long as it runs. Call it from the
+    long-lived ring thread: the request belongs to the calling thread."""
+    if not IS_WIN:
+        return False
+    try:
+        import ctypes
+        es_continuous, es_system_required = 0x80000000, 0x00000001
+        return bool(ctypes.windll.kernel32.SetThreadExecutionState(es_continuous | es_system_required))
+    except Exception:   # noqa: BLE001
+        return False
+
+
+def _power_call(cmd):
+    try:
+        return subprocess.run(cmd, capture_output=True, timeout=15,
+                              creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)).returncode == 0
+    except Exception:   # noqa: BLE001
+        return False
+
+
+def power_fix():
+    """Closing the lid and idle sleep must not silence the bell: lid = do nothing (mains and battery), never sleep
+    or hibernate on mains power. Changes this user's current power plan (no admin needed)."""
+    if not IS_WIN:
+        return True
+    cmds = [['powercfg', '/setacvalueindex', 'SCHEME_CURRENT', 'SUB_BUTTONS', LID_ACTION, '0'],
+            ['powercfg', '/setdcvalueindex', 'SCHEME_CURRENT', 'SUB_BUTTONS', LID_ACTION, '0'],
+            ['powercfg', '/change', 'standby-timeout-ac', '0'],
+            ['powercfg', '/change', 'hibernate-timeout-ac', '0'],
+            ['powercfg', '/setactive', 'SCHEME_CURRENT']]
+    return all([_power_call(c) for c in cmds])
+
+
 def load_cached_schedule():
     try:
         with open(os.path.join(CACHE, 'schedule.json'), encoding='utf-8') as f:
@@ -498,6 +561,7 @@ class Player:
         self.lock = threading.Lock()
         self.audio = queue.Queue()
         self.fired = set()
+        self.missed = ''                                 # rings lost while the PC slept / was off (admin page + log)
         self.last_ring = ''
         self.last_test = ''
         self.error = ''
@@ -611,7 +675,7 @@ class Player:
               'last_ring': self.last_ring, 'next_ring': self.next_ring_text(), 'clock_drift': self.clock_drift,
               'cached': self.cached_ok(), 'error': self.error[:300], 'license': self.license_text(),
               'fingerprint': self.fp, 'via': ('internet' if self.server == self.primary else 'school network ') + self.server,
-              'audio': audio_label() + (f' - {BASE}' if inst_tag() else '')}
+              'audio': audio_label() + (f' - {BASE}' if inst_tag() else ''), 'missed': self.missed}
         data, t0, t1 = self.call('POST', '/api/central/poll', st)
         r = json.loads(data.decode('utf-8'))
         self.sync_clock(r, t0, t1)
@@ -676,26 +740,61 @@ class Player:
                 out.append((k, slot))
         return out
 
+    def slots_between(self, a, b):
+        """Keys of the slots whose time is in (a, b] (may cross midnight)."""
+        out, d = [], a.date()
+        while d <= b.date():
+            day = datetime(d.year, d.month, d.day)
+            for slot in self.today_slots(day):
+                h, m = map(int, slot['t'].split(':'))
+                if a < day.replace(hour=h, minute=m) <= b:
+                    out.append(f"{d.strftime('%Y-%m-%d')} {slot['t']}")
+            d += timedelta(days=1)
+        return out
+
+    def report_missed(self, since, now, why):
+        """Name the rings that passed while nothing ran (Windows asleep / PC off): too late to play now."""
+        lost = [k for k in self.slots_between(since - timedelta(seconds=CATCH_UP_SECONDS),
+                                              now - timedelta(seconds=CATCH_UP_SECONDS)) if k not in self.fired]
+        self.fired.update(lost)
+        if lost:
+            today = now.strftime('%Y-%m-%d')
+            self.missed = f"{today} {now.strftime('%H:%M')} ({why}): " + \
+                ', '.join(k[11:] if k.startswith(today) else k for k in lost)
+            log.warning('MISSED %s - this PC was %s from %s to %s. Keep the bell PC switched on, plugged in and its '
+                        'lid open (BellPlayer stops idle sleep by itself, not a closed lid or the power button)',
+                        ', '.join(lost), why, since.strftime('%Y-%m-%d %H:%M:%S'), now.strftime('%H:%M:%S'))
+        return lost
+
     def ring_loop(self):
+        keep_awake()
         day = None
-        # On start-up don't replay a ring that already happened more than a few seconds ago.
+        # What was played, and when this player last ran, is kept on disk: a restart a few seconds after a ring does
+        # not replay it, a ring up to CATCH_UP_SECONDS late still plays, and rings lost while it was off are logged.
         start = amman_now()
-        for slot in self.today_slots(start):
-            h, m = map(int, slot['t'].split(':'))
-            if (start - start.replace(hour=h, minute=m, second=0, microsecond=0)).total_seconds() > 5:
-                self.fired.add(f"{start.strftime('%Y-%m-%d')} {slot['t']}")
+        fired, alive = load_fired()
+        self.fired |= {k for k in fired if k.startswith(start.strftime('%Y-%m-%d'))}
+        if alive and alive < start - timedelta(seconds=GAP_SECONDS):
+            self.report_missed(max(alive, start - timedelta(days=1)), start, 'off or the player was not running')
+        prev, saved = start, 0.0
         while True:
             now = amman_now()
+            if (now - prev).total_seconds() > GAP_SECONDS:
+                self.report_missed(prev, now, 'asleep')
+            prev = now
             if day != now.date():
                 day = now.date()
                 self.fired = {k for k in self.fired if k.startswith(now.strftime('%Y-%m-%d'))}
             with self.lock:
                 due = self.due(now)
                 tones = (self.schedule or {}).get('tones', {})
+            self.fired.update(k for k, _slot in due)
+            if due or time.monotonic() - saved > ALIVE_SAVE_SECONDS:
+                save_fired(self.fired, now)
+                saved = time.monotonic()
             for k, slot in due:
-                self.fired.add(k)
                 if not self.licensed():
-                    log.warning('RING %s skipped — no valid license', k)
+                    log.warning('RING %s skipped - no valid license', k)
                     continue
                 paths = []
                 for r in slot['rings']:
@@ -703,7 +802,7 @@ class Player:
                     if t and os.path.isfile(tone_file(r['tone'], t['url'])):
                         paths.append(tone_file(r['tone'], t['url']))
                     else:
-                        log.error('tone %s is not cached — not played', r['tone'])
+                        log.error('tone %s is not cached - not played', r['tone'])
                 if paths:
                     self.audio.put((paths, k))
                     log.info('RING %s: %s', k, ' + '.join(f"{r['tone']} ({', '.join(r['groups'])})" for r in slot['rings']))
@@ -1167,7 +1266,12 @@ def doctor(force=False):
               + ('' if p.cached_ok() else ' (some tones still downloading)'))
     else:
         print('  [!] no schedule on this computer yet - it arrives as soon as the server is reached')
-    # 5) start-up + running
+    # 5) power: a sleeping PC does not ring
+    if power_fix():
+        print('  [OK] power: closing the lid does nothing, never sleeps on mains power (keep it plugged in)')
+    else:
+        print('  [!] could not change the power settings - set "When I close the lid: Do nothing" and "Sleep: Never" by hand')
+    # 6) start-up + running
     write_tools()
     install_startup()
     time.sleep(3)
