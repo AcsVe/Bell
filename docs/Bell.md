@@ -46,7 +46,7 @@ tests/                              40 اختباراً
 
 - كل تعديل يُدفع إلى `main` ثم على جهاز الخادم: **`update.bat`** (يسحب من GitHub، يثبت المتطلبات، يعيد تشغيل الموقع).
 - تعديل `bell_player/bell_player.py` يبني `BellPlayer.exe` تلقائياً (Workflow: *Office bell player*) وينشره على
-  `https://github.com/AcsVe/Bell/releases/download/apps/BellPlayer.exe`. على جهاز المكتب: حمِّله واستبدل القديم (أوقفه أولاً من مدير المهام).
+  `https://github.com/AcsVe/downloads/releases/download/bell-apps/BellPlayer.exe`. على جهاز المكتب: حمِّله واستبدل القديم (أوقفه أولاً من مدير المهام).
 - التطبيقات تقرأ عنوان الخادم من متغير المستودع **`BELL_SERVER`** (Settings ← Secrets and variables ← Actions ← Variables).
   **يجب تغييره إلى `https://5.iajaward.org`** ثم إعادة بناء Android وDesktop (Actions ← Run workflow).
 
@@ -123,7 +123,7 @@ tests/                              40 اختباراً
 ## 5) التثبيت (مرة واحدة)
 
 ### أ) جهاز الخادم (`C:\Bell`)
-**الطريقة السريعة (جهاز جديد):** حمِّل `https://github.com/AcsVe/Bell/releases/download/apps/install_bell.bat` ← كليك يمين ← Run as administrator. يثبّت Python وGit إن لم يوجدا، ويحمّل النظام إلى `C:\Bell`، ويشغّل الإعداد، ويسترجع آخر نسخة من Drive، ويشغّله مع ويندوز، ثم يفحصه (`bell_check.bat`). شرطان: Google Drive for desktop مسجّل الدخول، ونفق Cloudflare `iajaward` يعمل على هذا الجهاز.
+**الطريقة السريعة (جهاز جديد):** حمِّل `https://github.com/AcsVe/downloads/releases/download/bell-apps/install_bell.bat` ← كليك يمين ← Run as administrator. يثبّت Python وGit إن لم يوجدا، ويحمّل النظام إلى `C:\Bell`، ويشغّل الإعداد، ويسترجع آخر نسخة من Drive، ويشغّله مع ويندوز، ثم يفحصه (`bell_check.bat`). شرطان: Google Drive for desktop مسجّل الدخول، ونفق Cloudflare `iajaward` يعمل على هذا الجهاز.
 
 **الطريقة اليدوية:**
 1. ثبّت Python 3.12 (64-bit، مع «Add to PATH») وGit إن لم يكونا مثبتين (مثبتان أصلاً لـ ATT).

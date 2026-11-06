@@ -74,7 +74,7 @@
 1. ثبّت **Google Drive for desktop** وسجّل الدخول، وتأكد من ظهور مجلد النسخ (مثل `G:\My Drive\RAS-Bell`).
 2. شغّل نفق Cloudflare `iajaward` على هذا الجهاز (بطريقة موقع الجائزة).
 3. حمِّل **`install_bell.bat`**:
-   `https://github.com/AcsVe/Bell/releases/download/apps/install_bell.bat`
+   `https://github.com/AcsVe/downloads/releases/download/bell-apps/install_bell.bat`
 4. كليك يمين ← **Run as administrator**.
 
 ما يفعله تلقائياً:
@@ -140,7 +140,7 @@ bell_check.bat              (كمسؤول — يجب أن تظهر [OK])
 
 ### ب) على كمبيوتر المبنى
 1. حمِّل **`BellPlayer.exe`** (إلى أي مكان، مثل Downloads):
-   `https://github.com/AcsVe/Bell/releases/download/apps/BellPlayer.exe`
+   `https://github.com/AcsVe/downloads/releases/download/bell-apps/BellPlayer.exe`
 2. انقر عليه مرتين. يسأل:
    | السؤال | الإجابة |
    |---|---|
@@ -191,7 +191,7 @@ bell_check.bat              (كمسؤول — يجب أن تظهر [OK])
 
 | المنصة | كيف |
 |---|---|
-| Android / Desktop | من صفحة الإصدارات `https://github.com/AcsVe/Bell/releases/tag/apps` |
+| Android / Desktop | من صفحة الإصدارات `https://github.com/AcsVe/downloads/releases/tag/bell-apps` |
 | المتصفح / شاشة الصف | `https://5.iajaward.org/login` ← كود الشعبة |
 
 - للمدرسة الجديدة بعنوان مختلف: غيّر متغير المستودع `BELL_SERVER` في GitHub ثم أعد بناء التطبيقات، أو اكتب العنوان في «عنوان الخادم» عند الدخول.
