@@ -21,7 +21,7 @@ python app.py            # http://localhost:5000  (SQLite محلي bell.db)
 
 برنامج `BellPlayer.exe` على كمبيوتر المكتب الموصول بالسمّاعات يرنّ ببداية كل حصة واستراحة لكل المدرسة — مستقل عن التطبيقات والأكواد،
 ويعمل أوفلاين من نسخة محفوظة. لكل توقيت (برنامج جرس أو مرحلة) نغمة حصة ونغمة استراحة يختارها المدير من صفحة **الجرس المركزي**.
-التحميل: `https://github.com/AcsVe/Bell/releases/download/apps/BellPlayer.exe`
+التحميل: `https://github.com/AcsVe/downloads/releases/download/bell-apps/BellPlayer.exe`
 
 ## ترتيب الإعداد في لوحة الإدارة
 

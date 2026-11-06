@@ -9,6 +9,6 @@ if exist "%~dp0BellPlayer.exe" (
 where python >nul 2>nul && ( python "%~dp0bell_player.py" --setup & goto :done )
 where py >nul 2>nul && ( py -3 "%~dp0bell_player.py" --setup & goto :done )
 echo   BellPlayer.exe not found next to this file and Python is not installed.
-echo   Download: https://github.com/AcsVe/Bell/releases/download/apps/BellPlayer.exe
+echo   Download: https://github.com/AcsVe/downloads/releases/download/bell-apps/BellPlayer.exe
 :done
 pause
