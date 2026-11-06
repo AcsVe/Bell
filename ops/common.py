@@ -23,6 +23,25 @@ def t(ar, en):
     return _plain(en) if os.name == 'nt' else en
 
 
+class _PlainOut:
+    """على ويندوز: كل ما يُطبع يمر بـ _plain، فلا تظهر الرموز (✓ ✖ ←) مربعات في نافذة الأوامر."""
+
+    def __init__(self, stream):
+        self._stream = stream
+
+    def write(self, text):
+        return self._stream.write(_plain(text) if isinstance(text, str) else text)
+
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
+
+
+if EN and os.name == 'nt':
+    for _name in ('stdout', 'stderr'):
+        if getattr(sys, _name, None) is not None and not isinstance(getattr(sys, _name), _PlainOut):
+            setattr(sys, _name, _PlainOut(getattr(sys, _name)))
+
+
 def load_env():
     """يقرأ .env (لا يستبدل متغيراً موجوداً مسبقاً). الافتراضي: قاعدة SQLite في مجلد data داخل المشروع
     (خارج الكود — لا يلمسها update.bat)."""
