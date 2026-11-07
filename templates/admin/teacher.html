@@ -66,7 +66,7 @@
   <form method="post" action="{{ url_for('admin.teacher_update', teacher_id=t.id) }}">
     <div class="row">
       <div><label>{{ L('الاسم بالعربية', 'Arabic name') }}</label><input type="text" name="name_ar" value="{{ t.name_ar }}" required></div>
-      <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input type="text" name="name_en" value="{{ t.name_en or '' }}"></div>
+      <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input lang="en" type="text" name="name_en" value="{{ t.name_en or '' }}"></div>
       <div><label>{{ L('البريد الإلكتروني', 'Email') }}</label><input type="text" name="email" dir="ltr" value="{{ t.email or '' }}"></div>
     </div>
     <div class="row" style="margin-top:10px;align-items:center">

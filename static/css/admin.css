@@ -410,3 +410,13 @@ tr.selected td{background:#eef5ff}
 .file-pick input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .file-pick .file-name{color:var(--muted);overflow-wrap:anywhere}
 @media (max-width:700px){.tabbar{flex-wrap:nowrap;overflow-x:auto}}
+
+/* ── فحص المظهر: لا خط أصغر من 13px، وتباين 4.5 على الأقل (tests/ui_audit.py) ───────────── */
+.nav-group{font-size:.82rem;color:rgba(255,255,255,.82)}
+.side-brand .sys{font-size:.84rem;color:rgba(255,255,255,.86)}
+.brand-sub,.auth-card .brand-sub{font-size:.88rem}
+.auth-foot{font-size:.86rem;color:#fff}
+.lang-switch{font-size:.86rem}
+.auth-lang .lang-switch{font-size:.84rem}
+.pt span{font-size:13px}
+a.chip{color:var(--primary-dark,#0847B0)}

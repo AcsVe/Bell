@@ -30,9 +30,9 @@
   <h2>{{ L('الصفوف', 'Grades') }}</h2>
   <form method="post" action="{{ url_for('admin.grade_add', stage_id=st.id) }}" class="row" style="margin-bottom:14px">
     <div><label>{{ L('أسماء الصفوف (افصل بفاصلة لإضافة عدة صفوف)', 'Grade names (comma-separate to add several)') }}</label>
-      <input type="text" name="names" placeholder="{{ L('الصف الأول، الصف الثاني، الصف الثالث', 'Arabic: الصف الأول، الصف الثاني') }}" required></div>
+      <input lang="ar" type="text" name="names" placeholder="{{ L('الصف الأول، الصف الثاني، الصف الثالث', 'Arabic: الصف الأول، الصف الثاني') }}" required></div>
     <div><label>{{ L('بالإنجليزية (اختياري، بالترتيب نفسه)', 'In English (optional, same order)') }}</label>
-      <input type="text" name="names_en" dir="ltr" placeholder="Grade 1, Grade 2, Grade 3"></div>
+      <input lang="en" type="text" name="names_en" dir="ltr" placeholder="Grade 1, Grade 2, Grade 3"></div>
     <div class="shrink"><button>{{ L('إضافة', 'Add') }}</button></div>
   </form>
   {% if st.grades %}
@@ -70,7 +70,7 @@
         <td>{{ loop.index }}</td>
         <td><select name="p{{ p.id }}_kind"><option value="class" {{ 'selected' if p.kind=='class' }}>{{ L('حصة', 'Class') }}</option><option value="break" {{ 'selected' if p.kind=='break' }}>{{ L('استراحة', 'Break') }}</option></select></td>
         <td><input type="text" name="p{{ p.id }}_label_ar" value="{{ p.label_ar }}"></td>
-        <td><input type="text" name="p{{ p.id }}_label_en" value="{{ p.label_en or '' }}"></td>
+        <td><input lang="en" type="text" name="p{{ p.id }}_label_en" value="{{ p.label_en or '' }}"></td>
         <td style="width:110px"><input type="number" min="1" max="240" name="p{{ p.id }}_duration" value="{{ p.duration }}"></td>
         <td class="small" dir="ltr">{{ p.start_time }} – {{ p.end_time }}</td>
         <td><button class="danger sm" form="del-p{{ p.id }}">✕</button></td>
@@ -146,7 +146,7 @@
   <form method="post" action="{{ url_for('admin.stage_update', stage_id=st.id) }}">
     <div class="row">
       <div><label>{{ L('الاسم بالعربية', 'Arabic name') }}</label><input type="text" name="name_ar" value="{{ st.name_ar }}" required></div>
-      <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input type="text" name="name_en" value="{{ st.name_en or '' }}"></div>
+      <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input lang="en" type="text" name="name_en" value="{{ st.name_en or '' }}"></div>
       <div class="shrink" style="width:110px"><label>{{ L('الترتيب', 'Order') }}</label><input type="number" name="sort_order" value="{{ st.sort_order }}"></div>
     </div>
     <label style="margin-top:12px">{{ L('أيام الدوام', 'School days') }}</label>

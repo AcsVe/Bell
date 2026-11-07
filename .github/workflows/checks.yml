@@ -1,0 +1,39 @@
+# الفحص الآلي مع كل رفع: ترجمة كل ملفات Python، ثم الاختبارات، ثم فحص المظهر واللغة في متصفح حقيقي (التباين مع شفافية
+# الآباء، والخط الصغير، واتجاه النص والتاريخ، والنص غير المترجم، ونصوص الإرشاد التي تشبه الكود أو بلغة غير مقبولة)
+# بالعربية والإنجليزية على الحاسوب والهاتف. يُشغَّل على Python 3.10 لأن كمبيوتر المدرسة أقدم من 3.12؛
+# وإن فشل وصل إشعار بالبريد إلى صاحب المستودع.
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      E2E_CHANNEL: chromium
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: pip
+      - name: Compile
+        run: python -m compileall -q -x '(\.git|venv|\.venv|bell_player|firmware|android|desktop)' .
+      - name: Install
+        run: |
+          pip install -r requirements.txt pytest playwright
+          python -m playwright install --with-deps chromium
+      - name: Tests
+        run: python -m pytest -q tests/ -k "not e2e"
+      - name: UI audit
+        run: python tests/ui_audit.py

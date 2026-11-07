@@ -218,7 +218,7 @@ bash ~/bell/standby/phone.sh configure
 - لا تلمس `app.py` بحيث يعود لـ Postgres: `ops/common.py` يفرض SQLite عند التشغيل على الجهاز.
 - جدول الرنين يُحسب من `resolve_grade_day` / `resolve_stage_day` في `services.py` — نفس ما تستخدمه التطبيقات، فلا يوجد جدول ثانٍ للصيانة.
 - أي تغيير على شكل `player_payload()` يجب أن يبقى متوافقاً مع `bell_player.py` المثبت (الأجهزة لا تتحدث تلقائياً).
-- الاختبارات: `python -m pytest -q tests` (44 اختباراً، منها محاكاة كاملة لجهاز المكتب مع خادم حقيقي: `tests/test_player.py`) + `tests/e2e_browser.py` (Chrome).
+- الاختبارات: `python -m pytest -q tests` (44 اختباراً، منها محاكاة كاملة لجهاز المكتب مع خادم حقيقي: `tests/test_player.py`) + `tests/e2e_browser.py` (Chrome) + فحص المظهر واللغة `tests/ui_audit.py` (كل صفحات الإدارة وصفحة المعلم، بواجهة عربية وإنجليزية وبيانات عربية وإنجليزية، على الحاسوب والهاتف؛ 0 ملاحظات، ويُشغَّل آلياً مع كل رفع).
 - برنامج ESP32 يُبنى في GitHub فقط (`bell_device.yml`)؛ أخطاء الترجمة تظهر كـ annotations في الـ run.
 - سجلات GitHub Actions لا تُقرأ من الجلسة (محجوبة) — استخدم annotations (`::error::`) لقراءة الأخطاء.
 - رموز الوصول (Cloudflare، GitHub) لا تُكتب في المحادثات ولا في المستودع — `.env` فقط.

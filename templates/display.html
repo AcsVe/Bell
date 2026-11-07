@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#12305e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<title>جرس الحصص · Class bell</title>
+<title>{{ 'Class bell' if lang == 'en' else 'جرس الحصص' }}</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/static/icons/icon-192.png">
 <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
@@ -27,7 +27,7 @@
   </div>
   <div class="tools">
     <span id="status" class="status"><i></i><span></span></span>
-    <button id="menuBtn" class="icon" aria-label="menu">⋯</button>
+    <button id="menuBtn" class="icon" aria-label="{{ 'Menu' if lang == 'en' else 'القائمة' }}">⋯</button>
   </div>
 </header>
 

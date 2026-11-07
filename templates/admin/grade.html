@@ -21,9 +21,9 @@
   <h2>{{ L('الشعب ورموزها', 'Sections & codes') }}</h2>
   <form method="post" action="{{ url_for('admin.section_add', grade_id=g.id) }}" class="row" style="margin-bottom:14px">
     <div><label>{{ L('أسماء الشعب (افصل بفاصلة) — يُولَّد لكل شعبة رمز تلقائياً', 'Section names (comma-separated) — each gets a code automatically') }}</label>
-      <input type="text" name="names" placeholder="{{ L('أ، ب، ج', 'Arabic: أ، ب، ج') }}" required></div>
+      <input lang="ar" type="text" name="names" placeholder="{{ L('أ، ب، ج', 'Arabic: أ، ب، ج') }}" required></div>
     <div><label>{{ L('بالإنجليزية (اختياري، بالترتيب نفسه)', 'In English (optional, same order)') }}</label>
-      <input type="text" name="names_en" dir="ltr" placeholder="A, B, C"></div>
+      <input lang="en" type="text" name="names_en" dir="ltr" placeholder="A, B, C"></div>
     <div class="shrink"><button>{{ L('إضافة', 'Add') }}</button></div>
   </form>
   {% if g.sections %}
@@ -96,7 +96,7 @@
 <div class="card">
   <form method="post" action="{{ url_for('admin.grade_update', grade_id=g.id) }}" class="row">
     <div><label>{{ L('الاسم بالعربية', 'Arabic name') }}</label><input type="text" name="name_ar" value="{{ g.name_ar }}" required></div>
-    <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input type="text" name="name_en" value="{{ g.name_en or '' }}"></div>
+    <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input lang="en" type="text" name="name_en" value="{{ g.name_en or '' }}"></div>
     <div class="shrink" style="width:110px"><label>{{ L('الترتيب', 'Order') }}</label><input type="number" name="sort_order" value="{{ g.sort_order }}"></div>
     <div class="shrink"><button>{{ L('حفظ', 'Save') }}</button></div>
   </form>
