@@ -192,7 +192,7 @@ def test_export_all_then_import(tmp_path):
     c.post('/admin/login', data={'username': 'admin', 'password': 'admin'})
     _seed(c, a)
     c.post('/admin/teachers/add', data={'names': 'منى\nسارة'})
-    assert 'تحميل bell.db' in c.get('/admin/settings').get_data(as_text=True)
+    assert 'تحميل قاعدة البيانات' in c.get('/admin/settings').get_data(as_text=True)
     r = c.get('/admin/export/all')
     assert r.status_code == 200 and 'bell-export-' in r.headers['Content-Disposition']
     f = tmp_path / 'export.db'

@@ -84,9 +84,9 @@
     <h2>{{ L('برنامج جديد', 'New program') }}</h2>
     <form method="post" action="{{ url_for('admin.program_add') }}">
       <label>{{ L('الاسم', 'Name') }}</label>
-      <input type="text" name="name" placeholder="{{ L('الصفوف 3+4 — الثلاثاء', 'الصفوف 3+4 — الثلاثاء (Arabic name)') }}" required>
+      <input lang="ar" type="text" name="name" placeholder="{{ L('الصفوف 3+4 — الثلاثاء', 'الصفوف 3+4 — الثلاثاء (Arabic name)') }}" required>
       <label style="margin-top:8px">{{ L('الاسم بالإنجليزية (اختياري)', 'English name (optional)') }}</label>
-      <input type="text" name="name_en" dir="ltr" placeholder="Grades 3+4 — Tuesday">
+      <input lang="en" type="text" name="name_en" dir="ltr" placeholder="Grades 3+4 — Tuesday">
       <label style="margin-top:8px">{{ L('نسخ من (اختياري)', 'Copy from (optional)') }}</label>
       <select name="copy_from"><option value="">—</option>{% for p in progs %}<option value="{{ p.id }}">{{ L(p.name, p.title_en) }}</option>{% endfor %}</select>
       <button style="margin-top:10px">{{ L('إنشاء', 'Create') }}</button>

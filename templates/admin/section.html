@@ -65,7 +65,7 @@
   <h2>{{ L('تعديل الشعبة', 'Edit section') }}</h2>
   <form method="post" action="{{ url_for('admin.section_update', section_id=s.id) }}" class="row">
     <div><label>{{ L('الاسم بالعربية', 'Arabic name') }}</label><input type="text" name="name_ar" value="{{ s.name_ar }}" required></div>
-    <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input type="text" name="name_en" value="{{ s.name_en or '' }}"></div>
+    <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input lang="en" type="text" name="name_en" value="{{ s.name_en or '' }}"></div>
     <div class="shrink" style="width:110px"><label>{{ L('الترتيب', 'Order') }}</label><input type="number" name="sort_order" value="{{ s.sort_order }}"></div>
     <div class="shrink"><button>{{ L('حفظ', 'Save') }}</button></div>
   </form>

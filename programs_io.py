@@ -120,7 +120,9 @@ def export_programs():
 def import_programs(fileobj):
     """Returns a summary; raises ValueError (nothing saved) on any error."""
     try:
-        wb = load_workbook(fileobj, data_only=True)
+        # الملف المرفوع يُقرأ إلى الذاكرة أولاً: في Python 3.10 لا يقبل zipfile الملف المؤقت الذي يحفظ فيه Flask الرفع
+        # (SpooledTemporaryFile بلا seekable)، فيظهر «الملف ليس ملف Excel صالحاً» لملف سليم
+        wb = load_workbook(io.BytesIO(fileobj.read()) if hasattr(fileobj, 'read') else fileobj, data_only=True)
     except Exception:
         raise Bi('الملف ليس ملف Excel صالحاً (xlsx).', 'This is not a valid Excel file (xlsx).')
     if PROG_SHEET not in wb.sheetnames:

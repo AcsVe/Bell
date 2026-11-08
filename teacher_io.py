@@ -154,7 +154,9 @@ def import_template(stage, fileobj, sync=True):
     """Create/update teachers and their section links for one stage.
     Returns a summary dict; raises ValueError for a file that isn't a valid template."""
     try:
-        wb = load_workbook(fileobj, data_only=True)
+        # الملف المرفوع يُقرأ إلى الذاكرة أولاً: في Python 3.10 لا يقبل zipfile الملف المؤقت الذي يحفظ فيه Flask الرفع
+        # (SpooledTemporaryFile بلا seekable)، فيظهر «الملف ليس ملف Excel صالحاً» لملف سليم
+        wb = load_workbook(io.BytesIO(fileobj.read()) if hasattr(fileobj, 'read') else fileobj, data_only=True)
     except Exception:
         raise Bi('الملف ليس ملف Excel صالحاً (xlsx).', 'This is not a valid Excel file (xlsx).')
     ws = wb[SHEET] if SHEET in wb.sheetnames else wb.worksheets[0]

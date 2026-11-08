@@ -13,6 +13,6 @@
   {% endwith %}
   {% block body %}{% endblock %}
 </div></div>
-<footer class="auth-foot">© {{ now_year }} <b>{{ org_name or L('جرس الحصص', 'School Bell') }}</b></footer>
+<footer class="auth-foot">© {{ now_year }} <b><bdi>{{ org_name or L('جرس الحصص', 'School Bell') }}</bdi></b></footer>
 {% block scripts %}{% endblock %}
 </body></html>

@@ -10,7 +10,8 @@
 | المجلد على كمبيوتر المدرسة | `C:\Bell` |
 | التقنية | Flask + Waitress (`serve.py`) + تطبيقات Android/Desktop + `bell_player/` (BellPlayer.exe) + `firmware/bell_device` (ESP32) — تُبنى في Actions |
 | القاعدة | SQLite `data\bell.db` |
-| الاختبار | `python -m pytest -q tests/ -k "not e2e"` |
+| الاختبار | `python -m pytest -q tests/ -k "not e2e"`، ثم فحص المظهر واللغة `python tests/ui_audit.py` (0 ملاحظات؛ البيانات من `tests/audit_server.py`): واجهة عربية/إنجليزية × بيانات عربية/إنجليزية × حاسوب/هاتف — التباين مع شفافية الآباء، والخط الأصغر من 13px، واتجاه النص والتاريخ، والنص غير المترجم، ولغة نصوص الإرشاد (placeholder وtitle وalt): نص يشبه الكود أو كلمة عامية أو دخيلة أو بغير لغة الواجهة؛ حقل الاسم بالإنجليزية يحمل `lang="en"` وبالعربية `lang="ar"` |
+| الفحص الآلي | `.github/workflows/checks.yml` مع كل رفع إلى `main`: ترجمة الملفات على Python 3.10 والاختبارات وفحص المظهر؛ الفشل يصل بريداً |
 | الأدلة | `docs/Bell.md`، `docs/Bell_Deploy.md`، `docs/Bell_Hardware.md` |
 
 - ترحيل القاعدة: كود داخلي عند الإقلاع. إعدادات الجرس المركزي في `app_settings` (JSON).

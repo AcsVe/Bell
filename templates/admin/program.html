@@ -18,7 +18,7 @@
   <form method="post" action="{{ url_for('admin.program_save', program_id=prog.id) }}">
     <div class="row" style="margin-bottom:10px">
       <div><label>{{ L('اسم البرنامج', 'Program name') }}</label><input type="text" name="name" value="{{ prog.name }}" required></div>
-      <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input type="text" name="name_en" value="{{ prog.name_en or '' }}" dir="ltr" placeholder="{{ prog.title_en if prog.title_en != prog.name else 'Grades 3+4 — Tuesday' }}"></div>
+      <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input lang="en" type="text" name="name_en" value="{{ prog.name_en or '' }}" dir="ltr" placeholder="{{ prog.title_en if prog.title_en != prog.name else 'Grades 3+4 — Tuesday' }}"></div>
       <div class="shrink" style="width:150px"><label>{{ L('بداية الدوام', 'Day starts at') }}</label><input type="time" name="day_start" value="{{ prog.day_start }}" required></div>
     </div>
     {% if prog.periods %}
@@ -30,7 +30,7 @@
         <span class="num">{{ '☕' if p.kind == 'break' else ns.i }}</span>
         <span class="tm" dir="ltr">{{ p.start_time }} – {{ p.end_time }}</span>
         <span class="lab"><input type="text" name="p{{ p.id }}_label_ar" value="{{ p.label_ar }}" aria-label="{{ L('التسمية', 'Label') }}"></span>
-        <span class="en"><input type="text" name="p{{ p.id }}_label_en" value="{{ p.label_en or '' }}" placeholder="English" aria-label="English"></span>
+        <span class="en"><input lang="en" type="text" name="p{{ p.id }}_label_en" value="{{ p.label_en or '' }}" placeholder="English" aria-label="{{ L('التسمية بالإنجليزية', 'English label') }}"></span>
         <span class="kind"><select name="p{{ p.id }}_kind"><option value="class" {{ 'selected' if p.kind=='class' }}>{{ L('حصة', 'Class') }}</option><option value="break" {{ 'selected' if p.kind=='break' }}>{{ L('فرصة', 'Break') }}</option></select></span>
         <span class="dur"><input type="number" min="1" max="240" name="p{{ p.id }}_duration" value="{{ p.duration }}" aria-label="{{ L('المدة', 'Minutes') }}"><span class="muted small">{{ L('د', 'm') }}</span></span>
         <span class="del"><button class="danger sm" form="del-p{{ p.id }}" title="{{ L('حذف', 'Delete') }}">✕</button></span>
