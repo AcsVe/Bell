@@ -187,7 +187,7 @@ try:
                     if os.environ.get('SHOTS'):
                         page.screenshot(path=os.path.join(OUT, f"{vp_name}-{u.strip('/').replace('/', '_')[:40] or 'root'}.jpg"),
                                         type='jpeg', quality=40)
-                page.goto(BASE + f'/lang/{lang}')
+                page.goto(BASE + f'/lang/{lang}?next=/admin/login', wait_until='networkidle')   # لا تُفتح صفحة المعلم قبل الدخول
                 for u in PUBLIC:
                     visit(u)
                 # صفحة المعلم بعد الدخول برمز الشعبة
