@@ -112,6 +112,13 @@ def create_app(test_config=None):
     from page_shield import install as _shield
     _shield(app)
 
+    # اشتراك نسخة العميل المستضافة (LICENSE_UNTIL في .env) والنسخة الكاملة من البيانات /license/export — license_gate.py
+    # (بعد حماية الصفحات حتى يُضاف تنبيه الاشتراك قبل التشفير)
+    from flask import session as _session
+    from license_gate import install as _license
+    _license(app, is_admin=lambda: bool(_session.get('admin_logged_in')), system_name='Bell',
+             allow_paths=('/admin/login', '/admin/logout'), login_path='/admin/login', sqlalchemy_db=db)
+
     @app.after_request
     def _firmware_no_cache(resp):
         # the device firmware changes with each build: never serve a stale manifest or .bin from the browser cache
