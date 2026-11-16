@@ -17,8 +17,11 @@ for ext in ('', '-wal', '-shm'):
         os.remove(db_path + ext)
 os.environ.update(DATABASE_URL='sqlite:///' + db_path.replace('\\', '/'), DATA_DIR=DATA, SECRET_KEY='audit-secret',
                   ADMIN_USER='admin', ADMIN_PASS='audit-pass-123')
-for k in ('MS_TENANT_ID', 'MS_CLIENT_ID', 'MS_CLIENT_SECRET', 'MS_SENDER_EMAIL', 'RENDER', 'SECURE_COOKIES'):
+for k in ('MS_TENANT_ID', 'MS_CLIENT_ID', 'MS_CLIENT_SECRET', 'MS_SENDER_EMAIL', 'RENDER', 'SECURE_COOKIES', 'LICENSE_FILE', 'LICENSE_ID'):
     os.environ.pop(k, None)
+# اشتراك قريب الانتهاء: يظهر تنبيه الاشتراك في كل صفحة إدارة فيشمله فحص المظهر واللغة
+from datetime import date, timedelta  # noqa: E402
+os.environ.update(LICENSE_UNTIL=(date.today() + timedelta(days=10)).isoformat(), LICENSE_CONTACT='0790000000')
 sys.path.insert(0, ROOT)
 os.chdir(ROOT)
 

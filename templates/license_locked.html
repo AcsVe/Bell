@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="{{ lang }}" dir="{{ 'ltr' if lang == 'en' else 'rtl' }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{{ 'Subscription ended' if lang == 'en' else 'انتهى الاشتراك' }}</title>
+<style>
+  :root { --ink:#0f172a; --muted:#475569; --line:#e2e8f0; --bg:#f4f7fb; --a:#b42318; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:Tajawal, system-ui, Tahoma, sans-serif; background:var(--bg); color:var(--ink); min-height:100vh;
+         display:grid; place-items:center; padding:20px; }
+  .box { background:#fff; border:1px solid var(--line); border-radius:18px; box-shadow:0 10px 30px rgb(15 23 42 / .08);
+         padding:34px 28px; max-width:520px; width:100%; text-align:center; }
+  .ic { width:64px; height:64px; border-radius:50%; background:#fee2e2; color:var(--a); display:grid; place-items:center;
+        font-size:2rem; margin:0 auto 14px; }
+  h1 { font-size:1.4rem; font-weight:800; margin-bottom:10px; }
+  p { color:var(--muted); line-height:1.8; font-size:1rem; }
+  .contact { margin-top:14px; font-weight:800; font-size:1.1rem; color:var(--ink); }
+  .sw { display:inline-block; margin-top:20px; font-size:.9rem; color:var(--muted); }
+</style>
+</head>
+<body>
+  <main class="box" role="main">
+    <div class="ic" aria-hidden="true">&#9203;</div>
+    <h1>{{ 'The subscription for this system has ended' if lang == 'en' else 'انتهى اشتراك هذا النظام' }}</h1>
+    <p>{{ 'Contact the service provider to renew it. Nothing of your data is deleted; the system returns as soon as the subscription is renewed.' if lang == 'en'
+          else 'تواصل مع مزوّد الخدمة لتجديده. لا يُحذف شيء من بياناتكم، ويعود النظام فور تجديد الاشتراك.' }}</p>
+    {% if lic.contact %}<p class="contact"><bdi>{{ lic.contact }}</bdi></p>{% endif %}
+    <a class="sw" href="?lang={{ 'ar' if lang == 'en' else 'en' }}" lang="{{ 'ar' if lang == 'en' else 'en' }}">{{ 'العربية' if lang == 'en' else 'English' }}</a>
+  </main>
+</body>
+</html>

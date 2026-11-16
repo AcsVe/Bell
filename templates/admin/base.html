@@ -59,6 +59,15 @@ window.normText = (v) => String(v || '').toLowerCase()
   </header>
   {% endif %}
   <main>
+    {% if lic.state in ('warn', 'grace') %}
+    <div class="flash error license-alert" role="status">
+      <i class="fa-solid fa-hourglass-half" aria-hidden="true"></i>
+      {{ L('ينتهي اشتراك هذا النظام في', 'The subscription for this system ends on') if lic.state == 'warn' else L('انتهى اشتراك هذا النظام، وسيتوقف في', 'The subscription for this system has ended; the system will be paused on') }}
+      <span dir="ltr">{{ lic.until if lic.state == 'warn' else lic.lock_from }}</span>.
+      {{ L('تواصل مع مزوّد الخدمة لتجديده.', 'Contact the service provider to renew it.') }}
+      {% if lic.contact %}<bdi>{{ lic.contact }}</bdi>{% endif %}
+    </div>
+    {% endif %}
     {% with msgs = get_flashed_messages(with_categories=true) %}
       {% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}
     {% endwith %}
