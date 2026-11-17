@@ -22,15 +22,15 @@
     bar.setAttribute('data-update-notice', '1');
     bar.dir = document.documentElement.dir || (en ? 'ltr' : 'rtl');
     var st = bar.style;
-    st.position = 'fixed'; st.left = '16px'; st.right = '16px'; st.bottom = '16px'; st.margin = '0 auto'; st.maxWidth = '640px';
+    st.position = 'fixed'; st.left = '16px'; st.right = '16px'; st.top = '14px'; st.margin = '0 auto'; st.maxWidth = '640px';
     st.zIndex = '2147483000'; st.display = 'flex'; st.flexWrap = 'wrap'; st.alignItems = 'center'; st.gap = '10px 14px';
-    st.padding = '12px 16px'; st.borderRadius = '12px'; st.background = '#0f172a'; st.color = '#ffffff';
+    st.padding = '12px 16px'; st.borderRadius = '12px'; st.background = '#0C67EC'; st.color = '#ffffff';
     st.fontSize = '14px'; st.lineHeight = '1.6'; st.boxShadow = '0 10px 30px rgba(0,0,0,.35)';
     var msg = document.createElement('span');
     msg.textContent = T.msg; msg.style.flex = '1 1 240px';
     var go = document.createElement('button');
     go.type = 'button'; go.textContent = T.now;
-    go.style.cssText = 'border:0;border-radius:8px;padding:6px 14px;background:#fff;color:#0f172a;font:inherit;font-weight:700;cursor:pointer';
+    go.style.cssText = 'border:0;border-radius:8px;padding:6px 14px;background:#fff;color:#0C67EC;font:inherit;font-weight:700;cursor:pointer';
     go.addEventListener('click', function () { location.reload(); });
     var x = document.createElement('button');
     x.type = 'button'; x.textContent = '×'; x.setAttribute('aria-label', T.close);
