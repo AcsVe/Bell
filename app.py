@@ -117,6 +117,8 @@ def create_app(test_config=None):
     from license import install as _license
     from brand_icon import install as _favicon
     _favicon(app)
+    from app_version import install as _app_version
+    _app_version(app, os.path.dirname(os.path.abspath(__file__)))     # تنبيه الإدارة بصدور تحديث
     from brand_icon import url as _custom_icon
     _license(app, open_endpoints={'brand_favicon', 'admin.login', 'admin.logout', 'set_lang', 'healthz', 'favicon', 'manifest',
                                   'service_worker', 'media'},
