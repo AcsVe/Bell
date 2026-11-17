@@ -4,6 +4,7 @@
 {% include 'admin/_head.html' %}
 <title>{% block title %}{{ L('لوحة الإدارة', 'Admin') }}{% endblock %} · {{ L('جرس الحصص', 'School Bell') }}</title>
 <script src="{{ asset('js/table.js') }}" defer></script>
+<script src="{{ asset('js/update-notice.js') }}" data-version="{{ app_version }}" data-url="/api/app-version" defer></script>
 <script>
 // Arabic-aware search text (used by page scripts): أ/إ/آ→ا, ة→ه, ى→ي, no diacritics or bidi marks.
 window.normText = (v) => String(v || '').toLowerCase()
