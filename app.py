@@ -117,6 +117,7 @@ def create_app(test_config=None):
     from license import install as _license
     from brand_icon import install as _favicon
     _favicon(app)
+    from brand_icon import url as _custom_icon
     _license(app, open_endpoints={'brand_favicon', 'admin.login', 'admin.logout', 'set_lang', 'healthz', 'favicon', 'manifest',
                                   'service_worker', 'media'},
              open_prefixes=('/api/', '/media/'))
@@ -172,7 +173,7 @@ def create_app(test_config=None):
         org = (org_en or org_ar) if lang == 'en' else (org_ar or org_en)
         return {'org_name': org,
                 'accent': accent if _re.fullmatch(r'#[0-9A-Fa-f]{6}', accent or '') else '#0C67EC',
-                'brand_logo_url': logo.url if logo else url_for('static', filename='brand/system.svg'),
+                'brand_logo_url': logo.url if logo else (_custom_icon() or url_for('static', filename='brand/system.svg')),
                 'brand_is_icon': not logo,
                 'now_year': datetime.now().year,
                 'admin_name': app.config.get('ADMIN_USER') or 'admin'}
