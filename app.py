@@ -115,7 +115,9 @@ def create_app(test_config=None):
     # اشتراك النسخة المستضافة (ملف الاشتراكات المشترك أو LICENSE_UNTIL في .env) — license.py.
     # بعد الإيقاف تبقى مفتوحة واجهات الأجهزة والتطبيقات (/api و/media) فلا يتوقف الجرس الفعلي في المدرسة.
     from license import install as _license
-    _license(app, open_endpoints={'admin.login', 'admin.logout', 'set_lang', 'healthz', 'favicon', 'manifest',
+    from brand_icon import install as _favicon
+    _favicon(app)
+    _license(app, open_endpoints={'brand_favicon', 'admin.login', 'admin.logout', 'set_lang', 'healthz', 'favicon', 'manifest',
                                   'service_worker', 'media'},
              open_prefixes=('/api/', '/media/'))
 

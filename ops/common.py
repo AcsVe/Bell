@@ -5,7 +5,7 @@ import sys
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Windows command windows cannot show Arabic (boxes), so the PC uses English; the phone (Termux) stays Arabic.
 # Force either with IAJ_LANG=ar / IAJ_LANG=en.
-_LANG = os.environ.get('IAJ_LANG') or os.environ.get('LANG_UI') or ('en' if os.name == 'nt' else 'ar')
+_LANG = os.environ.get('IAJ_LANG') or os.environ.get('LANG_UI') or ('ar' if os.environ.get('TERMUX_VERSION') else 'en')
 EN = _LANG == 'en'
 _ASCII = {'✓': '[OK]', '✅': '[OK]', '✖': '[X]', '❌': '[X]', '⚠': '[!]', '←': '<-', '→': '->', '★': '*', '•': '-',
           '🟢': '[OK]', '🔴': '[X]', '✋': '[!]', '…': '...', '—': '-', '–': '-', '«': '"', '»': '"'}
