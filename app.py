@@ -112,6 +112,13 @@ def create_app(test_config=None):
     from page_shield import install as _shield
     _shield(app)
 
+    # اشتراك النسخة المستضافة (ملف الاشتراكات المشترك أو LICENSE_UNTIL في .env) — license.py.
+    # بعد الإيقاف تبقى مفتوحة واجهات الأجهزة والتطبيقات (/api و/media) فلا يتوقف الجرس الفعلي في المدرسة.
+    from license import install as _license
+    _license(app, open_endpoints={'admin.login', 'admin.logout', 'set_lang', 'healthz', 'favicon', 'manifest',
+                                  'service_worker', 'media'},
+             open_prefixes=('/api/', '/media/'))
+
     @app.after_request
     def _firmware_no_cache(resp):
         # the device firmware changes with each build: never serve a stale manifest or .bin from the browser cache

@@ -16,7 +16,8 @@ concurrency:
 
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    # مثبّتة على 24.04: ubuntu-latest صارت 26.04 ولا يدعمها Playwright (تفشل خطوة تثبيت المتصفح)
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
       E2E_CHANNEL: chromium
