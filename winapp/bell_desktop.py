@@ -1,7 +1,7 @@
 """نسخة سطح المكتب من نظام جرس الحصص: برنامج واحد يعمل على كمبيوتر ويندوز دون خادم ولا إنترنت.
 
 يجمع في برنامج واحد:
-• النظام نفسه (لوحة الإدارة والجداول والبريد وأجهزة الشبكة المحلية والتطبيقات) بخادم Waitress على http://localhost:8005
+• النظام نفسه (لوحة الإدارة والجداول والبريد وأجهزة الشبكة المحلية والتطبيقات) بخادم Waitress على http://localhost:18005 (منفذ مختلف عن نظام الجرس الأصلي 8005، فيعملان على الكمبيوتر نفسه دون تعارض)
 • مشغّل الصوت (bell_player/bell_player.py نفسه) يرنّ الجرس على سماعات هذا الكمبيوتر حتى لو انقطعت الشبكة.
 • الترخيص: مفتاح موقّع (ECDSA P-256) مرتبط ببصمة الكمبيوتر، يُدخل من صفحة «الترخيص» في لوحة الإدارة؛ ومن دونه
   لا يرنّ الجرس (وتبقى لوحة الإدارة والبيانات مفتوحة). بصمة هذا الكمبيوتر هي نفسها بصمة BellPlayer.
@@ -71,7 +71,7 @@ def answering(port):
     """هل يعمل النظام على هذا المنفذ (نسخة سابقة من البرنامج)؟"""
     try:
         with urllib.request.urlopen(f'http://127.0.0.1:{port}/admin/login', timeout=2) as r:
-            return r.headers.get('Server', '').startswith('BELL')
+            return r.headers.get('Server', '').startswith('BELL-DESKTOP')      # لا نخلط بينه وبين نظام الجرس الأصلي (ident=BELL)
     except Exception:   # noqa: BLE001
         return False
 
@@ -280,7 +280,7 @@ def selftest():
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog='BellDesktop', description='IAJ Bell (desktop edition)')
-    ap.add_argument('--port', type=int, default=int(os.environ.get('BELL_DESKTOP_PORT') or 8005))
+    ap.add_argument('--port', type=int, default=int(os.environ.get('BELL_DESKTOP_PORT') or 18005))
     ap.add_argument('--local-only', action='store_true', help='do not accept connections from other devices on the network')
     ap.add_argument('--no-browser', action='store_true')
     ap.add_argument('--background', action='store_true', help='Windows start-up: no browser, no message boxes')
@@ -382,7 +382,7 @@ def main(argv=None):
         threading.Timer(1.5, lambda: webbrowser.open(url)).start()
     from waitress import serve
     log.info('BELL desktop on %s (data: %s)', url, root)
-    serve(app, host=host, port=port, threads=8, max_request_body_size=64 * 1024 ** 2, channel_timeout=300, ident='BELL')
+    serve(app, host=host, port=port, threads=8, max_request_body_size=64 * 1024 ** 2, channel_timeout=300, ident='BELL-DESKTOP')
     return 0
 
 
