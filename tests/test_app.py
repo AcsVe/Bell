@@ -1029,7 +1029,7 @@ def test_graph_status_and_test_mail(app):
         assert EmailLog.query.filter_by(status='failed').count() == 1
     c.get('/lang/en')
     h = c.get('/admin/system').get_data(as_text=True)
-    assert 'Send a test email' in h and 'Not ready' in h and 'Email log' in h
+    assert 'Send a test email' in h and 'Not ready' in h and 'Email Log' in h
 
 
 def test_bidi_fix_leaves_device_keys_intact():

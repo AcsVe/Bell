@@ -10,9 +10,9 @@
 </div>
 <nav class="tabbar" data-tabs>
   <a href="#list" data-tab="list">{{ L('القائمة', 'List') }}<span class="count">{{ teachers|length }}</span></a>
-  <a href="#add" data-tab="add">{{ L('إضافة يدوية', 'Add manually') }}</a>
+  <a href="#add" data-tab="add">{{ L('إضافة يدوية', 'Add Manually') }}</a>
   <a href="#members" data-tab="members">{{ L('من Microsoft 365', 'From Microsoft 365') }}</a>
-  <a href="#import" data-tab="import">{{ L('قالب Excel لكل مرحلة', 'Excel template per stage') }}</a>
+  <a href="#import" data-tab="import">{{ L('قالب Excel لكل مرحلة', 'Excel Template per Stage') }}</a>
 </nav>
 
 <section class="tabpane" data-pane="list">
@@ -85,7 +85,7 @@
 
 <section class="tabpane" data-pane="add">
 <div class="card">
-  <h2>{{ L('إضافة معلمين', 'Add teachers') }}</h2>
+  <h2>{{ L('إضافة معلمين', 'Add Teachers') }}</h2>
   <form method="post" action="{{ url_for('admin.teacher_add') }}">
     <label for="addNames">{{ L('معلم في كل سطر: الاسم، ويمكن كتابة البريد بعده. يمكنك لصق قائمة كاملة.', 'One teacher per line: the name, optionally followed by the email. You can paste a whole list.') }}</label>
     <textarea name="names" id="addNames" data-autofocus required rows="6" placeholder="{{ L('منى الخطيب  muna.khatib@ras.edu.jo&#10;رامي عودة', 'Muna Al-Khatib  muna.khatib@ras.edu.jo&#10;Rami Odeh') }}"></textarea>
@@ -131,7 +131,7 @@
 
 <section class="tabpane" data-pane="members">
 <div class="card" id="members-card">
-  <h2>{{ L('استيراد قوائم المعلمين من Microsoft 365 (CSV)', 'Import staff lists from Microsoft 365 (CSV)') }}</h2>
+  <h2>{{ L('استيراد قوائم المعلمين من Microsoft 365 (CSV)', 'Import Staff Lists from Microsoft 365 (CSV)') }}</h2>
   <p class="hint">{{ L('ارفع ملف أعضاء مجموعة المرحلة (Name, PrimarySmtpAddress). يُنشأ كل معلم برمز ويُربط بالمرحلة كاملة، فيستقبل تنبيهات كل صفوفها. المعلم الموجود في أكثر من مجموعة يُعرَف ببريده ويبقى له رمز واحد. الأسماء تُؤخذ من الحساب ويمكن تعريبها لاحقاً من قالب Excel.',
     'Upload the stage group’s member export (Name, PrimarySmtpAddress). Each teacher gets a code and is linked to the whole stage, receiving alerts for all its grades. A teacher in several groups is matched by email and keeps one code. Names come from the account and can be changed later via the Excel template.') }}</p>
   <form method="post" action="{{ url_for('admin.teachers_import_members') }}" enctype="multipart/form-data">
@@ -172,7 +172,7 @@
 
 <section class="tabpane" data-pane="import">
 <div class="card">
-  <h2>{{ L('استيراد المعلمين حسب المرحلة (Excel)', 'Import teachers by stage (Excel)') }}</h2>
+  <h2>{{ L('استيراد المعلمين حسب المرحلة (Excel)', 'Import Teachers by Stage (Excel)') }}</h2>
   <p class="hint">{{ L('حمِّل قالب المرحلة، واكتب أسماء المعلمين، وضع ✓ تحت شعب كل معلم، ثم ارفعه. يُنشأ المعلم الجديد برمزه تلقائياً، والمعلم المشترك بين مراحل يُكتب بنفس الاسم في قالب كل مرحلة فيبقى له رمز واحد. ويُحمَّل القالب معبّأً بالمعلمين الحاليين لتعدّله ثم تعيد رفعه.',
     'Download the stage template, enter teacher names and put ✓ under each teacher’s sections, then upload it. New teachers get a code automatically; a teacher shared across stages is written with the same name in each stage template and keeps one code. The template comes pre-filled with current teachers so you can edit and re-upload it.') }}</p>
   {% if stages %}

@@ -29,14 +29,14 @@ window.normText = (v) => String(v || '').toLowerCase()
   </a>
   <nav class="side-nav">
     <div class="nav-group">{{ L('الجرس اليومي', 'Daily bell') }}</div>
-    {{ item('admin.dashboard', ['admin.dashboard','admin.stage_view','admin.grade_view','admin.section_view'], 'fa-house', 'المراحل والصفوف', 'Stages & grades') }}
-    {{ item('central.page', ['central.page','central.device_page'], 'fa-bullhorn', 'الجرس المركزي', 'Central bell') }}
+    {{ item('admin.dashboard', ['admin.dashboard','admin.stage_view','admin.grade_view','admin.section_view'], 'fa-house', 'المراحل والصفوف', 'Stages & Grades') }}
+    {{ item('central.page', ['central.page','central.device_page'], 'fa-bullhorn', 'الجرس المركزي', 'Central Bell') }}
     <div class="nav-group">{{ L('البرامج والقوائم', 'Programs & lists') }}</div>
-    {{ item('admin.programs', ['admin.programs','admin.program_view','admin.programs_assign'], 'fa-clock', 'برامج الجرس', 'Bell programs') }}
+    {{ item('admin.programs', ['admin.programs','admin.program_view','admin.programs_assign'], 'fa-clock', 'برامج الجرس', 'Bell Programs') }}
     {{ item('admin.teachers', ['admin.teachers','admin.teacher_view'], 'fa-chalkboard-user', 'المعلمون', 'Teachers') }}
     {{ item('admin.codes', ['admin.codes'], 'fa-key', 'الرموز', 'Codes') }}
     <div class="nav-group">{{ L('الإدارة', 'Administration') }}</div>
-    {{ item('admin.settings', ['admin.settings'], 'fa-music', 'النغمات والأجهزة', 'Tones & devices') }}
+    {{ item('admin.settings', ['admin.settings'], 'fa-music', 'النغمات والأجهزة', 'Tones & Devices') }}
     {{ item('admin.system_settings', ['admin.system_settings'], 'fa-gear', 'الإعدادات', 'Settings') }}
     {% if desktop_edition %}{{ item('desktop.page', ['desktop.page'], 'fa-certificate', 'الترخيص', 'License') }}{% endif %}
   </nav>

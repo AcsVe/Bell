@@ -1,9 +1,9 @@
 {% extends 'admin/base.html' %}
 {% block title %}{{ L('الترخيص', 'License') }}{% endblock %}
 {% block content %}
-<div class="page-head"><h1>{{ L('ترخيص جرس الحصص', 'School bell license') }}</h1></div>
+<div class="page-head"><h1>{{ L('ترخيص جرس الحصص', 'School Bell License') }}</h1></div>
 <div class="card">
-  <h2><i class="fa-solid fa-certificate" aria-hidden="true"></i> {{ L('حالة الترخيص', 'License status') }}</h2>
+  <h2><i class="fa-solid fa-certificate" aria-hidden="true"></i> {{ L('حالة الترخيص', 'License Status') }}</h2>
   {% if lic.ok %}
     <p><span class="badge ok">{{ L('مرخّص', 'Licensed') }}</span>
       {% if lic.exp == 'PERMANENT' %}{{ L('ترخيص دائم لهذا الكمبيوتر.', 'Permanent license for this computer.') }}
@@ -19,7 +19,7 @@
       'Send this fingerprint to the service provider to get your license key. The key is for this computer only, and a BellPlayer key issued for the same computer works here too.') }}</p>
 </div>
 <form method="post" action="{{ url_for('desktop.save') }}" class="card">
-  <h2><i class="fa-solid fa-key" aria-hidden="true"></i> {{ L('إدخال المفتاح أو تجديده', 'Enter or renew the key') }}</h2>
+  <h2><i class="fa-solid fa-key" aria-hidden="true"></i> {{ L('إدخال المفتاح أو تجديده', 'Enter or Renew the Key') }}</h2>
   <label for="key">{{ L('مفتاح الترخيص', 'License key') }}</label>
   <input type="text" id="key" name="key" dir="ltr" autocomplete="off" spellcheck="false" required>
   <button type="submit"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> {{ L('حفظ المفتاح', 'Save the key') }}</button>

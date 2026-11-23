@@ -1,7 +1,7 @@
 {% extends 'auth/_layout.html' %}
 {% from 'auth/_fields.html' import field with context %}
-{% block title %}{{ L('تسجيل الدخول', 'Sign in') }}{% endblock %}
-{% block heading %}{{ L('دخول المسؤول', 'Admin sign in') }}{% endblock %}
+{% block title %}{{ L('تسجيل الدخول', 'Sign In') }}{% endblock %}
+{% block heading %}{{ L('دخول المسؤول', 'Admin Sign In') }}{% endblock %}
 {% block body %}
 {% if error %}<div class="alert danger">{{ error }}</div>{% endif %}
 <form method="post">

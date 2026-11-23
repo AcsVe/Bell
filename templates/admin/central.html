@@ -1,8 +1,8 @@
 {% extends 'admin/base.html' %}
-{% block title %}{{ L('الجرس المركزي', 'Central bell') }}{% endblock %}
+{% block title %}{{ L('الجرس المركزي', 'Central Bell') }}{% endblock %}
 {% block content %}
 <div class="page-head">
-  <h1><i class="fa-solid fa-bullhorn" aria-hidden="true"></i> {{ L('الجرس المركزي (السمّاعات)', 'Central bell (speakers)') }}</h1>
+  <h1><i class="fa-solid fa-bullhorn" aria-hidden="true"></i> {{ L('الجرس المركزي (السمّاعات)', 'Central Bell (Speakers)') }}</h1>
   <div class="actions dev-chips">
     {% for d in devices %}
     <a class="dev-chip {{ 'on' if d.st.online else ('off' if d.st.seen else 'new') }}" href="#dev-{{ d.id }}" data-open-device="{{ d.id }}"
@@ -14,12 +14,12 @@
   'A school-wide bell through the office speakers, independent of the apps and the teacher codes. It rings at the start of every period and every break; each timing (bell program or stage) has two tones — period and break — so students recognise their bell. The office player keeps the schedule and tones and rings even without internet or with the server down.') }}</p>
 
 <nav class="tabbar" data-tabs>
-  <a href="#ring-tab" data-tab="ring-tab"><i class="fa-solid fa-bell" aria-hidden="true"></i> {{ L('النغمات لكل توقيت', 'Tones per timing') }}<span class="count">{{ groups|length }}</span></a>
-  <a href="#off-tab" data-tab="off-tab"><i class="fa-solid fa-calendar-xmark" aria-hidden="true"></i> {{ L('روزنامة إيقاف الجرس', 'Days without the bell') }}<span class="count">{{ off_events|length }}</span></a>
-  <a href="#custom-tab" data-tab="custom-tab"><i class="fa-solid fa-clock" aria-hidden="true"></i> {{ L('رنّات حسب الوقت', 'Rings at set times') }}<span class="count">{{ custom|length }}</span></a>
-  <a href="#today-tab" data-tab="today-tab"><i class="fa-solid fa-calendar-week" aria-hidden="true"></i> {{ L('اليوم والأسبوع', 'Today & week') }}</a>
-  <a href="#tones-tab" data-tab="tones-tab"><i class="fa-solid fa-music" aria-hidden="true"></i> {{ L('مكتبة النغمات والتجربة', 'Tone library & test') }}</a>
-  <a href="#player-tab" data-tab="player-tab"><i class="fa-solid fa-desktop" aria-hidden="true"></i> {{ L('أجهزة الجرس', 'Bell devices') }}<span class="count">{{ devices|length }}</span></a>
+  <a href="#ring-tab" data-tab="ring-tab"><i class="fa-solid fa-bell" aria-hidden="true"></i> {{ L('النغمات لكل توقيت', 'Tones per Timing') }}<span class="count">{{ groups|length }}</span></a>
+  <a href="#off-tab" data-tab="off-tab"><i class="fa-solid fa-calendar-xmark" aria-hidden="true"></i> {{ L('روزنامة إيقاف الجرس', 'Days Without the Bell') }}<span class="count">{{ off_events|length }}</span></a>
+  <a href="#custom-tab" data-tab="custom-tab"><i class="fa-solid fa-clock" aria-hidden="true"></i> {{ L('رنّات حسب الوقت', 'Rings at Set Times') }}<span class="count">{{ custom|length }}</span></a>
+  <a href="#today-tab" data-tab="today-tab"><i class="fa-solid fa-calendar-week" aria-hidden="true"></i> {{ L('اليوم والأسبوع', 'Today & Week') }}</a>
+  <a href="#tones-tab" data-tab="tones-tab"><i class="fa-solid fa-music" aria-hidden="true"></i> {{ L('مكتبة النغمات والتجربة', 'Tone Library & Test') }}</a>
+  <a href="#player-tab" data-tab="player-tab"><i class="fa-solid fa-desktop" aria-hidden="true"></i> {{ L('أجهزة الجرس', 'Bell Devices') }}<span class="count">{{ devices|length }}</span></a>
 </nav>
 
 <section class="tabpane" data-pane="ring-tab">
@@ -227,7 +227,7 @@
   {% else %}<p class="muted">{{ L('لا رنين اليوم.', 'No rings today.') }}</p>{% endif %}
 </div>
 <div class="card">
-  <h2>{{ L('الأسبوع', 'The week') }}</h2>
+  <h2>{{ L('الأسبوع', 'The Week') }}</h2>
   {% for wd in week_order %}{% if week[wd] %}
   <details><summary><b>{{ wd_names[wd] }}</b> — {{ week[wd]|length }} {{ L('رنين', 'rings') }}</summary>
     <div class="ptimes" style="margin:8px 0">{% for s in week[wd] %}<span class="pt {{ 'break' if s.rings[0].kind == 'break' }}"><b dir="ltr">{{ s.t }}</b><span>{% for r in s.rings %}{{ tone_name(r.tone) }}{{ ' + ' if not loop.last }}{% endfor %}</span></span>{% endfor %}</div>
@@ -238,7 +238,7 @@
 
 <section class="tabpane" data-pane="tones-tab">
 <div class="card">
-  <h2>{{ L('تجربة على السمّاعات', 'Test on the speakers') }}</h2>
+  <h2>{{ L('تجربة على السمّاعات', 'Test on the Speakers') }}</h2>
   <form method="post" action="{{ url_for('central.test') }}" class="row">
     <div><select name="tone">{% for k, name, url in lib %}<option value="{{ k }}">{{ name }}</option>{% endfor %}</select></div>
     <div class="shrink"><button>{{ L('رنّ الآن', 'Ring now') }}</button></div>
@@ -256,7 +256,7 @@
   </form>
 </div>
 <div class="card">
-  <h2>{{ L('مكتبة النغمات', 'Tone library') }}</h2>
+  <h2>{{ L('مكتبة النغمات', 'Tone Library') }}</h2>
   <div class="tone-list">
   {% for k, name, url in lib %}
     <div class="tone-row" style="grid-template-columns:minmax(160px,1fr) minmax(220px,1.4fr) auto">
@@ -365,7 +365,7 @@
   </form>
 </div>
 <div class="card">
-  <h2>{{ L('تثبيت جهاز جرس (الحاسوب الموصول بالسمّاعات)', 'Install a bell device (the computer connected to the speakers)') }}</h2>
+  <h2>{{ L('تثبيت جهاز جرس (الحاسوب الموصول بالسمّاعات)', 'Install a Bell Device (The Computer Connected to the Speakers)') }}</h2>
   <ol style="line-height:2">
     <li>{{ L('أضف الجهاز أعلاه وانسخ مفتاحه.', 'Add the device above and copy its key.') }}</li>
     <li>{{ L('حمِّل', 'Download') }} <a href="https://github.com/AcsVe/downloads/releases/download/bell-apps/BellPlayer.exe"><b>{{ L('برنامج الجرس', 'the bell program') }}</b></a> {{ L('على ذلك الحاسوب وافتحه، ثم أدخل عنوان الخادم', 'on that computer and open it, then enter the server address') }} <code dir="ltr">{{ server_url }}</code> {{ L('ومفتاح الجهاز والترخيص. يعمل بعدها تلقائياً مع كل تشغيل للحاسوب.', 'the device key and the licence. It then starts by itself with the computer.') }}</li>
