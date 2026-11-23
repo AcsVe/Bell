@@ -1,0 +1,14 @@
+{% extends 'auth/_layout.html' %}
+{% from 'auth/_fields.html' import field with context %}
+{% block title %}{{ L('اختيار كلمة المرور', 'Choose a password') }}{% endblock %}
+{% block heading %}{{ L('مرحباً! اختر كلمة مرور للمسؤول', 'Welcome! Choose the administrator password') }}{% endblock %}
+{% block body %}
+<p class="lead">{{ L('هذه الخطوة تظهر مرة واحدة. اسم المستخدم دائماً admin، واكتب كلمة مرور تحفظها (8 أحرف على الأقل).',
+  'This step appears once. The username is always admin; type a password you will remember (at least 8 characters).') }}</p>
+{% if error %}<div class="alert danger">{{ error }}</div>{% endif %}
+<form method="post">
+  {{ field('password', L('كلمة المرور', 'Password'), 'fa-lock', type='password', autocomplete='new-password', autofocus=True) }}
+  {{ field('again', L('أعد كتابتها', 'Type it again'), 'fa-lock', type='password', autocomplete='new-password') }}
+  <button class="btn" type="submit"><i class="fa-solid fa-check" aria-hidden="true"></i> {{ L('حفظ ومتابعة', 'Save and continue') }}</button>
+</form>
+{% endblock %}

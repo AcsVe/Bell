@@ -7,12 +7,12 @@
   لا يرنّ الجرس (وتبقى لوحة الإدارة والبيانات مفتوحة). بصمة هذا الكمبيوتر هي نفسها بصمة BellPlayer.
 
 البيانات في %LOCALAPPDATA%\\IAJ Bell (القاعدة والنسخ والسجل ومفتاح المشغّل)؛ لا يمسّها التحديث ولا إلغاء التثبيت.
-أول تشغيل: يُنشأ حساب المدير admin بكلمة مرور عشوائية تظهر في نافذة وتُحفظ في «first-sign-in.txt».
+أول تشغيل: تطلب صفحة الدخول من المستخدم اختيار كلمة مرور للمدير admin (مرة واحدة، من هذا الكمبيوتر فقط).
 نصوص نوافذ الأوامر بالإنجليزية لأن نافذة الأوامر في ويندوز لا تعرض العربية سليمة.
 
     BellDesktop.exe                 يشغّل النظام ويفتح لوحة الإدارة (إن كان يعمل يفتح اللوحة فقط)
     BellDesktop.exe --background    كما في بدء ويندوز: بلا نافذة ولا متصفح
-    BellDesktopTools.exe --fingerprint | --license KEY | --audio | --set-password | --stop | --selftest
+    BellDesktopTools.exe --fingerprint | --license KEY | --audio | --set-password | --reset-password | --stop | --selftest
 """
 import argparse
 import getpass
@@ -101,7 +101,7 @@ def write_password(root, pw):
 
 
 def prepare(root, lan, port):
-    """متغيرات البيئة قبل استيراد النظام: مسارات البيانات، والعنوان المحلي، وكلمة مرور المدير. → (كلمة المرور الجديدة أو None)."""
+    """متغيرات البيئة قبل استيراد النظام: مسارات البيانات، والعنوان المحلي، وكلمة مرور المدير. → True إن لم تُختر كلمة مرور بعد (تُختار عند أول زيارة للوحة الإدارة)."""
     data = os.path.join(root, 'data')
     os.makedirs(data, exist_ok=True)
     os.makedirs(os.path.join(root, 'logs'), exist_ok=True)
@@ -117,21 +117,12 @@ def prepare(root, lan, port):
     os.environ.pop('SECURE_COOKIES', None)
     os.environ['BELL_EDITION'] = 'desktop'
     os.environ['ADMIN_USER'] = 'admin'
-    first = None
     pw = read_password(root)
-    if not pw:
-        pw = first = secrets.token_urlsafe(9)
-        write_password(root, pw)
-        with open(os.path.join(root, 'first-sign-in.txt'), 'w', encoding='utf-8') as fh:
-            fh.write('IAJ Bell - first sign-in\n'
-                     f'Address : http://localhost:{port}\n'
-                     'Username: admin\n'
-                     f'Password: {pw}\n\n'
-                     'The bell does not ring until you enter a license key: Admin panel > License.\n'
-                     'To change the password: BellDesktopTools.exe --set-password, then delete this file.\n'
-                     'لا يرنّ الجرس حتى تُدخل مفتاح الترخيص: لوحة الإدارة ثم «الترخيص».\n')
+    needs_setup = not pw
+    if needs_setup:
+        pw = secrets.token_urlsafe(24)      # عشوائية في الذاكرة فقط حتى يختار المستخدم كلمة (صفحة /admin/setup)
     os.environ['ADMIN_PASS'] = pw
-    return first
+    return needs_setup
 
 
 def setup_logging(root):
@@ -241,7 +232,8 @@ def selftest():
     os.environ['BELL_DESKTOP_HOME'] = tempfile.mkdtemp(prefix='bell-selftest-')
     root = data_root()
     os.environ['PAGE_SHIELD'] = '0'            # الصفحات المشفّرة لا تُقرأ في الفحص
-    first = prepare(root, False, 0)
+    needs = prepare(root, False, 0)
+    assert needs, 'a fresh install must ask for a password'
     app = load_system()
     bp = load_player(root)
     key = provision_player(app, root)
@@ -249,10 +241,14 @@ def selftest():
     bp.save_ini('http://127.0.0.1:1', key)
     app.config['BELL_PLAYER'] = bp
     app.config['BELL_FP'] = 'SELFTEST00000000'
+    app.config['BELL_NEEDS_SETUP'] = True
+    app.config['BELL_SAVE_PASSWORD'] = lambda pw: write_password(root, pw)
     c = app.test_client()
-    assert c.get('/admin/login').status_code == 200, 'login page'
-    r = c.post('/admin/login', data={'username': 'admin', 'password': first})
-    assert r.status_code == 302, 'sign-in failed'
+    r = c.get('/admin/login')
+    assert r.status_code == 302 and r.headers['Location'].endswith('/admin/setup'), 'first visit must ask for a password'
+    assert c.get('/admin/setup').status_code == 200, 'password page'
+    r = c.post('/admin/setup', data={'password': 'selftest-pass-1', 'again': 'selftest-pass-1'})
+    assert r.status_code == 302 and read_password(root) == 'selftest-pass-1', 'the password was not saved'
     assert c.get('/admin/').status_code == 200, 'dashboard'
     page = c.get('/admin/license')
     assert page.status_code == 200 and b'SELFTEST00000000' in page.data, 'license page'
@@ -291,6 +287,7 @@ def main(argv=None):
     ap.add_argument('--license', metavar='KEY')
     ap.add_argument('--audio', action='store_true')
     ap.add_argument('--set-password', action='store_true')
+    ap.add_argument('--reset-password', action='store_true', help='forget the administrator password; the next start asks for a new one')
     args = ap.parse_args(argv)
     if args.selftest:
         return selftest()
@@ -318,6 +315,16 @@ def main(argv=None):
             bp.AUDIO['device'] = bp.load_ini().get('audio') or ''
             bp.choose_audio()
         return 0
+    if args.reset_password:
+        stop_running(root)
+        for name in ('admin.pass', 'first-sign-in.txt'):
+            try:
+                os.remove(os.path.join(root, name))
+            except OSError:
+                pass
+        say('The password was cleared. Start the program and choose a new one.')
+        alert(APP_TITLE, 'The password was cleared. Start the program and choose a new one.')
+        return 0
     if args.set_password:
         pw = getpass.getpass('New password (at least 8 characters, hidden while typing): ')
         if len(pw) < 8 or pw != getpass.getpass('Type it again: '):
@@ -340,7 +347,7 @@ def main(argv=None):
     while not port_free(port, host) and port < args.port + 20:
         port += 1
     url = f'http://localhost:{port}/{page}'
-    first = prepare(root, lan, port)
+    needs_setup = prepare(root, lan, port)
     log = setup_logging(root)
 
     say('=' * 62)
@@ -350,6 +357,8 @@ def main(argv=None):
     try:
         app = load_system()
         bp = load_player(root)
+        app.config['BELL_NEEDS_SETUP'] = needs_setup
+        app.config['BELL_SAVE_PASSWORD'] = lambda pw: write_password(root, pw)
         start_player(app, bp, root, port)
     except Exception:   # noqa: BLE001
         log.exception('The system failed to start')
@@ -368,14 +377,12 @@ def main(argv=None):
             say(f'  From other devices  : http://{socket.gethostbyname(socket.gethostname())}:{port}')
         except OSError:
             pass
-    if first:
-        say('\n  First sign-in   username: admin')
-        say(f'                  password: {first}')
-        say('  (also saved in ' + os.path.join(root, 'first-sign-in.txt') + ')')
+    if needs_setup:
+        say('\n  First time: open the address above and choose your password (username: admin).')
         if not args.background:
-            alert(APP_TITLE, f'First sign-in\nAddress: http://localhost:{port}\nUsername: admin\nPassword: {first}\n\n'
-                             'Saved in: ' + os.path.join(root, 'first-sign-in.txt') +
-                             '\n\nThe bell does not ring until you enter a license key (Admin panel > License).')
+            alert(APP_TITLE, 'Welcome!\n\nThe program is starting. In the browser page that opens, choose your password '
+                             '(username: admin).\n\nThen enter the license key (Admin panel > License): the bell does not ring without it.\n\n'
+                             'Address: ' + url)
     say(f'\n  Data folder: {root}')
     say('\n  Keep this window open while using the system. Close it to stop.')
     if not args.no_browser and not args.background:

@@ -5,7 +5,7 @@
 """
 import threading
 
-from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
 
 from blueprints.admin import _msg, login_required
 
@@ -68,3 +68,43 @@ def save():
         bp.save_ini(cfg['server'], cfg['key'], license_key=key)       # المشغّل يقرأ الملف كل 30 ثانية فيبدأ الرنين
         flash(_msg('حُفظ الترخيص. سيبدأ الجرس بالرنين خلال لحظات.', 'The license is saved. The bell will start ringing in a moment.'), 'ok')
     return redirect(url_for('desktop.page'))
+
+
+# ── اختيار كلمة المرور عند أول زيارة ─────────────────────────────────────────────────
+# قبل أن يختار المستخدم كلمة مرور تكون كلمة المدير عشوائية في الذاكرة فقط (لا يعرفها أحد)، وصفحة الاختيار لا تُفتح إلا
+# من الكمبيوتر نفسه (لا من أجهزة الشبكة)، وبعد الاختيار تُغلق وتُحفظ الكلمة في بيانات البرنامج.
+MIN_PASSWORD = 8
+
+
+def _this_computer():
+    return request.remote_addr in ('127.0.0.1', '::1')
+
+
+@desktop_bp.before_app_request
+def _first_visit():
+    if current_app.config.get('BELL_NEEDS_SETUP') and request.endpoint == 'admin.login' and _this_computer():
+        return redirect(url_for('desktop.setup'))
+    return None
+
+
+@desktop_bp.route('/admin/setup', methods=['GET', 'POST'])
+def setup():
+    if not current_app.config.get('BELL_NEEDS_SETUP') or not _this_computer():
+        return redirect(url_for('admin.login'))
+    error = None
+    if request.method == 'POST':
+        pw, again = request.form.get('password', ''), request.form.get('again', '')
+        if len(pw) < MIN_PASSWORD:
+            error = _msg('كلمة المرور أقصر من 8 أحرف.', 'The password is shorter than 8 characters.')
+        elif pw != again:
+            error = _msg('كلمتا المرور غير متطابقتين.', 'The two passwords do not match.')
+        else:
+            current_app.config['BELL_SAVE_PASSWORD'](pw)
+            current_app.config['ADMIN_PASS'] = pw
+            current_app.config['BELL_NEEDS_SETUP'] = False
+            session.permanent = True
+            session['admin_logged_in'] = True
+            flash(_msg('حُفظت كلمة المرور. الخطوة التالية: أدخل مفتاح الترخيص ليبدأ الجرس بالرنين.',
+                       'The password is saved. Next step: enter the license key so the bell can start ringing.'), 'ok')
+            return redirect(url_for('desktop.page'))
+    return render_template('admin/desktop_setup.html', error=error)
