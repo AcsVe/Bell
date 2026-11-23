@@ -26,7 +26,7 @@
 {% set ts = by_stage[st.id] %}{% set secs = st.grades|map(attribute='sections')|sum(start=[]) %}
 <div class="card code-card" data-group="st{{ st.id }}">
   <div class="page-head" style="margin-bottom:6px">
-    <h2 style="margin:0">{{ L(st.name_ar, st.name_en or st.name_ar) }}
+    <h2 style="margin:0"><bdi>{{ L(st.name_ar, st.name_en or st.name_ar) }}</bdi>
       <span class="muted small">· {{ ts|length }} {{ L('معلم', 'teachers') }} · {{ secs|length }} {{ L('شعبة', 'sections') }}</span></h2>
     <div class="actions noprint">
       <a class="btn ghost sm" href="{{ url_for('admin.teachers_codes_export', stage_id=st.id) }}">⬇ Excel</a>

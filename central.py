@@ -112,7 +112,7 @@ def en_names():
     """Arabic → English for the names the week view shows (timings, periods, default device/event names),
     so the admin page reads in English without changing what the devices receive."""
     from models import BellProgramPeriod, Period
-    out = {'جهاز المكتب': 'Office player', 'أيام بلا جرس (من القائمة السابقة)': 'Days without the bell (earlier list)'}
+    out = {'جهاز المكتب': 'Office player', 'هذا الكمبيوتر': 'This computer', 'أيام بلا جرس (من القائمة السابقة)': 'Days without the bell (earlier list)'}
     for g in groups():
         out.setdefault(g['ar'], g['en'])
     for st in Stage.query.all():

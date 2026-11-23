@@ -4,7 +4,7 @@
 {% from 'admin/_bulk.html' import bulk_bar, bulk_all, bulk_item with context %}
 <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">{{ L('المراحل', 'Stages') }}</a></div>
 <div class="page-head">
-  <h1>{{ L(st.name_ar, st.name_en or st.name_ar) }}</h1>
+  <h1><bdi>{{ L(st.name_ar, st.name_en or st.name_ar) }}</bdi></h1>
   <div class="actions">
     <a class="btn" href="#grades">+ {{ L('صفوف', 'Grades') }}</a>
     <a class="btn ghost" href="{{ url_for('admin.programs_assign') }}">{{ L('برامج الجرس للصفوف', 'Grade bell programs') }}</a>
