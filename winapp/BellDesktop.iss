@@ -47,6 +47,8 @@ arabic.LicensePage=الترخيص وبصمة الكمبيوتر
 english.LicensePage=License and computer fingerprint
 arabic.StopBell=إيقاف الجرس
 english.StopBell=Stop the bell
+arabic.ResetPassword=نسيت كلمة المرور (اختيار كلمة جديدة)
+english.ResetPassword=Forgot the password (choose a new one)
 arabic.AutoStart=تشغيل الجرس تلقائياً مع ويندوز (موصى به)
 english.AutoStart=Start the bell automatically with Windows (recommended)
 
@@ -61,6 +63,7 @@ Source: "..\dist\BellDesktop\*"; DestDir: "{app}"; Flags: ignoreversion recurses
 Name: "{group}\{cm:OpenAdmin}"; Filename: "{app}\{#MyAppExe}"
 Name: "{group}\{cm:LicensePage}"; Filename: "{app}\{#MyAppExe}"; Parameters: "--page admin/license"
 Name: "{group}\{cm:StopBell}"; Filename: "{app}\{#MyToolsExe}"; Parameters: "--stop"
+Name: "{group}\{cm:ResetPassword}"; Filename: "{app}\{#MyToolsExe}"; Parameters: "--reset-password"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; Tasks: desktopicon
 Name: "{userstartup}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; Parameters: "--background"; Tasks: autostart

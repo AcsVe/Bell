@@ -162,3 +162,56 @@ def test_the_ordinary_server_has_no_license_page(tmp_path, monkeypatch):
     c.post('/admin/login', data={'username': 'admin', 'password': 'admin'})
     assert c.get('/admin/license').status_code == 404
     assert 'الجرس لا يرنّ' not in c.get('/admin/central').get_data(as_text=True)
+
+
+# ── اختيار كلمة المرور عند أول زيارة ─────────────────────────────────────────────
+@pytest.fixture
+def fresh(tmp_path, monkeypatch):
+    """تثبيت جديد: لم تُختر كلمة مرور بعد، فكلمة المدير عشوائية في الذاكرة فقط."""
+    monkeypatch.setenv('BELL_EDITION', 'desktop')
+    monkeypatch.setenv('PAGE_SHIELD', '0')
+    monkeypatch.setenv('ADMIN_PASS', 'random-unknown-' + secrets.token_hex(8))
+    from app import create_app
+    app = create_app({'TESTING': True, 'SQLALCHEMY_DATABASE_URI': f'sqlite:///{tmp_path}/f.db'})
+    saved = []
+    app.config['BELL_NEEDS_SETUP'] = True
+    app.config['BELL_SAVE_PASSWORD'] = saved.append
+    return app, saved
+
+
+def test_first_visit_asks_for_a_password_on_this_computer(fresh):
+    app, saved = fresh
+    r = app.test_client().get('/admin/login')
+    assert r.status_code == 302 and r.headers['Location'].endswith('/admin/setup')
+    page = app.test_client().get('/admin/setup').get_data(as_text=True)
+    assert 'اختر كلمة مرور' in page and 'name="again"' in page
+
+
+def test_setup_checks_the_password_then_signs_in_and_closes(fresh):
+    app, saved = fresh
+    c = app.test_client()
+    r = c.post('/admin/setup', data={'password': 'short', 'again': 'short'})
+    assert 'أقصر من 8' in r.get_data(as_text=True) and saved == []
+    r = c.post('/admin/setup', data={'password': 'long-enough-1', 'again': 'long-enough-2'})
+    assert 'غير متطابقتين' in r.get_data(as_text=True) and saved == []
+    r = c.post('/admin/setup', data={'password': 'long-enough-1', 'again': 'long-enough-1'})
+    assert r.status_code == 302 and r.headers['Location'].endswith('/admin/license')
+    assert saved == ['long-enough-1']
+    assert c.get('/admin/').status_code == 200                              # دخل تلقائياً
+    other = app.test_client()
+    assert other.get('/admin/login').status_code == 200                      # الصفحة عادت صفحة دخول عادية
+    assert other.get('/admin/setup').status_code == 302                      # وأُغلقت صفحة الاختيار
+    r = other.post('/admin/login', data={'username': 'admin', 'password': 'long-enough-1'})
+    assert r.status_code == 302 and '/admin/login' not in r.headers['Location']
+
+
+def test_setup_is_closed_to_other_computers_and_the_random_password_is_useless(fresh):
+    app, saved = fresh
+    far = {'REMOTE_ADDR': '10.0.0.7'}
+    c = app.test_client()
+    r = c.get('/admin/login', environ_overrides=far)
+    assert r.status_code == 200 and 'name="again"' not in r.get_data(as_text=True)      # صفحة دخول عادية لا اختيار
+    r = c.post('/admin/setup', data={'password': 'long-enough-1', 'again': 'long-enough-1'}, environ_overrides=far)
+    assert r.status_code == 302 and r.headers['Location'].endswith('/admin/login') and saved == []
+    r = c.post('/admin/login', data={'username': 'admin', 'password': 'admin'}, environ_overrides=far)
+    assert r.status_code == 200 and 'غير صحيحة' in r.get_data(as_text=True)
