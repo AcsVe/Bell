@@ -30,7 +30,7 @@
       <select id="pid">{% for d in devices %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select></div>
     <div class="shrink"><button type="button" id="connect">🔗 {{ L('اتصال', 'Connect') }}</button></div>
   </div>
-  <pre id="st" class="small" dir="ltr" style="background:#f4f6fa;padding:10px;border-radius:8px;white-space:pre-wrap;min-height:40px">{{ L('غير متصل', 'Not connected') }}</pre>
+  <pre id="st" class="small" dir="ltr" style="background:#f4f6fa;padding:10px;border-radius:8px;white-space:pre-wrap;min-height:40px">{{ L('غير متصل', 'Offline') }}</pre>
   <div id="progress" class="small" style="margin:6px 0"></div>
 
   <fieldset id="ops" disabled style="border:0;padding:0;margin:0">
