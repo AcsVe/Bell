@@ -1,0 +1,67 @@
+# نسخة سطح المكتب (BellDesktopSetup.exe): النظام كاملاً مع مشغّل الصوت والترخيص في برنامج واحد على كمبيوتر ويندوز دون خادم.
+# يُبنى على Python 3.12 لويندوز، ثم يُفحص البرنامج المبني نفسه (--selftest: الدخول وصفحة الترخيص وجهاز الرنين والملفات
+# المضمَّنة)، ثم يُنشر المثبّت في مستودع التحميلات العام.
+name: Desktop edition (BellDesktopSetup.exe)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    paths: ['winapp/**', 'bell_player/bell_player.py', '.github/workflows/winapp.yml', 'requirements.txt']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: winapp-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install
+        run: pip install -r requirements.txt certifi "pyinstaller==6.22.3" "pyinstaller-hooks-contrib>=2026.9"
+      - name: Version
+        id: v
+        shell: bash
+        run: echo "version=$(date -u +%Y.%-m.%-d).${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+      - name: PyInstaller
+        run: pyinstaller winapp/BellDesktop.spec --noconfirm
+      - name: Self-test of the built program
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          dist\BellDesktop\BellDesktopTools.exe --selftest
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          dist\BellDesktop\BellDesktopTools.exe --fingerprint
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DMyAppVersion=${{ steps.v.outputs.version }}" winapp\BellDesktop.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - uses: actions/upload-artifact@v4
+        with: { name: BellDesktopSetup, path: dist/BellDesktopSetup.exe, retention-days: 3 }
+      - name: Publish to the fixed download link
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          gh release view ${PFX}apps >/dev/null 2>&1 || gh release create ${PFX}apps --title "تطبيقات جرس الحصص" --notes "آخر نسخة من التطبيقات، تتحدث تلقائياً مع كل بناء."
+          gh release upload ${PFX}apps dist/BellDesktopSetup.exe --clobber
+        env:
+          # DOWNLOADS_TOKEN (رمز بصلاحية الكتابة على AcsVe/downloads): يُنشر الملف في مستودع التحميلات العام
+          # بوسم يبدأ باسم النظام؛ وبدونه يُنشر هنا
+          GH_TOKEN: ${{ secrets.DOWNLOADS_TOKEN || github.token }}
+          GH_REPO: ${{ secrets.DOWNLOADS_TOKEN && 'AcsVe/downloads' || github.repository }}
+          PFX: ${{ secrets.DOWNLOADS_TOKEN && 'bell-' || '' }}
