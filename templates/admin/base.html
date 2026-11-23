@@ -38,6 +38,7 @@ window.normText = (v) => String(v || '').toLowerCase()
     <div class="nav-group">{{ L('الإدارة', 'Administration') }}</div>
     {{ item('admin.settings', ['admin.settings'], 'fa-music', 'النغمة والأجهزة', 'Tone & devices') }}
     {{ item('admin.system_settings', ['admin.system_settings'], 'fa-gear', 'الإعدادات', 'Settings') }}
+    {% if desktop_edition %}{{ item('desktop.page', ['desktop.page'], 'fa-certificate', 'الترخيص', 'License') }}{% endif %}
   </nav>
 </aside>
 {% endif %}
@@ -60,6 +61,14 @@ window.normText = (v) => String(v || '').toLowerCase()
   </header>
   {% endif %}
   <main>
+    {% if desktop_edition and desktop_lic.ready and not desktop_lic.ok and ep != 'desktop.page' %}
+    <div class="flash error license-alert" role="status">
+      <i class="fa-solid fa-bell-slash" aria-hidden="true"></i>
+      {{ L('الجرس لا يرنّ:', 'The bell is not ringing:') }}
+      {{ L('انتهى الترخيص.', 'the license has expired.') if desktop_lic.expired else L('لا يوجد مفتاح ترخيص صالح.', 'there is no valid license key.') }}
+      <a href="{{ url_for('desktop.page') }}">{{ L('أدخل المفتاح من صفحة الترخيص', 'Enter the key on the License page') }}</a>
+    </div>
+    {% endif %}
     {% if lic.state in ('warn', 'grace') %}
     <div class="flash error license-alert" role="status">
       <i class="fa-solid fa-hourglass-half" aria-hidden="true"></i>

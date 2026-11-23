@@ -107,6 +107,9 @@ def create_app(test_config=None):
     app.register_blueprint(admin_bp)
     app.register_blueprint(client_bp)
     app.register_blueprint(central_bp)
+    if os.environ.get('BELL_EDITION') == 'desktop':          # نسخة سطح المكتب (winapp/bell_desktop.py): صفحة الترخيص
+        from blueprints.desktop import desktop_bp
+        app.register_blueprint(desktop_bp)
 
     # حماية مصدر الصفحات: HTML مشفّر + منع الزر الأيمن وF12 وعرض المصدر — انظر page_shield.py
     from page_shield import install as _shield

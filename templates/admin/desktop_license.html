@@ -1,0 +1,27 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ L('الترخيص', 'License') }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1>{{ L('ترخيص جرس الحصص', 'School bell license') }}</h1></div>
+<div class="card">
+  <h2><i class="fa-solid fa-certificate" aria-hidden="true"></i> {{ L('حالة الترخيص', 'License status') }}</h2>
+  {% if lic.ok %}
+    <p><span class="badge ok">{{ L('مرخّص', 'Licensed') }}</span>
+      {% if lic.exp == 'PERMANENT' %}{{ L('ترخيص دائم لهذا الكمبيوتر.', 'Permanent license for this computer.') }}
+      {% else %}{{ L('ينتهي في', 'Valid until') }} <span dir="ltr">{{ lic.exp }}</span>.{% endif %}</p>
+  {% elif lic.expired %}
+    <p><span class="badge bad">{{ L('منتهٍ', 'Expired') }}</span> {{ L('انتهى الترخيص في', 'The license expired on') }} <span dir="ltr">{{ lic.exp }}</span>. {{ L('الجرس متوقف عن الرنين، أما لوحة الإدارة والبيانات فمفتوحة.', 'The bell is not ringing; the admin panel and your data stay open.') }}</p>
+  {% else %}
+    <p><span class="badge bad">{{ L('بلا ترخيص', 'Not licensed') }}</span> {{ L('الجرس لا يرنّ حتى تُدخل مفتاحاً صالحاً. لوحة الإدارة والبيانات مفتوحة.', 'The bell does not ring until you enter a valid key. The admin panel and your data stay open.') }}</p>
+  {% endif %}
+  <h3>{{ L('بصمة هذا الكمبيوتر', 'This computer\'s fingerprint') }}</h3>
+  <p><span class="mono" dir="ltr" style="user-select:all;font-size:1.2rem;font-weight:700">{{ fp or '…' }}</span></p>
+  <p class="note">{{ L('أرسل هذه البصمة إلى مزوّد الخدمة ليصدر لك مفتاح الترخيص. المفتاح خاص بهذا الكمبيوتر، ومفتاح مشغّل الجرس (BellPlayer) نفسه يصلح هنا إن صدر لنفس الكمبيوتر.',
+      'Send this fingerprint to the service provider to get your license key. The key is for this computer only, and a BellPlayer key issued for the same computer works here too.') }}</p>
+</div>
+<form method="post" action="{{ url_for('desktop.save') }}" class="card">
+  <h2><i class="fa-solid fa-key" aria-hidden="true"></i> {{ L('إدخال المفتاح أو تجديده', 'Enter or renew the key') }}</h2>
+  <label for="key">{{ L('مفتاح الترخيص', 'License key') }}</label>
+  <input type="text" id="key" name="key" dir="ltr" autocomplete="off" spellcheck="false" required>
+  <button type="submit"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> {{ L('حفظ المفتاح', 'Save the key') }}</button>
+</form>
+{% endblock %}
