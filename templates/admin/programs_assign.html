@@ -9,7 +9,7 @@
 <form method="post">
 {% for st in stages %}
 <div class="card" style="overflow-x:auto">
-  <h2>{{ L(st.name_ar, st.name_en or st.name_ar) }}</h2>
+  <h2><bdi>{{ L(st.name_ar, st.name_en or st.name_ar) }}</bdi></h2>
   {% if st.grades %}
   <table>
     <thead><tr><th>{{ L('الصف', 'Grade') }}</th>{% for wd in week_order if wd in st.weekday_list %}<th>{{ wd_names[wd] }}</th>{% endfor %}</tr></thead>

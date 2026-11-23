@@ -29,7 +29,7 @@
     <div class="row" style="align-items:center">
       {% if st.logo %}<img class="thumb shrink" style="height:44px" src="{{ st.logo.url }}" alt="">{% endif %}
       <div>
-        <h2 style="margin:0"><a href="{{ url_for('admin.stage_view', stage_id=st.id) }}">{{ L(st.name_ar, st.name_en or st.name_ar) }}</a></h2>
+        <h2 style="margin:0"><a href="{{ url_for('admin.stage_view', stage_id=st.id) }}"><bdi>{{ L(st.name_ar, st.name_en or st.name_ar) }}</bdi></a></h2>
         {% if not st.active %}<span class="chip">{{ L('غير فعّالة', 'Inactive') }}</span>{% endif %}
       </div>
     </div>

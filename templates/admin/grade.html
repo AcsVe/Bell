@@ -5,7 +5,7 @@
 <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">{{ L('المراحل', 'Stages') }}</a> <span class="fwd">›</span>
   <a href="{{ url_for('admin.stage_view', stage_id=st.id) }}">{{ L(st.name_ar, st.name_en or st.name_ar) }}</a></div>
 <div class="page-head">
-  <h1>{{ L(g.name_ar, g.name_en or g.name_ar) }}</h1>
+  <h1><bdi>{{ L(g.name_ar, g.name_en or g.name_ar) }}</bdi></h1>
   <div class="actions">
     <a class="btn" href="#sections-tab">+ {{ L('شعب', 'Sections') }}</a>
     <a class="btn ghost" href="{{ url_for('admin.programs_assign') }}">{{ L('برنامج الجرس', 'Bell program') }}</a>

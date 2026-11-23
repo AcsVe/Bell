@@ -215,3 +215,15 @@ def test_setup_is_closed_to_other_computers_and_the_random_password_is_useless(f
     assert r.status_code == 302 and r.headers['Location'].endswith('/admin/login') and saved == []
     r = c.post('/admin/login', data={'username': 'admin', 'password': 'admin'}, environ_overrides=far)
     assert r.status_code == 200 and 'غير صحيحة' in r.get_data(as_text=True)
+
+
+def test_the_embedded_device_has_an_english_name(desk):
+    """جهاز الرنين المضمَّن اسمه «هذا الكمبيوتر»: في الواجهة الإنجليزية يُعرض «This computer» (والعربية كما هي)."""
+    app, c, bp, sign, launcher, key, home = desk
+    ar = c.get('/admin/central').get_data(as_text=True)
+    assert 'هذا الكمبيوتر' in ar and 'This computer' not in ar
+    with c.session_transaction() as s:
+        s['lang'] = 'en'
+    en = c.get('/admin/central').get_data(as_text=True)
+    assert 'This computer' in en
+    assert 'dev-name">هذا الكمبيوتر' not in en
