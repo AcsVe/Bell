@@ -6,7 +6,7 @@ from flask import (Blueprint, current_app, flash, redirect, render_template, req
 
 from models import (db, AppSetting, BellProgram, BellProgramPeriod, Device, Grade,
                     GradeDayProgram, GradePeriodTime, MediaFile, Period, Section, Stage,
-                    StageDayPeriodTime, StageWeekday, Teacher, TeacherSection, TeacherStage)
+                    StageDayPeriodTime, StageWeekday, Teacher, TeacherSection, TeacherStage, stage_en_guess)
 from services import (WEEK_ORDER, bump_schedule_version, chain_times, default_period_labels,
                       generate_code, minutes_between, parse_duration, rechain_stage,
                       resolve_grade_day, valid_time, weekday_names,
@@ -127,7 +127,7 @@ def stage_add():
     if not name_ar:
         flash(_msg('اسم المرحلة مطلوب', 'Stage name is required'), 'error')
         return redirect(url_for('admin.dashboard'))
-    st = _create_stage(name_ar, _form_text('name_en') or None)
+    st = _create_stage(name_ar, _form_text('name_en') or stage_en_guess(name_ar))
     db.session.commit()
     return redirect(url_for('admin.stage_view', stage_id=st.id))
 

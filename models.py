@@ -223,6 +223,25 @@ def period_en_guess(label):
     return f'{word} {num}' if num else None
 
 
+_STAGES_EN = {'رياض الأطفال': 'Kindergarten', 'الطفولة المبكرة': 'Early years', 'الروضة': 'Kindergarten',
+              'الحضانة': 'Nursery', 'الأساسية': 'Primary', 'الابتدائية': 'Primary', 'المتوسطة': 'Middle',
+              'الإعدادية': 'Preparatory', 'الثانوية': 'Secondary'}
+
+
+def stage_en_guess(name):
+    """«المرحلة الأساسية 1-3» → «Primary 1-3»، «المرحلة الثانوية» → «Secondary»؛ وإلا None (لا نخمّن ما لا نعرفه)."""
+    import re
+    n = re.sub(r'\s+', ' ', (name or '').translate(_DIGITS)).strip()
+    n = re.sub(r'^(?:ال)?مرحلة\s+', '', n)
+    for ar in sorted(_STAGES_EN, key=len, reverse=True):
+        if n == ar or n.startswith(ar + ' '):
+            rest = n[len(ar):].strip()
+            if re.search(r'[\u0600-\u06FF]', rest):          # بقية الاسم عربية لا نعرفها: نتركه كما هو
+                return None
+            return (_STAGES_EN[ar] + (' ' + rest if rest else ''))
+    return None
+
+
 def section_en_guess(name):
     """«أ» → «A», «2» → «2»; otherwise None."""
     n = (name or '').strip().translate(_DIGITS)
@@ -375,10 +394,10 @@ def ensure_schema():
         if 'name_en' not in cols:
             with db.engine.begin() as conn:
                 conn.execute(text('ALTER TABLE bell_programs ADD COLUMN name_en VARCHAR(200)'))
-    if {'grades', 'sections'} <= set(insp.get_table_names()):
+    if {'grades', 'sections', 'stages'} <= set(insp.get_table_names()):
         # English names for grades / sections typed in Arabic only (only confident guesses; never overwrites)
         with db.engine.begin() as conn:
-            for table, guess in (('grades', grade_en_guess), ('sections', section_en_guess)):
+            for table, guess in (('grades', grade_en_guess), ('sections', section_en_guess), ('stages', stage_en_guess)):
                 rows = conn.execute(text(f"SELECT id, name_ar FROM {table} WHERE name_en IS NULL OR name_en = ''")).fetchall()
                 for rid, ar in rows:
                     en = guess(ar)

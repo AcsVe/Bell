@@ -18,7 +18,7 @@
 </nav>
 <section class="tabpane" data-pane="sections-tab">
 <div class="card" id="sections">
-  <h2>{{ L('الشعب ورموزها', 'Sections & codes') }}</h2>
+  <h2>{{ L('الشعب والرموز', 'Sections & codes') }}</h2>
   <form method="post" action="{{ url_for('admin.section_add', grade_id=g.id) }}" class="row" style="margin-bottom:14px">
     <div><label>{{ L('أسماء الشعب (افصل بفاصلة) — يُولَّد لكل شعبة رمز تلقائياً', 'Section names (comma-separated) — each gets a code automatically') }}</label>
       <input lang="ar" type="text" name="names" placeholder="{{ L('أ، ب، ج', 'Arabic: أ، ب، ج') }}" required></div>

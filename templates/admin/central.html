@@ -45,7 +45,7 @@
       <td><b><bdi>{{ L(g.ar, g.en) }}</bdi></b><div class="small muted">{{ L('برنامج جرس', 'Bell program') if g.kind == 'program' else L('توقيت المرحلة', 'Stage times') }}</div>
         {% set gps = group_periods(g.key) %}{% if gps %}
         {% set n_off = gps|selectattr('key', 'in', cfg.off_periods)|list|length %}
-        <details style="margin-top:4px"><summary class="small">{{ L('الحصص والاستراحات', 'Periods and breaks') }} ({{ gps|length - n_off }}/{{ gps|length }} {{ L('مفعّلة', 'on') }})</summary>
+        <details style="margin-top:4px"><summary class="small">{{ L('الحصص والاستراحات', 'Periods & breaks') }} ({{ gps|length - n_off }}/{{ gps|length }} {{ L('مفعّلة', 'on') }})</summary>
           <div style="display:grid;gap:2px;margin-top:4px">
           {% for p in gps %}<input type="hidden" name="per_seen" value="{{ p.key }}">
             <label class="small" style="display:flex;gap:6px;align-items:center;font-weight:normal"><input type="checkbox" name="on__{{ p.key }}" value="1" {{ 'checked' if p.key not in cfg.off_periods }}>
