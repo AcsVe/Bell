@@ -58,7 +58,7 @@
 
 {% if unlinked %}
 <div class="card code-card" data-group="none">
-  <h2>{{ L('معلمون غير مرتبطين بمرحلة', 'Teachers not linked to a stage') }} <span class="muted small">· {{ unlinked|length }}</span></h2>
+  <h2>{{ L('معلمون غير مرتبطين بمرحلة', 'Teachers Not Linked to a Stage') }} <span class="muted small">· {{ unlinked|length }}</span></h2>
   <table>
     {% for t in unlinked %}
     <tr><td><a href="{{ url_for('admin.teacher_view', teacher_id=t.id) }}">{{ L(t.name_ar, t.name_en or t.name_ar) }}</a></td>

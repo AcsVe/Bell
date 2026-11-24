@@ -2,9 +2,9 @@
 {# Sign-in of a classroom screen or a teacher with a code (the alert app). Ids are used by the script below and the e2e tests. #}
 {% set lang_next = '/login' %}
 {% block head %}<link rel="manifest" href="/manifest.webmanifest">{% endblock %}
-{% block title %}{{ L('دخول الشاشة', 'Screen sign-in') }}{% endblock %}
+{% block title %}{{ L('دخول الشاشة', 'Screen Sign-In') }}{% endblock %}
 {% block card_attrs %}{% if error %} data-error="{{ error }}"{% endif %}{% endblock %}
-{% block heading %}{{ L('أدخل رمز الصف أو رمز المعلم', 'Enter the section code or teacher code') }}{% endblock %}
+{% block heading %}{{ L('أدخل رمز الصف أو رمز المعلم', 'Enter the Section Code or Teacher Code') }}{% endblock %}
 {% block body %}
 {% if error %}<div class="alert danger">{{ L('الرمز غير صحيح. تأكد منه وأعد المحاولة.', 'Invalid code. Check it and try again.') }}</div>{% endif %}
 <div id="offline" class="alert warning" hidden>{{ L('لا يوجد اتصال بالإنترنت. تسجيل الدخول لأول مرة يحتاج اتصالاً؛ التنبيهات على الأجهزة المسجلة تستمر بدونه.',

@@ -10,7 +10,7 @@
   </div>
 </div>
 <div class="card">
-  <h2>{{ L('رمز المعلم', 'Teacher code') }}</h2>
+  <h2>{{ L('رمز المعلم', 'Teacher Code') }}</h2>
   <p><span class="code copy" data-copy="{{ t.code }}">{{ t.code }}</span>
     <button class="ghost sm" data-copy="{{ t.code }}">{{ L('نسخ', 'Copy') }}</button></p>
   <p class="muted small">{{ L('رمز واحد يغطي كل الشعب أدناه، يُدخله المعلم على هاتفه أو حاسوبه المحمول.', 'One code covering all sections below; the teacher enters it on their phone or laptop.') }}
@@ -27,7 +27,7 @@
 </nav>
 <section class="tabpane" data-pane="stages-tab">
 <div class="card">
-  <h2>{{ L('مراحل كاملة', 'Whole stages') }}</h2>
+  <h2>{{ L('مراحل كاملة', 'Whole Stages') }}</h2>
   <p class="muted small">{{ L('يستقبل المعلم تنبيهات كل صفوف المرحلة.', 'The teacher receives alerts for every grade in the stage.') }}</p>
   {% if t.stage_links %}
   {{ bulk_bar('stage_links', [('unlink', 'إزالة', 'Remove', true)]) }}
@@ -37,13 +37,13 @@
   </table>
   {% else %}<p class="muted">{{ L('غير مرتبط بمرحلة كاملة.', 'Not linked to a whole stage.') }}</p>{% endif %}
   {% set sitems = [] %}{% for st in stages if st.id not in stage_linked %}{% set _ = sitems.append({'id': st.id, 'label': L(st.name_ar, st.name_en or st.name_ar), 'sub': '', 'tags': []}) %}{% endfor %}
-  {% if sitems %}<h2 style="margin-top:14px;font-size:15px">{{ L('إضافة مراحل', 'Add stages') }}</h2>
+  {% if sitems %}<h2 style="margin-top:14px;font-size:15px">{{ L('إضافة مراحل', 'Add Stages') }}</h2>
   {{ picker('pick-stages', url_for('admin.teacher_stage_add', teacher_id=t.id), 'stage_id', sitems, 'ربط المحددة', 'Link selected') }}{% endif %}
 </div>
 </section>
 <section class="tabpane" data-pane="sections-tab">
 <div class="card">
-  <h2>{{ L('شعب محددة', 'Specific sections') }}</h2>
+  <h2>{{ L('شعب محددة', 'Specific Sections') }}</h2>
   {% if t.section_links %}
   {{ bulk_bar('section_links', [('unlink', 'إزالة', 'Remove', true)]) }}
   <table>
@@ -56,13 +56,13 @@
   {% for st in stages %}{% set _ = fl.append(('s' ~ st.id, st.name_ar)) %}{% for g in st.grades %}{% for sec in g.sections if sec.id not in linked %}
     {% set _ = items.append({'id': sec.id, 'label': sec.full_name(lang), 'sub': st.name_ar, 'tags': ['s' ~ st.id]}) %}
   {% endfor %}{% endfor %}{% endfor %}
-  <h2 style="margin-top:14px;font-size:15px">{{ L('إضافة شعب', 'Add sections') }}</h2>
+  <h2 style="margin-top:14px;font-size:15px">{{ L('إضافة شعب', 'Add Sections') }}</h2>
   {{ picker('pick-sections', url_for('admin.teacher_section_add', teacher_id=t.id), 'section_id', items, 'ربط المحددة', 'Link selected', fl) }}
 </div>
 </section>
 <section class="tabpane" data-pane="details-tab">
 <div class="card">
-  <h2>{{ L('تعديل البيانات', 'Edit details') }}</h2>
+  <h2>{{ L('تعديل البيانات', 'Edit Details') }}</h2>
   <form method="post" action="{{ url_for('admin.teacher_update', teacher_id=t.id) }}">
     <div class="row">
       <div><label>{{ L('الاسم بالعربية', 'Arabic name') }}</label><input type="text" name="name_ar" value="{{ t.name_ar }}" required></div>

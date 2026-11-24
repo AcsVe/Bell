@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}
-{% block title %}{{ L('برامج الجرس', 'Bell programs') }}{% endblock %}
+{% block title %}{{ L('برامج الجرس', 'Bell Programs') }}{% endblock %}
 {% block content %}
 {% macro seed_card(open_first) %}
 <div class="card" id="seed" style="border-color:#b9c8e4">
@@ -25,24 +25,24 @@
 {% endmacro %}
 {% from 'admin/_bulk.html' import bulk_bar, bulk_all, bulk_item with context %}
 <div class="page-head">
-  <h1>{{ L('برامج الجرس', 'Bell programs') }}</h1>
+  <h1>{{ L('برامج الجرس', 'Bell Programs') }}</h1>
   <div class="actions">
     <a class="btn" href="{{ url_for('admin.programs_assign') }}">{{ L('التوزيع على الصفوف والأيام', 'Grades & days') }}</a>
   </div>
 </div>
 <nav class="tabbar" data-tabs>
   <a href="#list-tab" data-tab="list-tab">{{ L('البرامج', 'Programs') }}<span class="count">{{ progs|length }}</span></a>
-  <a href="#import-tab" data-tab="import-tab">{{ L('استيراد وتصدير Excel', 'Excel import / export') }}</a>
-  <a href="#new-tab" data-tab="new-tab">{{ L('برنامج جديد', 'New program') }}</a>
+  <a href="#import-tab" data-tab="import-tab">{{ L('استيراد وتصدير Excel', 'Excel Import / Export') }}</a>
+  <a href="#new-tab" data-tab="new-tab">{{ L('برنامج جديد', 'New Program') }}</a>
 </nav>
 <section class="tabpane" data-pane="list-tab">
 {% if not progs %}{{ seed_card(true) }}{% endif %}
-<p class="hint">{{ L('برنامج الجرس = قائمة الحصص والفرص بتوقيتها. اضغط «عرض وتعديل» لتغيير المدد أو إضافة/حذف حصة. لإنشاء برنامج: تبويب «برنامج جديد». للحذف: حدّد ثم «حذف».', 'A bell program = the periods and breaks with times. Tap “View & edit” to change durations or add/remove a period. New: the “New program” tab. Delete: select, then “Delete”.') }}</p>
+<p class="hint">{{ L('برنامج الجرس = قائمة الحصص والاستراحات بتوقيتها. اضغط «عرض وتعديل» لتغيير المدد أو إضافة/حذف حصة. لإنشاء برنامج: تبويب «برنامج جديد». للحذف: حدّد ثم «حذف».', 'A bell program = the periods and breaks with times. Tap “View & edit” to change durations or add/remove a period. New: the “New program” tab. Delete: select, then “Delete”.') }}</p>
 {% if progs %}<div class="card">
   {% if progs %}
   {{ bulk_bar('programs', [('delete', 'حذف', 'Delete', true)]) }}
   <table class="resp">
-    <thead><tr><th class="chk">{{ bulk_all('programs') }}</th><th>{{ L('البرنامج', 'Program') }}</th><th>{{ L('الحصص والفرص', 'Periods & breaks') }}</th><th>{{ L('مستخدم في', 'Used by') }}</th><th></th></tr></thead>
+    <thead><tr><th class="chk">{{ bulk_all('programs') }}</th><th>{{ L('البرنامج', 'Program') }}</th><th>{{ L('الحصص والاستراحات', 'Periods & breaks') }}</th><th>{{ L('مستخدم في', 'Used by') }}</th><th></th></tr></thead>
     <tbody>
     {% for p in progs %}
     <tr data-row>
@@ -62,7 +62,7 @@
 <section class="tabpane" data-pane="import-tab">
   {% if progs %}{{ seed_card(false) }}{% endif %}
   <div class="card">
-    <h2>{{ L('استيراد / تصدير (Excel)', 'Import / export (Excel)') }}</h2>
+    <h2>{{ L('استيراد / تصدير (Excel)', 'Import / Export (Excel)') }}</h2>
     <p class="muted small">{{ L('الملف يحتوي البرامج وتوزيعها على الصفوف والأيام. صدِّر الملف الحالي، وعدِّله، ثم ارفعه.', 'The file holds the programs and their grade/day assignment. Export, edit, re-upload.') }}</p>
     <form method="post" action="{{ url_for('admin.programs_import') }}" enctype="multipart/form-data">
       <input type="file" name="file" accept=".xlsx" required>
@@ -73,7 +73,7 @@
     </form>
   </div>
   <div class="card">
-    <h2>{{ L('تصدير الحصص لنظام الغياب', 'Export the periods for SAS') }}</h2>
+    <h2>{{ L('تصدير الحصص لنظام الغياب', 'Export the Periods for SAS') }}</h2>
     <p class="muted small">{{ L('الحصص والأوقات الفعلية لكل صف في كل يوم (بعد البرامج والتعديلات)، لتُستورد في نظام غياب الطلبة (8.iajaward.org) من «الهيكل المدرسي ← الحصص ← استيراد».', 'The actual periods and times of every grade on every day (after programs and overrides), to import in the student-absence system (8.iajaward.org): School structure → Periods → Import.') }}</p>
     <a class="btn ghost" href="{{ url_for('admin.programs_export_sas') }}">⬇ {{ L('تصدير الحصص لنظام الغياب', 'Export periods for SAS') }}</a>
   </div>
@@ -81,7 +81,7 @@
 </section>
 <section class="tabpane" data-pane="new-tab">
   <div class="card">
-    <h2>{{ L('برنامج جديد', 'New program') }}</h2>
+    <h2>{{ L('برنامج جديد', 'New Program') }}</h2>
     <form method="post" action="{{ url_for('admin.program_add') }}">
       <label>{{ L('الاسم', 'Name') }}</label>
       <input lang="ar" type="text" name="name" placeholder="{{ L('الصفوف 3+4 — الثلاثاء', 'الصفوف 3+4 — الثلاثاء (Arabic name)') }}" required>

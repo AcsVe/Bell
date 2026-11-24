@@ -12,13 +12,13 @@
   </div>
 </div>
 <nav class="tabbar" data-tabs>
-  <a href="#sections-tab" data-tab="sections-tab">{{ L('الشعب والرموز', 'Sections & codes') }}<span class="count">{{ g.sections|length }}</span></a>
+  <a href="#sections-tab" data-tab="sections-tab">{{ L('الشعب والرموز', 'Sections & Codes') }}<span class="count">{{ g.sections|length }}</span></a>
   <a href="#times-tab" data-tab="times-tab">{{ L('التوقيت', 'Timing') }}</a>
   <a href="#settings-tab" data-tab="settings-tab">{{ L('الإعدادات', 'Settings') }}</a>
 </nav>
 <section class="tabpane" data-pane="sections-tab">
 <div class="card" id="sections">
-  <h2>{{ L('الشعب ورموزها', 'Sections & codes') }}</h2>
+  <h2>{{ L('الشعب والرموز', 'Sections & Codes') }}</h2>
   <form method="post" action="{{ url_for('admin.section_add', grade_id=g.id) }}" class="row" style="margin-bottom:14px">
     <div><label>{{ L('أسماء الشعب (افصل بفاصلة) — يُولَّد لكل شعبة رمز تلقائياً', 'Section names (comma-separated) — each gets a code automatically') }}</label>
       <input lang="ar" type="text" name="names" placeholder="{{ L('أ، ب، ج', 'Arabic: أ، ب، ج') }}" required></div>
@@ -48,7 +48,7 @@
 </section>
 <section class="tabpane" data-pane="times-tab">
 <div class="card" id="times">
-  <h2>{{ L('توقيت مختلف لهذا الصف', 'Different timing for this grade') }}</h2>
+  <h2>{{ L('توقيت مختلف لهذا الصف', 'Different Timing for This Grade') }}</h2>
   <p class="hint">{{ L('عدّل بداية الدوام أو مدد الحصص لهذا الصف في يوم معيّن (أو كل الأيام). الترتيب: تخصيص الصف ← يوم المرحلة ← الافتراضي.',
     'Change the day start or period durations for this grade on one day (or all days). Priority: grade → stage day → default.') }}</p>
   <div class="tabs">
@@ -102,7 +102,7 @@
   </form>
 </div>
 <div class="card">
-  <h2>{{ L('حذف الصف', 'Delete grade') }}</h2>
+  <h2>{{ L('حذف الصف', 'Delete Grade') }}</h2>
 <form method="post" action="{{ url_for('admin.grade_delete', grade_id=g.id) }}" data-confirm="{{ L('حذف الصف بكل شعبه ورموزها؟', 'Delete this grade with all its sections and codes?') }}">
   <button class="danger">{{ L('حذف الصف', 'Delete grade') }}</button>
 </form>

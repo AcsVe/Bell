@@ -13,7 +13,7 @@
   </div>
 </div>
 <div class="card">
-  <h2>{{ L('رمز الصف', 'Section code') }}</h2>
+  <h2>{{ L('رمز الصف', 'Section Code') }}</h2>
   <p><span class="code copy" data-copy="{{ s.code }}">{{ s.code }}</span>
     <button class="ghost sm" data-copy="{{ s.code }}">{{ L('نسخ', 'Copy') }}</button></p>
   <p class="muted small">{{ L('أدخل هذا الرمز على الشاشة أو الجهاز اللوحي الثابت في الصف.', 'Enter this code on the fixed classroom screen/tablet.') }}
@@ -24,13 +24,13 @@
   </form>
 </div>
 <nav class="tabbar" data-tabs>
-  <a href="#teachers-tab" data-tab="teachers-tab">{{ L('المعلمون المرتبطون', 'Linked teachers') }}<span class="count">{{ s.teacher_links|length }}</span></a>
-  <a href="#add-tab" data-tab="add-tab">{{ L('إضافة معلمين', 'Add teachers') }}</a>
+  <a href="#teachers-tab" data-tab="teachers-tab">{{ L('المعلمون المرتبطون', 'Linked Teachers') }}<span class="count">{{ s.teacher_links|length }}</span></a>
+  <a href="#add-tab" data-tab="add-tab">{{ L('إضافة معلمين', 'Add Teachers') }}</a>
   <a href="#settings-tab" data-tab="settings-tab">{{ L('الإعدادات', 'Settings') }}</a>
 </nav>
 <section class="tabpane" data-pane="teachers-tab">
 <div class="card">
-  <h2>{{ L('المعلمون المرتبطون بهذه الشعبة', 'Teachers linked to this section') }} <span class="muted small">({{ s.teacher_links|length }})</span></h2>
+  <h2>{{ L('المعلمون المرتبطون بهذه الشعبة', 'Teachers Linked to This Section') }} <span class="muted small">({{ s.teacher_links|length }})</span></h2>
   {% set st_links = s.grade.stage.teacher_links %}
   {% if st_links %}<p class="muted small">{{ L('إضافة إلى ذلك، يستقبل تنبيهات هذه الشعبة كل معلمي المرحلة كاملة', 'In addition, all whole-stage teachers receive this section’s alerts') }}: {{ st_links|length }}</p>{% endif %}
   {% if s.teacher_links %}
@@ -50,7 +50,7 @@
 </section>
 <section class="tabpane" data-pane="add-tab">
 <div class="card">
-  <h2>{{ L('إضافة معلمين للشعبة', 'Add teachers to the section') }}</h2>
+  <h2>{{ L('إضافة معلمين للشعبة', 'Add Teachers to the Section') }}</h2>
   {% set items = [] %}
   {% for t in teachers if t.id not in linked_ids %}
     {% set tags = [] %}{% for st in t.stages %}{% set _ = tags.append('s' ~ st.id) %}{% endfor %}
@@ -62,7 +62,7 @@
 </section>
 <section class="tabpane" data-pane="settings-tab">
 <div class="card">
-  <h2>{{ L('تعديل الشعبة', 'Edit section') }}</h2>
+  <h2>{{ L('تعديل الشعبة', 'Edit Section') }}</h2>
   <form method="post" action="{{ url_for('admin.section_update', section_id=s.id) }}" class="row">
     <div><label>{{ L('الاسم بالعربية', 'Arabic name') }}</label><input type="text" name="name_ar" value="{{ s.name_ar }}" required></div>
     <div><label>{{ L('الاسم بالإنجليزية', 'English name') }}</label><input lang="en" type="text" name="name_en" value="{{ s.name_en or '' }}"></div>

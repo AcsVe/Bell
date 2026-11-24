@@ -45,7 +45,7 @@
   <form id="del-p{{ p.id }}" method="post" action="{{ url_for('admin.program_period_delete', period_id=p.id) }}" data-confirm="{{ L('حذف هذا السطر؟ التالي يتقدم تلقائياً.', 'Delete this row? The next ones move up.') }}"></form>
   {% endfor %}
 
-  <h2 style="margin-top:18px" id="add-row">{{ L('إضافة حصة / استراحة', 'Add a period / break') }}</h2>
+  <h2 style="margin-top:18px" id="add-row">{{ L('إضافة حصة / استراحة', 'Add a Period / Break') }}</h2>
   <form method="post" action="{{ url_for('admin.program_period_add', program_id=prog.id) }}" class="row">
     {% if prog.periods %}<div class="shrink" style="min-width:210px"><label>{{ L('المكان', 'Position') }}</label><select name="before">
       <option value="">{{ L('في آخر اليوم', 'At the end of the day') }}</option>
@@ -61,7 +61,7 @@
 </div>
 
 <div class="card">
-  <h2>{{ L('الصفوف التي تتبع هذا البرنامج', 'Grades using this program') }}</h2>
+  <h2>{{ L('الصفوف التي تتبع هذا البرنامج', 'Grades Using This Program') }}</h2>
   {% set by_grade = {} %}
   {% for a in prog.assignments %}{% set _ = by_grade.setdefault(a.grade, []).append(a.weekday) %}{% endfor %}
   {% set names = ['الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت','الأحد'] if lang != 'en' else ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}

@@ -1,7 +1,7 @@
 {% extends 'admin/base.html' %}
 {% block title %}{{ L('الإعدادات', 'Settings') }}{% endblock %}
 {% block content %}
-<div class="page-head"><h1>{{ L('إعدادات النظام', 'System settings') }}</h1></div>
+<div class="page-head"><h1>{{ L('إعدادات النظام', 'System Settings') }}</h1></div>
 <nav class="tabbar" data-tabs>
   <a href="#identity-tab" data-tab="identity-tab"><i class="fa-solid fa-building" aria-hidden="true"></i> {{ L('الهوية', 'Identity') }}</a>
   <a href="#mail-tab" data-tab="mail-tab"><i class="fa-solid fa-envelope" aria-hidden="true"></i> {{ L('البريد', 'Mail') }}<span class="count">{{ logs|length }}</span></a>
@@ -52,7 +52,7 @@
 </div>
 
 <div class="card">
-  <h2><i class="fa-solid fa-envelope-open-text" aria-hidden="true"></i> {{ L('سجل البريد', 'Email log') }} <span class="count-pill">{{ logs|length }}</span></h2>
+  <h2><i class="fa-solid fa-envelope-open-text" aria-hidden="true"></i> {{ L('سجل البريد', 'Email Log') }} <span class="count-pill">{{ logs|length }}</span></h2>
   <div class="dt-wrap">
   <table data-table>
     <thead><tr><th data-filter="text">{{ L('الوقت', 'Time') }}</th><th data-filter="text">{{ L('إلى', 'To') }}</th><th data-filter="text">{{ L('الموضوع', 'Subject') }}</th><th data-filter="select">{{ L('الحالة', 'Status') }}</th><th data-nosort>{{ L('الخطأ', 'Error') }}</th></tr></thead>
