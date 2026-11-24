@@ -16,6 +16,22 @@ AR_ORDINALS = ['الأولى', 'الثانية', 'الثالثة', 'الرابع
                'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة']
 
 
+_AR_MARKS = re.compile('[\u064B-\u0652\u0640]')
+
+
+def alpha_key(text):
+    """مفتاح الترتيب الأبجدي: بلا تشكيل ولا تطويل، وأ/إ/آ=ا، وى=ي، وة=ه، ولا فرق بين الحروف الكبيرة والصغيرة."""
+    t = _AR_MARKS.sub('', str(text or ''))
+    for a, b in (('أ', 'ا'), ('إ', 'ا'), ('آ', 'ا'), ('ى', 'ي'), ('ة', 'ه')):
+        t = t.replace(a, b)
+    return re.sub(r'\s+', ' ', t).casefold().strip()
+
+
+def by_name(items, lang):
+    """القائمة مرتّبة أبجدياً بالاسم الذي تعرضه الواجهة: العربي في العربية، والإنجليزي (وإلا العربي) في الإنجليزية."""
+    return sorted(items, key=lambda x: alpha_key((x.name_en or x.name_ar) if lang == 'en' else x.name_ar))
+
+
 def normalize_code(code):
     # Also drop invisible direction marks a copy/paste may carry along.
     return re.sub(r'[\s\-\u200e\u200f\u2066-\u2069\u202a-\u202e]', '', (code or '')).upper()

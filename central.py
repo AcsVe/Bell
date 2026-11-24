@@ -62,6 +62,7 @@ def config():
     c.setdefault('tones', {})
     c.setdefault('off_groups', [])      # timings switched off (no ring at all for them)
     c.setdefault('off_periods', [])
+    c.setdefault('end_ring', {'enabled': False, 'tone': ''})   # رنّة عند نهاية الحصة الأخيرة لكل برنامج/توقيت
     c.setdefault('hidden_tones', [])    # built-in tones removed from the library (can be restored)     # single periods/breaks switched off: 'pp:<program period id>' / 'sp:<stage period id>'
     return c
 
@@ -347,6 +348,14 @@ def today_amman():
         return datetime.now().date()
 
 
+def _minutes(hhmm):
+    try:
+        h, m = str(hhmm).split(':')[:2]
+        return int(h) * 60 + int(m)
+    except (ValueError, TypeError):
+        return 0
+
+
 def week_rings(cfg=None, only=None, pid='*'):
     """{weekday: [{'t': 'HH:MM', 'rings': [{'tone', 'kind', 'groups': [...], 'label'}]}]} for Monday=0..Sunday=6.
     only = a set of group keys (one bell device that serves some buildings/stages only); None = every group."""
@@ -369,17 +378,38 @@ def week_rings(cfg=None, only=None, pid='*'):
         if gname not in r['groups']:
             r['groups'].append(gname)
 
+    # رنّة نهاية الدوام: عند نهاية آخر حصة (أو استراحة) في اليوم لكل برنامج/توقيت، فتختلف بين الأيام (مثل الثلاثاء)
+    end = cfg.get('end_ring') or {}
+    end_tone = end.get('tone') if end.get('tone') in set(all_tone_keys()) else (all_tone_keys() or [''])[0]
+
+    def add_end(wd, day_periods, gkey, gname):
+        if not end.get('enabled') or not day_periods or not end_tone or end_tone == SILENT:
+            return
+        if only is not None and gkey not in only:
+            return
+        if gkey in off_g:
+            return
+        t = max((p['end'] for p in day_periods), key=_minutes)
+        slot = days[wd].setdefault(t, {})
+        r = slot.setdefault(end_tone, {'tone': end_tone, 'kind': 'custom', 'groups': [], 'label': 'نهاية الدوام'})
+        if gname not in r['groups']:
+            r['groups'].append(gname)
+
     for st in _active_stages():
         for wd in st.weekday_list:
             if st.grades:
                 for g in st.grades:
                     prog = g.program_for(wd)
                     gkey, gname = (f'program:{prog.id}', prog.name) if prog else (f'stage:{st.id}', st.name_ar)
-                    for p in resolve_grade_day(g, wd):
+                    day = resolve_grade_day(g, wd)
+                    for p in day:
                         add(wd, p, gkey, gname)
+                    add_end(wd, day, gkey, gname)
             else:
-                for p in resolve_stage_day(st, wd):
+                day = resolve_stage_day(st, wd)
+                for p in day:
                     add(wd, p, f'stage:{st.id}', st.name_ar)
+                add_end(wd, day, f'stage:{st.id}', st.name_ar)
     # custom rings (pid '*' = the admin view: every device)
     valid = set(all_tone_keys())
     for c in custom_rings():

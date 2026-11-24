@@ -49,7 +49,7 @@
       <td class="chk">{{ bulk_item('programs', p.id) }}</td>
       <td><a href="{{ url_for('admin.program_view', program_id=p.id) }}"><b>{{ L(p.name, p.title_en) }}</b></a>
         <div class="small muted" dir="ltr" style="text-align:start">{{ p.day_start }} – {{ p.day_end }}</div></td>
-      <td class="small"><div class="ptimes">{% set ns = namespace(i=0) %}{% for q in p.periods %}{% if q.kind == 'class' %}{% set ns.i = ns.i + 1 %}{% endif %}<span class="pt {{ 'break' if q.kind=='break' }}"><b>{{ L('فرصة', 'Break') if q.kind=='break' else ns.i }}</b><span dir="ltr">{{ q.start_time }}–{{ q.end_time }}</span></span>{% endfor %}</div></td>
+      <td class="small"><div class="ptimes">{% set ns = namespace(i=0) %}{% for q in p.periods %}{% if q.kind == 'class' %}{% set ns.i = ns.i + 1 %}{% endif %}<span class="pt {{ 'break' if q.kind=='break' }}"><b>{{ L('استراحة', 'Break') if q.kind=='break' else ns.i }}</b><span dir="ltr">{{ q.start_time }}–{{ q.end_time }}</span></span>{% endfor %}</div></td>
       <td class="small">{% for u in usage[p.id] %}<span class="chip">{{ L(u[2], u[3]) }}</span>{% else %}<span class="muted">—</span>{% endfor %}</td>
       <td class="open"><a class="btn sm" href="{{ url_for('admin.program_view', program_id=p.id) }}">{{ L('عرض وتعديل', 'View & edit') }} <span class="fwd">›</span></a></td>
     </tr>

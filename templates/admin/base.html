@@ -2,7 +2,7 @@
 <html lang="{{ lang }}" dir="{{ dir }}">
 <head>
 {% include 'admin/_head.html' %}
-<title>{% block title %}{{ L('لوحة الإدارة', 'Admin') }}{% endblock %} · {{ L('جرس الحصص', 'School Bell') }}</title>
+<title>{% block title %}{{ L('لوحة الإدارة', 'Admin panel') }}{% endblock %} · {{ L('جرس الحصص', 'School Bell') }}</title>
 <script src="{{ asset('js/table.js') }}" defer></script>
 <script src="{{ asset('js/update-notice.js') }}" data-version="{{ app_version }}" data-url="/api/app-version" defer></script>
 <script>
@@ -25,7 +25,7 @@ window.normText = (v) => String(v || '').toLowerCase()
   <a class="side-brand" href="{{ url_for('admin.dashboard') }}">
     {% include 'admin/_brand_logo.html' %}
     <span class="org" title="{{ org_name or L('جرس الحصص', 'School Bell') }}">{{ org_name or L('جرس الحصص', 'School Bell') }}</span>
-    <span class="sys">{{ L('نظام جرس الحصص', 'School bell system') if org_name else L('لوحة الإدارة', 'Administration') }}</span>
+    <span class="sys">{{ L('نظام جرس الحصص', 'School bell system') if org_name else L('لوحة الإدارة', 'Admin panel') }}</span>
   </a>
   <nav class="side-nav">
     <div class="nav-group">{{ L('الجرس اليومي', 'Daily bell') }}</div>

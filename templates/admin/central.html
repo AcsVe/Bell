@@ -42,7 +42,7 @@
       <td><input type="hidden" name="grp_seen" value="{{ g.key }}">
         <label class="switch" title="{{ L('تفعيل / تعطيل كل رنّات هذا التوقيت', 'Turn all rings of this timing on / off') }}" style="display:flex;gap:6px;align-items:center;font-weight:normal">
           <input type="checkbox" name="on__{{ g.key }}" value="1" {{ 'checked' if g_on }}> <span class="small">{{ L('مفعّل', 'On') if g_on else L('معطّل', 'Off') }}</span></label></td>
-      <td><b><bdi>{{ L(g.ar, g.en) }}</bdi></b><div class="small muted">{{ L('برنامج جرس', 'Bell program') if g.kind == 'program' else L('توقيت المرحلة', 'Stage times') }}</div>
+      <td><b><bdi>{{ L(g.ar, g.en) }}</bdi></b><div class="small muted">{{ L('برنامج الجرس', 'Bell program') if g.kind == 'program' else L('توقيت المرحلة', 'Stage times') }}</div>
         {% set gps = group_periods(g.key) %}{% if gps %}
         {% set n_off = gps|selectattr('key', 'in', cfg.off_periods)|list|length %}
         <details style="margin-top:4px"><summary class="small">{{ L('الحصص والاستراحات', 'Periods and breaks') }} ({{ gps|length - n_off }}/{{ gps|length }} {{ L('مفعّلة', 'on') }})</summary>
@@ -67,6 +67,19 @@
     </tbody>
   </table>
   {% endif %}
+  <div class="end-ring" style="margin-top:16px;padding-top:14px;border-top:1px solid #e3e9f2">
+    <input type="hidden" name="end_seen" value="1">
+    <label style="display:flex;gap:8px;align-items:center;font-weight:700"><input type="checkbox" name="end_on" value="1" {{ 'checked' if cfg.end_ring.enabled }}> {{ L('رنّة نهاية الدوام', 'End-of-day ring') }}</label>
+    <div class="row" style="align-items:center;margin-top:8px">
+      <div><label>{{ L('النغمة', 'Tone') }}</label>
+        <select name="end_tone" data-tone-select>
+          {% for k, name, url in lib %}<option value="{{ k }}" {{ 'selected' if end_tone == k }}>{{ name }}</option>{% endfor %}
+        </select></div>
+      <button type="button" class="ghost sm shrink" data-play title="{{ L('استماع', 'Listen') }}">▶</button>
+    </div>
+    <p class="muted small">{{ L('ترنّ عند نهاية آخر حصة في اليوم لكل توقيت، فيختلف وقتها حسب البرنامج واليوم (مثل يوم الثلاثاء). تنتهي الحصة الأخيرة ولا تبدأ بعدها حصة، فلا ترنّ في الوضع المعتاد.',
+      'Rings when the last period of the day ends, for every timing, so its time follows the program and the day (for example Tuesday). The last period is followed by no other period, so it does not ring otherwise.') }}</p>
+  </div>
   <p class="small" style="margin-top:14px">📅 {{ L('أيام العطل والامتحانات وأي فترة بلا جرس: تبويب', 'Holidays, exams and any period without the bell: the tab') }} <a href="#off-tab">{{ L('روزنامة إيقاف الجرس', 'Days without the bell') }}</a>.</p>
   <button style="margin-top:12px">{{ L('حفظ', 'Save') }}</button>
   <p class="muted small">{{ L('زر الاستماع ▶ يشغّل النغمة على جهازك أنت. وللتجربة على السمّاعات: تبويب «مكتبة النغمات والتجربة».', 'Listening ▶ plays on your own device. To test on the office speakers: the “Tone library & test” tab.') }}</p>
@@ -178,7 +191,7 @@
       <td><b>{{ tr(e.name) }}</b></td>
       <td>{{ L('فترة', 'Period') if e.kind == 'range' else L('أيام محددة', 'Specific days') }}</td>
       <td class="small"><span dir="ltr" style="unicode-bidi:isolate">{% if e.kind == 'range' %}{{ e['from'] }}{% if e.to != e['from'] %} – {{ e.to }}{% endif %}{% else %}{{ e.dates[:6]|join(', ') }}{% if e.dates|length > 6 %} … (+{{ e.dates|length - 6 }}){% endif %}{% endif %}</span></td>
-      <td>{{ {'none': L('لا يتكرر', 'No'), 'monthly': L('كل شهر', 'Monthly'), 'yearly': L('كل سنة', 'Yearly')}[e.repeat or 'none'] }}{% if e.until %} <span class="small muted">{{ L('حتى', 'until') }} <span dir="ltr">{{ e.until }}</span></span>{% endif %}</td>
+      <td>{{ {'none': L('لا يتكرر', 'Does not repeat'), 'monthly': L('كل شهر', 'Every month'), 'yearly': L('كل سنة', 'Every year')}[e.repeat or 'none'] }}{% if e.until %} <span class="small muted">{{ L('حتى', 'until') }} <span dir="ltr">{{ e.until }}</span></span>{% endif %}</td>
       {% if devices|length > 1 %}<td>{% if e.devices is none %}{{ L('كل الأجهزة', 'All devices') }}{% else %}{% for d in devices if d.id in e.devices %}{{ tr(d.name) }}{{ '، ' if not loop.last }}{% endfor %}{% endif %}</td>{% endif %}
       <td data-value="{{ info|length }}">{{ info|length }}</td>
       <td dir="ltr" class="small" style="white-space:nowrap">{{ (info|list|first) or '—' }}</td>
@@ -215,7 +228,7 @@
 <div class="card">
   <h2>{{ L('اليوم', 'Today') }} — {{ wd_names[now.weekday()] }} <span dir="ltr" class="muted small">{{ now.strftime('%Y-%m-%d %H:%M') }}</span></h2>
   {% if today_off %}<p class="chip" style="background:#fff4e0;color:#8a5a00">{{ L('لا جرس اليوم (معطّل أو يوم مستثنى)', 'No bell today (disabled or a skipped day)') }}</p>{% endif %}
-  {% if next_ring and not today_off %}<p><b>{{ L('الجرس التالي', 'Next ring') }}:</b> <span dir="ltr">{{ next_ring.t }}</span> — {% for r in next_ring.rings %}{{ tone_name(r.tone) }} ({% for g in r.groups %}{{ tr(g) }}{% if not loop.last %}{{ L('، ', ', ') }}{% endif %}{% endfor %}){{ ' + ' if not loop.last }}{% endfor %}</p>{% endif %}
+  {% if next_ring and not today_off %}<p><b>{{ L('الرنّة القادمة', 'Next ring') }}:</b> <span dir="ltr">{{ next_ring.t }}</span> — {% for r in next_ring.rings %}{{ tone_name(r.tone) }} ({% for g in r.groups %}{{ tr(g) }}{% if not loop.last %}{{ L('، ', ', ') }}{% endif %}{% endfor %}){{ ' + ' if not loop.last }}{% endfor %}</p>{% endif %}
   {% if today_rings %}
   <table class="resp">
     <thead><tr><th>{{ L('الوقت', 'Time') }}</th><th>{{ L('الرنين', 'Ring') }}</th></tr></thead>
@@ -304,7 +317,7 @@
       {% else %}<span class="badge">{{ L('لم يتصل بعد', 'Not connected yet') }}</span>{% endif %}
       {% if lic_bad %}<span class="badge bad">{{ L('غير مفعّل', 'Not activated') }}</span>{% endif %}
       {% if st.missed %}<span class="badge warn">{{ L('رنين فات', 'Missed rings') }}</span>{% endif %}
-      {% if st.next_ring %}<span class="muted">{{ L('الرنين التالي', 'Next ring') }} <bdi dir="ltr">{{ st.next_ring }}</bdi></span>{% endif %}
+      {% if st.next_ring %}<span class="muted">{{ L('الرنّة القادمة', 'Next ring') }} <bdi dir="ltr">{{ st.next_ring }}</bdi></span>{% endif %}
     </span>
     <i class="fa-solid fa-chevron-down dev-caret" aria-hidden="true"></i>
   </summary>
@@ -315,12 +328,12 @@
   {% endif %}
   {% if st.seen %}
   <dl class="dev-info">
-    <div><dt>{{ L('الحالة', 'State') }}</dt><dd>{% if st.online %}<b class="t-ok">{{ L('متصل ويعمل', 'Online and working') }}</b>{% else %}<b class="t-bad">{{ L('غير متصل', 'Offline') }}</b> — {{ L('آخر اتصال', 'last seen') }} {{ ago(st.age_s) }}{% endif %}</dd></div>
+    <div><dt>{{ L('الحالة', 'Status') }}</dt><dd>{% if st.online %}<b class="t-ok">{{ L('متصل ويعمل', 'Online and working') }}</b>{% else %}<b class="t-bad">{{ L('غير متصل', 'Offline') }}</b> — {{ L('آخر اتصال', 'last seen') }} {{ ago(st.age_s) }}{% endif %}</dd></div>
     <div><dt>{{ L('الجدول', 'Schedule') }}</dt><dd>{{ L('محدَّث ومحفوظ على الجهاز', 'Up to date and saved on the device') if st.version == dev_versions[d.id] else L('يُحدَّث الآن…', 'Updating…') }}</dd></div>
     <div><dt>{{ L('آخر رنين', 'Last ring') }}</dt><dd><bdi dir="ltr">{{ st.last_ring or '—' }}</bdi></dd></div>
-    <div><dt>{{ L('الرنين التالي', 'Next ring') }}</dt><dd><bdi dir="ltr">{{ st.next_ring or '—' }}</bdi></dd></div>
+    <div><dt>{{ L('الرنّة القادمة', 'Next ring') }}</dt><dd><bdi dir="ltr">{{ st.next_ring or '—' }}</bdi></dd></div>
     <div><dt>{{ L('ساعة الجهاز', 'Device clock') }}</dt><dd>{% if st.clock_drift is not none and (st.clock_drift|abs) > 60 %}<b class="t-bad">{{ L('غير مضبوطة: تختلف عن الخادم بنحو', 'Wrong: differs from the server by about') }} {{ ((st.clock_drift|abs) / 60)|round|int }} {{ L('دقيقة', 'min') }}</b> — {{ L('الجرس يرنّ بساعة الجهاز، فاضبط التاريخ والوقت والمنطقة الزمنية فيه.', 'the bell rings by the device clock, so correct its date, time and time zone.') }}{% else %}{{ L('مضبوطة', 'Correct') }}{% endif %}</dd></div>
-    <div><dt>{{ L('الترخيص', 'Licence') }}</dt><dd>{% if not st.license %}—{% elif st.license == 'PERMANENT' %}<b class="t-ok">{{ L('دائم', 'Permanent') }}</b>{% elif lic_bad %}<b class="t-bad">{{ L('غير مفعّل، والجهاز لا يرنّ', 'Not activated, the device is not ringing') }}</b>{% if st.fingerprint %} — {{ L('بصمة الجهاز لطلب الترخيص:', 'device fingerprint for the licence request:') }} <code dir="ltr">{{ st.fingerprint }}</code>{% endif %}{% else %}{{ L('سارٍ حتى', 'Valid until') }} <bdi dir="ltr">{{ st.license }}</bdi>{% if st.fingerprint %} — {{ L('بصمة الجهاز للتجديد:', 'device fingerprint for renewal:') }} <code dir="ltr">{{ st.fingerprint }}</code>{% endif %}{% endif %}</dd></div>
+    <div><dt>{{ L('الترخيص', 'License') }}</dt><dd>{% if not st.license %}—{% elif st.license == 'PERMANENT' %}<b class="t-ok">{{ L('دائم', 'Permanent') }}</b>{% elif lic_bad %}<b class="t-bad">{{ L('غير مفعّل، والجهاز لا يرنّ', 'Not activated, the device is not ringing') }}</b>{% if st.fingerprint %} — {{ L('بصمة الجهاز لطلب الترخيص:', 'device fingerprint for the licence request:') }} <code dir="ltr">{{ st.fingerprint }}</code>{% endif %}{% else %}{{ L('سارٍ حتى', 'Valid until') }} <bdi dir="ltr">{{ st.license }}</bdi>{% if st.fingerprint %} — {{ L('بصمة الجهاز للتجديد:', 'device fingerprint for renewal:') }} <code dir="ltr">{{ st.fingerprint }}</code>{% endif %}{% endif %}</dd></div>
     {% if st.audio and 'NOT FOUND' in st.audio %}<div><dt>{{ L('مخرج الصوت', 'Sound output') }}</dt><dd><b class="t-bad">{{ L('جهاز الصوت المختار غير موصول، فيرنّ على الصوت الافتراضي.', 'The chosen sound output is not connected, so it rings on the default one.') }}</b></dd></div>{% endif %}
     {% if st.missed %}<div><dt>{{ L('رنين فات', 'Missed rings') }}</dt><dd><b class="t-bad">{{ L('كان الجهاز نائماً أو مطفأً فلم يرنّ:', 'The device was asleep or off and did not ring:') }}</b> <bdi dir="ltr">{{ st.missed }}</bdi> — {{ L('أبقِ الجهاز موصولاً بالكهرباء وغطاءه مفتوحاً.', 'keep it plugged in with its lid open.') }}</dd></div>{% endif %}
     {% if st.error and not st.online %}<div><dt>{{ L('ملاحظة', 'Note') }}</dt><dd>{{ L('تعذّر على الجهاز الوصول إلى الخادم في آخر محاولة، وهو يرنّ من الجدول المحفوظ عليه.', 'The device could not reach the server on its last try; it rings from its saved schedule.') }}</dd></div>{% endif %}
