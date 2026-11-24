@@ -87,7 +87,7 @@ def build_workbook(stage_names):
         for i, (x, t) in enumerate(zip(seq, times), start=1):
             a, b = t.split('-')
             if x == B:
-                ws.append([name, i, 'استراحة', 'الفرصة', 'Break', a, b])
+                ws.append([name, i, 'استراحة', 'الاستراحة', 'Break', a, b])
             else:
                 ws.append([name, i, 'حصة', f'الحصة {ORD[x - 1]}', f'Period {x}', a, b])
     wa = wb.create_sheet(ASSIGN_SHEET)

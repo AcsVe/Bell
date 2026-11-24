@@ -5,7 +5,7 @@
 <div class="page-head">
   <h1>{{ L(prog.name, prog.title_en) }} <span class="muted small" dir="ltr">{{ prog.day_start }} – {{ prog.day_end }}</span></h1>
   <div class="actions">
-    <a class="btn ghost sm" href="#add-row">+ {{ L('حصة/فرصة', 'Period/break') }}</a>
+    <a class="btn ghost sm" href="#add-row">+ {{ L('حصة/استراحة', 'Period/break') }}</a>
     <form method="post" action="{{ url_for('admin.program_delete', program_id=prog.id) }}" style="display:inline"
           data-confirm="{{ L('حذف البرنامج؟ الصفوف التي تتبعه تعود لتوقيت مرحلتها.', 'Delete? Its grades fall back to stage timing.') }}">
       <button class="danger sm">{{ L('حذف البرنامج', 'Delete program') }}</button>
@@ -31,7 +31,7 @@
         <span class="tm" dir="ltr">{{ p.start_time }} – {{ p.end_time }}</span>
         <span class="lab"><input type="text" name="p{{ p.id }}_label_ar" value="{{ p.label_ar }}" aria-label="{{ L('التسمية', 'Label') }}"></span>
         <span class="en"><input lang="en" type="text" name="p{{ p.id }}_label_en" value="{{ p.label_en or '' }}" placeholder="English" aria-label="{{ L('التسمية بالإنجليزية', 'English label') }}"></span>
-        <span class="kind"><select name="p{{ p.id }}_kind"><option value="class" {{ 'selected' if p.kind=='class' }}>{{ L('حصة', 'Class') }}</option><option value="break" {{ 'selected' if p.kind=='break' }}>{{ L('فرصة', 'Break') }}</option></select></span>
+        <span class="kind"><select name="p{{ p.id }}_kind"><option value="class" {{ 'selected' if p.kind=='class' }}>{{ L('حصة', 'Period') }}</option><option value="break" {{ 'selected' if p.kind=='break' }}>{{ L('استراحة', 'Break') }}</option></select></span>
         <span class="dur"><input type="number" min="1" max="240" name="p{{ p.id }}_duration" value="{{ p.duration }}" aria-label="{{ L('المدة', 'Minutes') }}"><span class="muted small">{{ L('د', 'm') }}</span></span>
         <span class="del"><button class="danger sm" form="del-p{{ p.id }}" title="{{ L('حذف', 'Delete') }}">✕</button></span>
       </div>
@@ -45,14 +45,14 @@
   <form id="del-p{{ p.id }}" method="post" action="{{ url_for('admin.program_period_delete', period_id=p.id) }}" data-confirm="{{ L('حذف هذا السطر؟ التالي يتقدم تلقائياً.', 'Delete this row? The next ones move up.') }}"></form>
   {% endfor %}
 
-  <h2 style="margin-top:18px" id="add-row">{{ L('إضافة حصة / فرصة', 'Add a Period / Break') }}</h2>
+  <h2 style="margin-top:18px" id="add-row">{{ L('إضافة حصة / استراحة', 'Add a Period / Break') }}</h2>
   <form method="post" action="{{ url_for('admin.program_period_add', program_id=prog.id) }}" class="row">
     {% if prog.periods %}<div class="shrink" style="min-width:210px"><label>{{ L('المكان', 'Position') }}</label><select name="before">
       <option value="">{{ L('في آخر اليوم', 'At the end of the day') }}</option>
       {% set ns2 = namespace(i=0) %}{% for p in prog.periods %}{% if p.kind == 'class' %}{% set ns2.i = ns2.i + 1 %}{% endif %}
       <option value="{{ p.id }}">{{ L('قبل', 'Before') }} {{ ('☕ ' ~ p.label_ar) if p.kind == 'break' else (L('الحصة', 'period') ~ ' ' ~ ns2.i) }} ({{ p.start_time }})</option>{% endfor %}
     </select></div>{% endif %}
-    <div class="shrink" style="width:120px"><label>{{ L('النوع', 'Type') }}</label><select name="kind"><option value="class">{{ L('حصة', 'Class') }}</option><option value="break">{{ L('فرصة', 'Break') }}</option></select></div>
+    <div class="shrink" style="width:120px"><label>{{ L('النوع', 'Type') }}</label><select name="kind"><option value="class">{{ L('حصة', 'Period') }}</option><option value="break">{{ L('استراحة', 'Break') }}</option></select></div>
     <div><label>{{ L('التسمية (اختياري)', 'Label (optional)') }}</label><input type="text" name="label_ar" placeholder="{{ L('تُولَّد تلقائياً', 'Auto') }}"></div>
     <div class="shrink" style="width:120px"><label>{{ L('المدة (د)', 'Minutes') }}</label><input type="number" min="1" max="240" name="duration" value="45" required></div>
     {% if not prog.periods %}<div class="shrink" style="width:140px"><label>{{ L('بداية الدوام', 'Day start') }}</label><input type="time" name="day_start" value="08:00"></div>{% endif %}

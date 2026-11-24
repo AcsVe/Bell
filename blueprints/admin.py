@@ -7,6 +7,7 @@ from flask import (Blueprint, current_app, flash, redirect, render_template, req
 from models import (db, AppSetting, BellProgram, BellProgramPeriod, Device, Grade,
                     GradeDayProgram, GradePeriodTime, MediaFile, Period, Section, Stage,
                     StageDayPeriodTime, StageWeekday, Teacher, TeacherSection, TeacherStage, stage_en_guess)
+import services
 from services import (WEEK_ORDER, bump_schedule_version, chain_times, default_period_labels,
                       generate_code, minutes_between, parse_duration, rechain_stage,
                       resolve_grade_day, valid_time, weekday_names,
@@ -475,7 +476,7 @@ def section_add(grade_id):
 def section_view(section_id):
     s = db.get_or_404(Section, section_id)
     linked_ids = {l.teacher_id for l in s.teacher_links}
-    teachers = Teacher.query.order_by(Teacher.name_ar).all()
+    teachers = services.by_name(Teacher.query.all(), session.get('lang', 'ar'))
     devices = Device.query.filter_by(code_type='section', owner_id=s.id).all()
     all_stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
     return render_template('admin/section.html', s=s, teachers=teachers, all_stages=all_stages,
@@ -544,7 +545,7 @@ def link_delete(link_id):
 @admin_bp.route('/teachers')
 @login_required
 def teachers():
-    rows = Teacher.query.order_by(Teacher.name_ar).all()
+    rows = services.by_name(Teacher.query.all(), session.get('lang', 'ar'))
     stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
     new_ids = [int(i) for i in (request.args.get('new') or '').split(',') if i.isdigit()]
     known = [[norm_name(t.name_ar), t.email or '', t.name_ar, t.id] for t in rows]
@@ -896,7 +897,7 @@ def program_period_add(program_id):
     class_index = sum(1 for p in prog.periods[:idx] if p.kind == 'class') + 1
     d_ar, d_en = default_period_labels(kind, class_index)
     if kind == 'break':
-        d_ar = 'الفرصة'
+        d_ar = 'الاستراحة'
     number = before.number if before else len(prog.periods) + 1
     if before:
         _shift_numbers(list(prog.periods), 'number', number)
@@ -1146,7 +1147,7 @@ def codes():
     stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
     by_stage = {st.id: _stage_teachers(st) for st in stages}
     linked = {t.id for ts in by_stage.values() for t in ts}
-    unlinked = [t for t in Teacher.query.order_by(Teacher.name_ar) if t.id not in linked]
+    unlinked = [t for t in services.by_name(Teacher.query.all(), session.get('lang', 'ar')) if t.id not in linked]
     return render_template('admin/codes.html', stages=stages, by_stage=by_stage, unlinked=unlinked)
 
 
@@ -1156,7 +1157,7 @@ def codes_export_all():
     from teacher_io import _stage_teachers, build_codes_export_all
     stages = Stage.query.order_by(Stage.sort_order, Stage.id).all()
     linked = {t.id for st in stages for t in _stage_teachers(st)}
-    unlinked = [t for t in Teacher.query.order_by(Teacher.name_ar) if t.id not in linked]
+    unlinked = [t for t in services.by_name(Teacher.query.all(), session.get('lang', 'ar')) if t.id not in linked]
     return send_file(build_codes_export_all(stages, unlinked), mimetype=XLSX, as_attachment=True,
                      download_name=_msg('رموز جرس الحصص.xlsx', 'Class bell codes.xlsx'))
 

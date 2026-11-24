@@ -43,7 +43,8 @@ def page():
                   if k in central.CENTRAL_TONES]
     new_key = session.pop('central_new_key', None)
     new_key_for = session.pop('central_new_key_for', None)
-    return render_template('admin/central.html', cfg=cfg, groups=group_list, tones=tones, week=week, lib=lib,
+    end_tone = (cfg.get('end_ring') or {}).get('tone') or (lib[0][0] if lib else '')
+    return render_template('admin/central.html', end_tone=end_tone, cfg=cfg, groups=group_list, tones=tones, week=week, lib=lib,
                            uploads=central.uploaded_tones(), st=central.status(), has_key=central.has_key(),
                            new_key=new_key, new_key_for=new_key_for, devices=devs, today_rings=today_rings, today_off=today_off, next_ring=next_ring,
                            now=now, week_order=WEEK_ORDER, wd_names=weekday_names(session.get('lang', 'ar')),
@@ -95,6 +96,10 @@ def save():
         seen_p = request.form.getlist('per_seen')
         cfg['off_groups'] = sorted(g for g in seen_g if not request.form.get('on__' + g))
         cfg['off_periods'] = sorted(p for p in seen_p if not request.form.get('on__' + p))
+    if request.form.get('end_seen'):                  # رنّة نهاية الدوام (خانة وقائمة النغمة في النموذج نفسه)
+        tone = request.form.get('end_tone')
+        keys = set(central.all_tone_keys())
+        cfg['end_ring'] = {'enabled': bool(request.form.get('end_on')), 'tone': tone if tone in keys else ''}
     valid = set(central.all_tone_keys()) | {central.SILENT}
     for g in central.groups():
         c, b = request.form.get(f'class__{g["key"]}'), request.form.get(f'break__{g["key"]}')
