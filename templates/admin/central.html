@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}
-{% macro rep_select(name, cur) %}<select name="{{ name }}" title="{{ L('عدد مرات تكرار النغمة في الرنّة الواحدة (لنغمة أطول وأوضح)', 'How many times the tone plays in one ring (a longer, clearer bell)') }}">
+{% macro rep_select(name, cur) %}<select name="{{ name }}" data-rep title="{{ L('عدد مرات تكرار النغمة في الرنّة الواحدة (لنغمة أطول وأوضح)', 'How many times the tone plays in one ring (a longer, clearer bell)') }}">
   {% for n in range(1, 6) %}<option value="{{ n }}" {{ 'selected' if (cur|int(1)) == n }}>{{ [L('مرة واحدة', 'Once'), L('مرتان', 'Twice'), L('3 مرات', '3 times'), L('4 مرات', '4 times'), L('5 مرات', '5 times')][n - 1] }}</option>{% endfor %}
 </select>{% endmacro %}
 {% block title %}{{ L('الجرس المركزي', 'Central Bell') }}{% endblock %}
@@ -13,8 +13,8 @@
     {% else %}<span class="chip">{{ L('لم يُثبَّت أي جهاز جرس بعد', 'No bell device installed yet') }}</span>{% endfor %}
   </div>
 </div>
-<p class="hint">{{ L('جرس للمدرسة كلها عبر السمّاعات، مستقل عن التطبيقات ورموز المعلمين. يرنّ عند بداية كل حصة وكل استراحة، ولكل توقيت (برنامج جرس أو مرحلة) نغمتان: للحصة وللاستراحة، فيميّز الطلاب جرسهم. تحفظ أجهزة الجرس الجدول والنغمات، وترنّ حتى إن انقطع الإنترنت أو توقف الخادم.',
-  'A school-wide bell through the office speakers, independent of the apps and the teacher codes. It rings at the start of every period and every break; each timing (bell program or stage) has two tones — period and break — so students recognise their bell. The office player keeps the schedule and tones and rings even without internet or with the server down.') }}</p>
+<p class="hint">{{ L('جرس للمدرسة كلها عبر السمّاعات، مستقل عن التطبيقات ورموز المعلمين. يرنّ عند بداية كل حصة وكل استراحة، ولكل توقيت (برنامج جرس أو مرحلة) ثلاث نغمات: للحصة وللاستراحة ولنهاية الدوام (اختيارية)، ولكل منها تكرار من مرة إلى 5 مرات، فيميّز الطلاب جرسهم. تحفظ أجهزة الجرس الجدول والنغمات، وترنّ حتى إن انقطع الإنترنت أو توقف الخادم.',
+  'A school-wide bell through the office speakers, independent of the apps and the teacher codes. It rings at the start of every period and every break; each timing (bell program or stage) has three tones — period, break and end of day (optional) — each can repeat 1 to 5 times, so students recognise their bell. The office player keeps the schedule and tones and rings even without internet or with the server down.') }}</p>
 
 <nav class="tabbar" data-tabs>
   <a href="#ring-tab" data-tab="ring-tab"><i class="fa-solid fa-bell" aria-hidden="true"></i> {{ L('النغمات لكل توقيت', 'Tones per Timing') }}<span class="count">{{ groups|length }}</span></a>
@@ -38,7 +38,7 @@
   <p class="muted">{{ L('لا توجد توقيتات بعد — أضف المراحل والحصص أو برامج الجرس ووزّعها على الصفوف أولاً.', 'No timings yet — add stages and periods or bell programs and assign them to grades first.') }}</p>
   {% else %}
   <table class="resp" style="margin-top:12px">
-    <thead><tr><th style="width:70px">{{ L('مفعّل', 'On') }}</th><th>{{ L('التوقيت', 'Timing') }}</th><th>{{ L('الصفوف', 'Grades') }}</th><th>{{ L('نغمة بداية الحصة', 'Period-start tone') }}</th><th>{{ L('نغمة الاستراحة', 'Break tone') }}</th></tr></thead>
+    <thead><tr><th style="width:70px">{{ L('مفعّل', 'On') }}</th><th>{{ L('التوقيت', 'Timing') }}</th><th>{{ L('الصفوف', 'Grades') }}</th><th>{{ L('نغمة بداية الحصة', 'Period-start tone') }}</th><th>{{ L('نغمة الاستراحة', 'Break tone') }}</th><th>{{ L('نغمة نهاية الدوام', 'End-of-day tone') }}</th></tr></thead>
     <tbody>
     {% for g in groups %}{% set cur = tones[g.key] %}{% set g_on = g.key not in cfg.off_groups %}
     <tr data-row style="{{ 'opacity:.55' if not g_on }}">
@@ -56,7 +56,7 @@
           {% endfor %}</div>
         </details>{% endif %}</td>
       <td class="small">{% for u in (g.uses_en if lang == 'en' else g.uses) %}<span class="chip">{{ u }}</span>{% endfor %}</td>
-      {% for kind in ['class', 'break'] %}
+      {% for kind in ['class', 'break', 'end'] %}
       <td><div class="row" style="flex-wrap:nowrap;gap:6px">
         <select name="{{ kind }}__{{ g.key }}" data-tone-select>
           {% for k, name, url in lib %}<option value="{{ k }}" {{ 'selected' if cur[kind] == k }}>{{ name }}</option>{% endfor %}
@@ -71,20 +71,6 @@
     </tbody>
   </table>
   {% endif %}
-  <div class="end-ring" style="margin-top:16px;padding-top:14px;border-top:1px solid #e3e9f2">
-    <input type="hidden" name="end_seen" value="1">
-    <label style="display:flex;gap:8px;align-items:center;font-weight:700"><input type="checkbox" name="end_on" value="1" {{ 'checked' if cfg.end_ring.enabled }}> {{ L('رنّة نهاية الدوام', 'End-of-day ring') }}</label>
-    <div class="row" style="align-items:center;margin-top:8px">
-      <div class="shrink" style="min-width:120px"><label>{{ L('التكرار', 'Repeat') }}</label>{{ rep_select('end_repeat', cfg.end_ring.repeat|default(1)) }}</div>
-      <div><label>{{ L('النغمة', 'Tone') }}</label>
-        <select name="end_tone" data-tone-select>
-          {% for k, name, url in lib %}<option value="{{ k }}" {{ 'selected' if end_tone == k }}>{{ name }}</option>{% endfor %}
-        </select></div>
-      <button type="button" class="ghost sm shrink" data-play title="{{ L('استماع', 'Listen') }}">▶</button>
-    </div>
-    <p class="muted small">{{ L('ترنّ عند نهاية آخر حصة في اليوم لكل توقيت، فيختلف وقتها حسب البرنامج واليوم (مثل يوم الثلاثاء). تنتهي الحصة الأخيرة ولا تبدأ بعدها حصة، فلا ترنّ في الوضع المعتاد.',
-      'Rings when the last period of the day ends, for every timing, so its time follows the program and the day (for example Tuesday). The last period is followed by no other period, so it does not ring otherwise.') }}</p>
-  </div>
   <p class="small" style="margin-top:14px">📅 {{ L('أيام العطل والامتحانات وأي فترة بلا جرس: تبويب', 'Holidays, exams and any period without the bell: the tab') }} <a href="#off-tab">{{ L('روزنامة إيقاف الجرس', 'Days without the bell') }}</a>.</p>
   <button style="margin-top:12px">{{ L('حفظ', 'Save') }}</button>
   <p class="muted small">{{ L('زر الاستماع ▶ يشغّل النغمة على جهازك أنت. وللتجربة على السمّاعات: تبويب «مكتبة النغمات والتجربة».', 'Listening ▶ plays on your own device. To test on the office speakers: the “Tone library & test” tab.') }}</p>
@@ -260,7 +246,9 @@
 <div class="card">
   <h2>{{ L('تجربة على السمّاعات', 'Test on the Speakers') }}</h2>
   <form method="post" action="{{ url_for('central.test') }}" class="row">
-    <div><select name="tone">{% for k, name, url in lib %}<option value="{{ k }}">{{ name }}</option>{% endfor %}</select></div>
+    <div class="row" style="flex-wrap:nowrap;gap:6px;align-items:center"><select name="tone" data-tone-select>{% for k, name, url in lib %}<option value="{{ k }}">{{ name }}</option>{% endfor %}</select>
+      <button type="button" class="ghost sm shrink" data-play title="{{ L('استماع على جهازك', 'Listen on your device') }}">▶</button></div>
+    <div class="shrink" style="min-width:120px"><label>{{ L('التكرار', 'Repeat') }}</label>{{ rep_select('repeat', 1) }}</div>
     <div class="shrink"><button>{{ L('رنّ الآن', 'Ring now') }}</button></div>
     <div style="flex-basis:100%">
       <label>{{ L('على الأجهزة (المباني):', 'On the devices (buildings):') }}</label>
@@ -530,8 +518,13 @@
   const URLS = {{ lib_urls|tojson }};
   document.querySelectorAll('[data-play]').forEach(b => b.addEventListener('click', () => {
     const sel = b.parentElement.querySelector('select');
-    const url = URLS[sel.value];
+    const scope = b.closest('td') || b.closest('form');
+    const repSel = scope && scope.querySelector('[data-rep]');
+    const times = repSel ? parseInt(repSel.value, 10) || 1 : 1;
+    let url = URLS[sel.value];
     if (!url) return;
+    // the listen button plays the tone the same number of times the bell will (the server builds the repeated file)
+    if (times > 1 && !String(sel.value).includes('@')) url = '/media/tone/' + sel.value.replace(':', '-') + '/' + times + '.wav';
     if (window._bellAudio) window._bellAudio.pause();
     window._bellAudio = new Audio(url);
     window._bellAudio.play();
