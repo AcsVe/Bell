@@ -99,7 +99,8 @@ def save():
     if request.form.get('end_seen'):                  # رنّة نهاية الدوام (خانة وقائمة النغمة في النموذج نفسه)
         tone = request.form.get('end_tone')
         keys = set(central.all_tone_keys())
-        cfg['end_ring'] = {'enabled': bool(request.form.get('end_on')), 'tone': tone if tone in keys else ''}
+        cfg['end_ring'] = {'enabled': bool(request.form.get('end_on')), 'tone': tone if tone in keys else '',
+                           'repeat': central.clamp_repeat(request.form.get('end_repeat'))}
     valid = set(central.all_tone_keys()) | {central.SILENT}
     for g in central.groups():
         c, b = request.form.get(f'class__{g["key"]}'), request.form.get(f'break__{g["key"]}')
@@ -108,6 +109,10 @@ def save():
             cur['class'] = c
         if b in valid:
             cur['break'] = b
+        if request.form.get('rep_seen'):              # عدد مرات تكرار النغمة في كل رنّة (1 إلى 5)
+            cfg.setdefault('repeats', {})[g['key']] = {
+                'class': central.clamp_repeat(request.form.get(f'rep_class__{g["key"]}')),
+                'break': central.clamp_repeat(request.form.get(f'rep_break__{g["key"]}'))}
     central.save_config(cfg)
     db.session.commit()
     flash(_msg('حُفظت إعدادات الجرس المركزي، ويصل التحديث إلى أجهزة الجرس خلال 15 ثانية',
@@ -311,6 +316,7 @@ def _custom_from_form(cur=None):
     known = set(central.players())
     devs = [d for d in request.form.getlist('devices') if d in known]
     c.update({'name': name or t, 't': t, 'days': days, 'tone': tone, 'enabled': bool(request.form.get('enabled')),
+              'repeat': central.clamp_repeat(request.form.get('repeat')),
               'devices': None if request.form.get('all_devices') or not known or set(devs) == known else devs})
     return c, None
 

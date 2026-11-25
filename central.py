@@ -24,16 +24,13 @@ CENTRAL_TONES = {
     'class-2': ('دينغ دونغ', 'Ding-dong'),
     'class-3': ('ثلاث نغمات صاعدة', 'Three rising notes'),
     'class-4': ('ويستمنستر', 'Westminster'),
-    'class-5': ('صفّارة مزدوجة', 'Double beep'),
     'class-6': ('ثلاث دقّات', 'Three strikes'),
     'class-7': ('ماريمبا هابطة', 'Falling marimba'),
-    'class-8': ('جرس كهربائي طويل', 'Long electric bell'),
     'break-1': ('لحن الاستراحة', 'Break melody'),
     'break-2': ('زقزقة', 'Chirps'),
     'break-3': ('أربع نغمات هابطة', 'Four falling bells'),
     'break-4': ('نغمة الفرح', 'Happy arpeggio'),
     'break-5': ('دقّات خشبية', 'Wood blocks'),
-    'break-6': ('رنّتان طويلتان', 'Two long rings'),
     # children — soft and playful, no electric ringing
     'kids-1': ('صندوق الموسيقى', 'Music box'),
     'kids-2': ('إكسيليفون مرح', 'Happy xylophone'),
@@ -44,6 +41,10 @@ CENTRAL_TONES = {
     'kids-7': ('نجمة صغيرة', 'Little star'),
     'kids-8': ('قفزات مرحة', 'Bouncy'),
 }
+# Tones removed from the library for good: whatever still points at one of them uses its replacement instead.
+RETIRED_TONES = {'class-5': 'class-2', 'class-8': 'class-1', 'break-6': 'break-1'}
+MAX_REPEAT = 5           # a ring can play its tone up to 5 times in a row (a longer, more noticeable bell)
+REPEAT_GAP = 0.6         # seconds of silence between two plays
 CLASS_DEFAULTS = [k for k in CENTRAL_TONES if k.startswith('class-')]
 BREAK_DEFAULTS = [k for k in CENTRAL_TONES if k.startswith('break-')]
 SILENT = 'none'          # a group may switch one kind off (e.g. no break bell for the kindergarten)
@@ -62,6 +63,7 @@ def config():
     c.setdefault('tones', {})
     c.setdefault('off_groups', [])      # timings switched off (no ring at all for them)
     c.setdefault('off_periods', [])
+    c.setdefault('repeats', {})        # {group key: {'class': 1-5, 'break': 1-5}} plays of the tone per ring
     c.setdefault('end_ring', {'enabled': False, 'tone': ''})   # رنّة عند نهاية الحصة الأخيرة لكل برنامج/توقيت
     c.setdefault('hidden_tones', [])    # built-in tones removed from the library (can be restored)     # single periods/breaks switched off: 'pp:<program period id>' / 'sp:<stage period id>'
     return c
@@ -75,7 +77,29 @@ def save_config(c):
     AppSetting.set('central_bell', json.dumps(c, ensure_ascii=False, sort_keys=True))
 
 
+def clamp_repeat(n):
+    try:
+        return max(1, min(MAX_REPEAT, int(n)))
+    except (TypeError, ValueError):
+        return 1
+
+
+def rep_key(base, n):
+    """The tone key of «base played n times»: 'class-1@x3' (plain base when n = 1)."""
+    n = clamp_repeat(n)
+    return base if n <= 1 else f'{base}@x{n}'
+
+
+def split_key(key):
+    """'class-1@x3' → ('class-1', 3);  'class-1' → ('class-1', 1)."""
+    base, sep, n = (key or '').partition('@x')
+    return (base, clamp_repeat(n)) if sep and n.isdigit() else (key, 1)
+
+
 def tone_url(key):
+    base, n = split_key(key)
+    if n > 1 and (base in CENTRAL_TONES or (base or '').startswith('media:')) and tone_url(base):
+        return f'/media/tone/{base.replace(":", "-")}/{n}.wav'
     if key in CENTRAL_TONES:
         return f'/static/sounds/central/{key}.wav'
     if key and key.startswith('media:'):
@@ -85,6 +109,9 @@ def tone_url(key):
 
 
 def tone_name(key, lang='ar'):
+    base, n = split_key(key)
+    if n > 1:
+        return f'{tone_name(base, lang)} ×{n}'
     if key == SILENT:
         return 'بلا رنين' if lang == 'ar' else 'No ring'
     if key in CENTRAL_TONES:
@@ -101,6 +128,41 @@ def uploaded_tones():
 
 def all_tone_keys():
     return list(CENTRAL_TONES) + [f'media:{m.id}' for m in uploaded_tones()]
+
+
+def repeated_audio(base_key, n):
+    """(bytes, mimetype) of the tone played n times in a row with a short pause. WAV is rebuilt properly;
+    anything else (MP3) is concatenated, which players accept. None when the tone does not exist."""
+    import io
+    import os
+    import wave
+    n = clamp_repeat(n)
+    if base_key in CENTRAL_TONES:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'sounds', 'central', f'{base_key}.wav')
+        if not os.path.isfile(path):
+            return None
+        with open(path, 'rb') as f:
+            raw, mime = f.read(), 'audio/wav'
+    elif (base_key or '').startswith('media:') and base_key[6:].isdigit():
+        m = db.session.get(MediaFile, int(base_key[6:]))
+        if m is None:
+            return None
+        raw, mime = bytes(m.data), m.mime or 'audio/mpeg'
+    else:
+        return None
+    if n <= 1:
+        return raw, mime
+    try:
+        with wave.open(io.BytesIO(raw)) as w:
+            params, frames = w.getparams(), w.readframes(w.getnframes())
+        gap = b'\x00' * (int(params.framerate * REPEAT_GAP) * params.nchannels * params.sampwidth)
+        out = io.BytesIO()
+        with wave.open(out, 'wb') as o:
+            o.setparams(params)
+            o.writeframes(gap.join([frames] * n))
+        return out.getvalue(), 'audio/wav'
+    except (wave.Error, EOFError):
+        return raw * n, mime
 
 
 def library_keys(cfg=None):
@@ -195,7 +257,7 @@ def effective_tones(cfg=None, group_list=None):
     valid = set(all_tone_keys()) | {SILENT}
     out = {}
     for i, g in enumerate(group_list):
-        saved = cfg['tones'].get(g['key'], {})
+        saved = {k: RETIRED_TONES.get(v, v) for k, v in cfg['tones'].get(g['key'], {}).items()}
         hidden = set(cfg.get('hidden_tones') or [])
         cd = [k for k in CLASS_DEFAULTS if k not in hidden] or CLASS_DEFAULTS
         bd = [k for k in BREAK_DEFAULTS if k not in hidden] or BREAK_DEFAULTS
@@ -225,7 +287,8 @@ def custom_rings():
         out = json.loads(AppSetting.get('central_custom') or '[]')
     except ValueError:
         out = []
-    return sorted([c for c in out if isinstance(c, dict) and c.get('t')], key=lambda c: (c['t'], c.get('name', '')))
+    out = [dict(c, tone=RETIRED_TONES.get(c.get('tone'), c.get('tone'))) for c in out if isinstance(c, dict) and c.get('t')]
+    return sorted(out, key=lambda c: (c['t'], c.get('name', '')))
 
 
 def save_custom_rings(items):
@@ -370,9 +433,11 @@ def week_rings(cfg=None, only=None, pid='*'):
             return
         if gkey in off_g or period_key(period) in off_p:
             return
-        tone = tones.get(gkey, {}).get('break' if period['kind'] == 'break' else 'class')
+        kind = 'break' if period['kind'] == 'break' else 'class'
+        tone = tones.get(gkey, {}).get(kind)
         if not tone or tone == SILENT:
             return
+        tone = rep_key(tone, (cfg.get('repeats') or {}).get(gkey, {}).get(kind, 1))
         slot = days[wd].setdefault(period['start'], {})
         r = slot.setdefault(tone, {'tone': tone, 'kind': period['kind'], 'groups': [], 'label': period['ar']})
         if gname not in r['groups']:
@@ -391,7 +456,8 @@ def week_rings(cfg=None, only=None, pid='*'):
             return
         t = max((p['end'] for p in day_periods), key=_minutes)
         slot = days[wd].setdefault(t, {})
-        r = slot.setdefault(end_tone, {'tone': end_tone, 'kind': 'custom', 'groups': [], 'label': 'نهاية الدوام'})
+        et = rep_key(end_tone, end.get('repeat', 1))
+        r = slot.setdefault(et, {'tone': et, 'kind': 'custom', 'groups': [], 'label': 'نهاية الدوام'})
         if gname not in r['groups']:
             r['groups'].append(gname)
 
@@ -421,7 +487,8 @@ def week_rings(cfg=None, only=None, pid='*'):
         for wd in c.get('days') or []:
             if 0 <= int(wd) <= 6:
                 slot = days[int(wd)].setdefault(c['t'], {})
-                r = slot.setdefault(c['tone'], {'tone': c['tone'], 'kind': 'custom', 'groups': [], 'label': c.get('name', '')})
+                ct = rep_key(c['tone'], c.get('repeat', 1))
+                r = slot.setdefault(ct, {'tone': ct, 'kind': 'custom', 'groups': [], 'label': c.get('name', '')})
                 if c.get('name', '') not in r['groups']:
                     r['groups'].append(c.get('name', ''))
     return {wd: [{'t': t, 'rings': list(slot.values())} for t, slot in sorted(slots.items())] for wd, slots in days.items()}

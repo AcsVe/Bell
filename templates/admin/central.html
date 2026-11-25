@@ -1,4 +1,7 @@
 {% extends 'admin/base.html' %}
+{% macro rep_select(name, cur) %}<select name="{{ name }}" title="{{ L('عدد مرات تكرار النغمة في الرنّة الواحدة (لنغمة أطول وأوضح)', 'How many times the tone plays in one ring (a longer, clearer bell)') }}">
+  {% for n in range(1, 6) %}<option value="{{ n }}" {{ 'selected' if (cur|int(1)) == n }}>{{ [L('مرة واحدة', 'Once'), L('مرتان', 'Twice'), L('3 مرات', '3 times'), L('4 مرات', '4 times'), L('5 مرات', '5 times')][n - 1] }}</option>{% endfor %}
+</select>{% endmacro %}
 {% block title %}{{ L('الجرس المركزي', 'Central Bell') }}{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -39,7 +42,7 @@
     <tbody>
     {% for g in groups %}{% set cur = tones[g.key] %}{% set g_on = g.key not in cfg.off_groups %}
     <tr data-row style="{{ 'opacity:.55' if not g_on }}">
-      <td><input type="hidden" name="grp_seen" value="{{ g.key }}">
+      <td><input type="hidden" name="grp_seen" value="{{ g.key }}"><input type="hidden" name="rep_seen" value="1">
         <label class="switch" title="{{ L('تفعيل / تعطيل كل رنّات هذا التوقيت', 'Turn all rings of this timing on / off') }}" style="display:flex;gap:6px;align-items:center;font-weight:normal">
           <input type="checkbox" name="on__{{ g.key }}" value="1" {{ 'checked' if g_on }}> <span class="small">{{ L('مفعّل', 'On') if g_on else L('معطّل', 'Off') }}</span></label></td>
       <td><b><bdi>{{ L(g.ar, g.en) }}</bdi></b><div class="small muted">{{ L('برنامج الجرس', 'Bell program') if g.kind == 'program' else L('توقيت المرحلة', 'Stage times') }}</div>
@@ -60,7 +63,8 @@
           <option value="{{ silent }}" {{ 'selected' if cur[kind] == silent }}>— {{ L('بلا رنين', 'No ring') }} —</option>
         </select>
         <button type="button" class="ghost sm shrink" data-play title="{{ L('استماع', 'Listen') }}">▶</button>
-      </div></td>
+      </div>
+      <div class="small" style="margin-top:4px;display:flex;gap:6px;align-items:center"><span class="muted">{{ L('التكرار:', 'Repeat:') }}</span>{{ rep_select('rep_' ~ kind ~ '__' ~ g.key, (cfg.repeats.get(g.key, {}).get(kind, 1))) }}</div></td>
       {% endfor %}
     </tr>
     {% endfor %}
@@ -71,6 +75,7 @@
     <input type="hidden" name="end_seen" value="1">
     <label style="display:flex;gap:8px;align-items:center;font-weight:700"><input type="checkbox" name="end_on" value="1" {{ 'checked' if cfg.end_ring.enabled }}> {{ L('رنّة نهاية الدوام', 'End-of-day ring') }}</label>
     <div class="row" style="align-items:center;margin-top:8px">
+      <div class="shrink" style="min-width:120px"><label>{{ L('التكرار', 'Repeat') }}</label>{{ rep_select('end_repeat', cfg.end_ring.repeat|default(1)) }}</div>
       <div><label>{{ L('النغمة', 'Tone') }}</label>
         <select name="end_tone" data-tone-select>
           {% for k, name, url in lib %}<option value="{{ k }}" {{ 'selected' if end_tone == k }}>{{ name }}</option>{% endfor %}
@@ -86,6 +91,7 @@
 </form>
 </section>
 
+
 {% macro custom_fields(c, idp) %}
   <div class="row">
     <div><label>{{ L('الاسم', 'Name') }}</label><input type="text" name="name" value="{{ c.name if c else '' }}" maxlength="60" placeholder="{{ L('مثلاً: طابور الصباح', 'e.g. Morning line-up') }}" required></div>
@@ -93,6 +99,7 @@
     <div class="shrink" style="min-width:220px"><label>{{ L('النغمة', 'Tone') }}</label>
       <div class="row" style="flex-wrap:nowrap;gap:6px"><select name="tone" data-tone-select>{% for k, name, url in lib %}<option value="{{ k }}" {{ 'selected' if c and c.tone == k }}>{{ name }}</option>{% endfor %}</select>
       <button type="button" class="ghost sm shrink" data-play title="{{ L('استماع', 'Listen') }}">▶</button></div></div>
+    <div class="shrink" style="min-width:120px"><label>{{ L('التكرار', 'Repeat') }}</label>{{ rep_select('repeat', c.repeat if c else 1) }}</div>
   </div>
   <div class="row" style="gap:4px 14px;flex-wrap:wrap;margin-top:6px">
     <b class="shrink small">{{ L('الأيام:', 'Days:') }}</b>
