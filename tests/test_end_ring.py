@@ -49,13 +49,27 @@ def test_no_end_ring_by_default(env):
                 assert 'custom' not in kinds
 
 
+def _set_end(admin, app, tone, repeat='1', only=None):
+    """The end-of-day tone is the third tone of each timing, next to the period and break tones."""
+    import central
+    with app.app_context():
+        keys = [g['key'] for g in central.groups()]
+    data = {}
+    for k in keys:
+        if only is None or k in only:
+            data[f'end__{k}'] = tone
+            data['rep_seen'] = '1'
+            data[f'rep_end__{k}'] = repeat
+    return admin.post('/admin/central/save', data=data), keys
+
+
 def test_end_ring_follows_each_programs_last_period_and_the_day(env):
     app, admin = env
     import central
-    r = admin.post('/admin/central/save', data={'end_seen': '1', 'end_on': '1', 'end_tone': 'class-2'})
+    r, keys = _set_end(admin, app, 'air-3')
     assert r.status_code == 302
     with app.app_context():
-        assert central.config()['end_ring'] == {'enabled': True, 'tone': 'class-2', 'repeat': 1}
+        assert all(central.config()['tones'][k]['end'] == 'air-3' for k in keys)
         week = central.week_rings()
         for wd in (SUN, TUE):
             ends = _last_end(app, wd)
@@ -63,42 +77,66 @@ def test_end_ring_follows_each_programs_last_period_and_the_day(env):
             for end in ends:
                 slot = _times(week, wd)[end]
                 ring = next(r for r in slot['rings'] if r['kind'] == 'custom' and r['label'] == 'نهاية الدوام')
-                assert ring['tone'] == 'class-2' and ring['groups']
+                assert ring['tone'] == 'air-3' and ring['groups']
         assert _last_end(app, SUN) != _last_end(app, TUE)            # الثلاثاء ينتهي قبل بقية الأيام: أوقات مختلفة
         assert week[4] == [] and week[5] == []                       # لا رنّة في الجمعة والسبت
 
 
-def test_saving_other_settings_keeps_the_end_ring(env):
+def test_each_program_has_its_own_end_tone_and_repeat(env):
     app, admin = env
     import central
-    admin.post('/admin/central/save', data={'end_seen': '1', 'end_on': '1', 'end_tone': 'class-1'})
-    admin.post('/admin/central/save', data={'volume': '60'})                 # نموذج لا يحمل خانة النهاية
-    with app.app_context():
-        assert central.config()['end_ring']['enabled'] is True
-
-
-def test_unchecking_turns_it_off_and_a_device_gets_only_its_groups(env):
-    app, admin = env
-    import central
-    admin.post('/admin/central/save', data={'end_seen': '1', 'end_on': '1', 'end_tone': 'class-2'})
     with app.app_context():
         keys = [g['key'] for g in central.groups()]
+    assert len(keys) >= 2
+    admin.post('/admin/central/save', data={'rep_seen': '1', f'end__{keys[0]}': 'air-3', f'rep_end__{keys[0]}': '3',
+                                            f'end__{keys[1]}': central.SILENT, f'rep_end__{keys[1]}': '1'})
+    with app.app_context():
+        eff = central.effective_tones()
+        assert eff[keys[0]]['end'] == 'air-3' and eff[keys[1]]['end'] == central.SILENT
+        ends = {r['tone'] for wd in central.week_rings().values() for s in wd for r in s['rings'] if r['kind'] == 'custom'}
+        assert ends == {'air-3@x3'}
+
+
+def test_saving_other_settings_keeps_the_end_tones(env):
+    app, admin = env
+    import central
+    _, keys = _set_end(admin, app, 'air-4')
+    admin.post('/admin/central/save', data={'volume': '60'})                 # نموذج لا يحمل نغمات النهاية
+    with app.app_context():
+        assert all(central.config()['tones'][k]['end'] == 'air-4' for k in keys)
+
+
+def test_silent_end_tone_turns_it_off_and_a_device_gets_only_its_groups(env):
+    app, admin = env
+    import central
+    _, keys = _set_end(admin, app, 'air-3')
+    with app.app_context():
         only = {keys[0]}
         week = central.week_rings(only=only)
         groups = {g for wd in week.values() for s in wd for r in s['rings'] if r['kind'] == 'custom' for g in r['groups']}
         assert len(groups) == 1                                              # جهاز لمجموعة واحدة: رنّة نهايتها وحدها
-        payload = central.player_payload()
-        assert 'class-2' in payload['tones']
-    admin.post('/admin/central/save', data={'end_seen': '1', 'end_tone': 'class-2'})      # أُزيلت العلامة
+        assert 'air-3' in central.player_payload()['tones']
+    _set_end(admin, app, central.SILENT)                                     # «بلا رنين» لكل البرامج
     with app.app_context():
-        assert central.config()['end_ring']['enabled'] is False
         assert not any(r['kind'] == 'custom' for wd in central.week_rings().values() for s in wd for r in s['rings'])
 
 
-def test_the_admin_page_shows_the_setting(env):
+def test_the_old_global_end_ring_moves_into_the_programs(env):
+    app, admin = env
+    import central
+    with app.app_context():
+        cfg = central.config()
+        cfg['end_ring'] = {'enabled': True, 'tone': 'class-2', 'repeat': 1}      # إعداد قديم بنغمة محذوفة
+        central.save_config(cfg)
+        eff = central.effective_tones()
+        assert eff and all(v['end'] == 'air-2' for v in eff.values())
+
+
+def test_the_admin_page_shows_the_end_tone_with_the_programs(env):
     app, admin = env
     html = admin.get('/admin/central').get_data(as_text=True)
-    assert 'name="end_on"' in html and 'name="end_tone"' in html and 'رنّة نهاية الدوام' in html
+    assert 'نغمة نهاية الدوام' in html and 'name="end_tone"' not in html and 'name="end_on"' not in html
+    assert 'name="end__program:' in html and 'name="rep_end__program:' in html
 
 
 # ── ترتيب أبجدي حسب لغة الواجهة ────────────────────────────────────────────────

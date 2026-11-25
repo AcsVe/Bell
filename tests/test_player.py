@@ -107,10 +107,10 @@ def test_player_end_to_end(env, monkeypatch):
     off = bp.Player({'server': 'http://127.0.0.1:9', 'key': key})
     assert off.cached_ok() and off.schedule['version'] == p.schedule['version']
     # test ring from the admin page reaches the audio queue once
-    admin.post('/admin/central/test', data={'tone': 'class-3'})
+    admin.post('/admin/central/test', data={'tone': 'air-3'})
     p.poll()
     paths, what = p.audio.get_nowait()
-    assert what == 'test' and os.path.basename(paths[0]).startswith('class-3')
+    assert what == 'test' and os.path.basename(paths[0]).startswith('air-3')
     p.poll()
     assert p.audio.empty()
     # status reached the server

@@ -45,7 +45,7 @@ def test_groups_tones_and_week(admin, app):
         cls = [tones[k]['class'] for k in keys]
         n_cls = len(central.CLASS_DEFAULTS)
         assert len(set(cls[:n_cls])) == min(n_cls, len(cls))
-        assert all(tones[k]['break'].startswith('break-') for k in keys)
+        assert all(tones[k]['break'] in central.BREAK_DEFAULTS for k in keys)
         week = central.week_rings()
         sunday = week[6]
         assert sunday and sunday == sorted(sunday, key=lambda s: s['t'])
@@ -54,7 +54,7 @@ def test_groups_tones_and_week(admin, app):
         # a break ring uses that group's break tone
         for s in sunday:
             for r in s['rings']:
-                assert r['tone'].startswith('break-' if r['kind'] == 'break' else 'class-')
+                assert r['tone'] in (central.BREAK_DEFAULTS if r['kind'] == 'break' else central.CLASS_DEFAULTS)
         assert week[4] == [] and week[5] == []                              # Friday / Saturday: no school
         # same minute + same tone rings once, listing every group
         flat = [(s['t'], r['tone']) for s in sunday for r in s['rings']]
@@ -69,7 +69,7 @@ def test_admin_page_save_and_silent(admin, app):
     with app.app_context():
         g = central.groups()[0]['key']
         assert central.config()['tones'][g]                                 # defaults frozen on first view
-    r = admin.post('/admin/central/save', data={'enabled': '1', 'volume': '70', f'class__{g}': 'class-4',
+    r = admin.post('/admin/central/save', data={'enabled': '1', 'volume': '70', f'class__{g}': 'air-4',
                                                 f'break__{g}': central.SILENT, 'skip_dates': '2099-01-01\nbad\n2000-01-01'},
                    follow_redirects=True)
     body = r.get_data(as_text=True)
@@ -77,7 +77,7 @@ def test_admin_page_save_and_silent(admin, app):
     with app.app_context():
         cfg = central.config()
         assert cfg['volume'] == 70 and cfg['skip_dates'] == ['2099-01-01']   # past dates dropped
-        assert cfg['tones'][g] == {'class': 'class-4', 'break': central.SILENT}
+        assert cfg['tones'][g] == {'class': 'air-4', 'break': central.SILENT, 'end': central.SILENT}
         week = central.week_rings()
         rings = [r for d in week.values() for s in d for r in s['rings']]
         assert not any(r['tone'] == central.SILENT for r in rings)
@@ -106,9 +106,9 @@ def test_player_api_key_version_and_test_ring(admin, app):
     p = c.post('/api/central/poll', headers=h, json={'host': 'OFFICE-PC', 'version': v, 'player': '1.0',
                                                       'clock_drift': 2, 'cached': True}).get_json()
     assert p['version'] == v and p['test'] is None
-    admin.post('/admin/central/test', data={'tone': 'class-2'})
+    admin.post('/admin/central/test', data={'tone': 'air-2'})
     p = c.post('/api/central/poll', headers=h, json={'host': 'OFFICE-PC'}).get_json()
-    assert p['test']['tone'] == 'class-2' and p['test']['url'].endswith('class-2.wav')
+    assert p['test']['tone'] == 'air-2' and p['test']['url'].endswith('air-2.wav')
     html = admin.get('/admin/central').get_data(as_text=True)
     assert 'متصل ويعمل' in html and 'dev-chip on' in html
     assert 'OFFICE-PC' not in html                                       # no technical details on the page
@@ -123,7 +123,7 @@ def test_player_api_key_version_and_test_ring(admin, app):
 def test_uploaded_tone(admin, app):
     _seed(admin, app)
     import central
-    wav = open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'sounds', 'central', 'class-1.wav'), 'rb').read()
+    wav = open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'sounds', 'central', 'air-1.wav'), 'rb').read()
     r = admin.post('/admin/central/upload', data={'tone': (io.BytesIO(wav), 'school.wav', 'audio/wav')},
                    content_type='multipart/form-data', follow_redirects=True)
     assert 'رُفعت النغمة' in r.get_data(as_text=True)
@@ -139,7 +139,7 @@ def test_uploaded_tone(admin, app):
     admin.post(f'/admin/central/tone/{m.id}/delete')
     with app.app_context():
         assert not central.uploaded_tones()
-        assert central.effective_tones()[g]['class'].startswith('class-')    # back to a default
+        assert central.effective_tones()[g]['class'] in central.CLASS_DEFAULTS    # back to a default
 
 
 def test_stage_without_program_and_inactive_stage(admin, app):
@@ -263,8 +263,8 @@ def test_multiple_bell_devices(admin, app):
     admin.post('/admin/central/test', data={'tone': 'kids-3', 'player': 'p2'})
     assert c.post('/api/central/poll', headers={'X-Bell-Key': k1}, json={}).get_json()['test'] is None
     assert c.post('/api/central/poll', headers={'X-Bell-Key': k2}, json={}).get_json()['test']['tone'] == 'kids-3'
-    admin.post('/admin/central/test', data={'tone': 'class-1', 'player': 'all'})
-    assert c.post('/api/central/poll', headers={'X-Bell-Key': k1}, json={}).get_json()['test']['tone'] == 'class-1'
+    admin.post('/admin/central/test', data={'tone': 'air-1', 'player': 'all'})
+    assert c.post('/api/central/poll', headers={'X-Bell-Key': k1}, json={}).get_json()['test']['tone'] == 'air-1'
     # a new key for building 1 does not stop building 2
     admin.post('/admin/central/key', data={'player': 'p1'})
     assert c.get('/api/central/schedule', headers={'X-Bell-Key': k1}).status_code == 401
@@ -390,7 +390,7 @@ def test_custom_rings_name_and_time(admin, app):
     r = admin.post('/admin/central/custom/add', data={'name': 'طابور الصباح', 't': '07:35', 'days': ['6', '0'], 'tone': 'kids-1',
                                                       'devices': ['p1'], 'enabled': '1'}, follow_redirects=True)
     assert 'أُضيف' in r.get_data(as_text=True)
-    admin.post('/admin/central/custom/add', data={'name': 'نهاية الدوام', 't': '13:47', 'days': ['3'], 'tone': 'class-1',
+    admin.post('/admin/central/custom/add', data={'name': 'نهاية الدوام', 't': '13:47', 'days': ['3'], 'tone': 'air-1',
                                                   'all_devices': '1', 'enabled': '1'})
     bad = admin.post('/admin/central/custom/add', data={'name': 'x', 't': '25:00', 'days': ['1'], 'tone': 'kids-1'}, follow_redirects=True)
     assert 'وقتاً صحيحاً' in bad.get_data(as_text=True)
@@ -529,40 +529,54 @@ def test_off_calendar_events_reach_the_devices(admin, app):
     assert 'offcal' in html and 'عطلة الشتاء' in html and 'data-off-edit' in html
 
 
-def test_three_tones_removed_for_good(admin, app):
+def test_traditional_tones_removed_for_good(admin, app):
     import central
     import os
-    for k in ('class-5', 'class-8', 'break-6'):
+    gone = ('class-1', 'class-2', 'class-3', 'class-4', 'class-5', 'class-6', 'class-8', 'break-3', 'break-5', 'break-6')
+    for k in gone:
         with app.app_context():
             assert k not in central.CENTRAL_TONES and k not in central.all_tone_keys()
         assert not os.path.exists(os.path.join(app.root_path, 'static', 'sounds', 'central', f'{k}.wav'))
+    assert set(central.RETIRED_TONES) == set(gone) and all(v in central.CENTRAL_TONES for v in central.RETIRED_TONES.values())
     with app.app_context():
         # a custom ring and a group that still point at a removed tone use its replacement
         central.save_custom_rings([{'id': 'a1', 'name': 'x', 't': '10:00', 'days': [0], 'tone': 'class-8', 'enabled': True, 'devices': None}])
-        assert central.custom_rings()[0]['tone'] == 'class-1'
+        assert central.custom_rings()[0]['tone'] == 'air-3'
         cfg = central.config()
-        cfg['tones'] = {'program:1': {'class': 'class-5', 'break': 'break-6'}}
+        cfg['tones'] = {'program:1': {'class': 'class-1', 'break': 'break-5'}}
         central.save_config(cfg)
-        assert central.effective_tones(cfg, [{'key': 'program:1'}])['program:1'] == {'class': 'class-2', 'break': 'break-1'}
+        assert central.effective_tones(cfg, [{'key': 'program:1'}])['program:1'] == {'class': 'air-2', 'break': 'break-1', 'end': central.SILENT}
+
+
+def test_announcement_chimes_are_in_the_library(admin, app):
+    import central
+    import os
+    keys = [k for k in central.CENTRAL_TONES if k.startswith('air-')]
+    assert len(keys) >= 6
+    with app.app_context():
+        for k in keys:
+            assert os.path.isfile(os.path.join(app.root_path, 'static', 'sounds', 'central', f'{k}.wav'))
+            assert k in central.library_keys() and central.CENTRAL_TONES[k][0] and central.CENTRAL_TONES[k][1]
+    assert all(k in central.CENTRAL_TONES for k in central.CLASS_DEFAULTS + central.BREAK_DEFAULTS + [central.END_DEFAULT])
 
 
 def test_repeat_plays_the_tone_several_times(admin, app):
     import io
     import wave
     import central
-    assert central.rep_key('class-1', 1) == 'class-1' and central.rep_key('class-1', 3) == 'class-1@x3'
-    assert central.split_key('class-1@x3') == ('class-1', 3) and central.split_key('class-1') == ('class-1', 1)
-    assert central.rep_key('class-1', 99) == 'class-1@x5' and central.clamp_repeat('x') == 1
-    single = admin.get('/static/sounds/central/class-1.wav').data
-    r = admin.get('/media/tone/class-1/3.wav')
+    assert central.rep_key('air-1', 1) == 'air-1' and central.rep_key('air-1', 3) == 'air-1@x3'
+    assert central.split_key('air-1@x3') == ('air-1', 3) and central.split_key('air-1') == ('air-1', 1)
+    assert central.rep_key('air-1', 99) == 'air-1@x5' and central.clamp_repeat('x') == 1
+    single = admin.get('/static/sounds/central/air-1.wav').data
+    r = admin.get('/media/tone/air-1/3.wav')
     assert r.status_code == 200 and r.mimetype == 'audio/wav'
     dur = lambda b: (lambda w: w.getnframes() / w.getframerate())(wave.open(io.BytesIO(b)))
     assert dur(r.data) > dur(single) * 3                      # three plays plus the pauses between them
-    assert admin.get('/media/tone/class-1/1.wav').status_code == 404
-    assert admin.get('/media/tone/class-1/9.wav').status_code == 404
+    assert admin.get('/media/tone/air-1/1.wav').status_code == 404
+    assert admin.get('/media/tone/air-1/9.wav').status_code == 404
     assert admin.get('/media/tone/nope/2.wav').status_code == 404
     with app.app_context():
-        assert central.tone_url('class-1@x3') == '/media/tone/class-1/3.wav' and central.tone_name('class-1@x3', 'en').endswith('×3')
+        assert central.tone_url('air-1@x3') == '/media/tone/air-1/3.wav' and central.tone_name('air-1@x3', 'en').endswith('×3')
 
 
 def test_repeat_setting_reaches_the_schedule(admin, app):
@@ -571,15 +585,15 @@ def test_repeat_setting_reaches_the_schedule(admin, app):
     with app.app_context():
         gk = central.groups()[0]['key']
     admin.post('/admin/central/save', data={'rep_seen': '1', f'rep_class__{gk}': '3', f'rep_break__{gk}': '2',
-                                            'end_seen': '1', 'end_on': '1', 'end_tone': 'class-2', 'end_repeat': '4'})
+                                            f'end__{gk}': 'air-3', f'rep_end__{gk}': '4'})
     admin.post('/admin/central/custom/add', data={'name': 'تنبيه', 't': '11:11', 'days': ['0'], 'tone': 'kids-1', 'repeat': '5',
                                                   'all_devices': '1', 'enabled': '1'})
     with app.app_context():
-        assert central.config()['repeats'][gk] == {'class': 3, 'break': 2}
+        assert central.config()['repeats'][gk] == {'class': 3, 'break': 2, 'end': 4}
         wk = central.week_rings()
         tones = {r['tone'] for day in wk.values() for slot in day for r in slot['rings']}
         assert any(t.endswith('@x3') for t in tones) and any(t.endswith('@x2') for t in tones)
-        assert 'class-2@x4' in tones and 'kids-1@x5' in tones
+        assert 'air-3@x4' in tones and 'kids-1@x5' in tones
         body = central.player_payload()
         assert body['tones']['kids-1@x5']['url'] == '/media/tone/kids-1/5.wav'
         # every ring's tone has a download address the device can fetch

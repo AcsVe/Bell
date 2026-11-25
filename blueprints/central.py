@@ -43,8 +43,7 @@ def page():
                   if k in central.CENTRAL_TONES]
     new_key = session.pop('central_new_key', None)
     new_key_for = session.pop('central_new_key_for', None)
-    end_tone = (cfg.get('end_ring') or {}).get('tone') or (lib[0][0] if lib else '')
-    return render_template('admin/central.html', end_tone=end_tone, cfg=cfg, groups=group_list, tones=tones, week=week, lib=lib,
+    return render_template('admin/central.html', cfg=cfg, groups=group_list, tones=tones, week=week, lib=lib,
                            uploads=central.uploaded_tones(), st=central.status(), has_key=central.has_key(),
                            new_key=new_key, new_key_for=new_key_for, devices=devs, today_rings=today_rings, today_off=today_off, next_ring=next_ring,
                            now=now, week_order=WEEK_ORDER, wd_names=weekday_names(session.get('lang', 'ar')),
@@ -96,23 +95,21 @@ def save():
         seen_p = request.form.getlist('per_seen')
         cfg['off_groups'] = sorted(g for g in seen_g if not request.form.get('on__' + g))
         cfg['off_periods'] = sorted(p for p in seen_p if not request.form.get('on__' + p))
-    if request.form.get('end_seen'):                  # رنّة نهاية الدوام (خانة وقائمة النغمة في النموذج نفسه)
-        tone = request.form.get('end_tone')
-        keys = set(central.all_tone_keys())
-        cfg['end_ring'] = {'enabled': bool(request.form.get('end_on')), 'tone': tone if tone in keys else '',
-                           'repeat': central.clamp_repeat(request.form.get('end_repeat'))}
     valid = set(central.all_tone_keys()) | {central.SILENT}
     for g in central.groups():
-        c, b = request.form.get(f'class__{g["key"]}'), request.form.get(f'break__{g["key"]}')
+        c, b, e = (request.form.get(f'{k}__{g["key"]}') for k in ('class', 'break', 'end'))
         cur = cfg['tones'].setdefault(g['key'], {})
         if c in valid:
             cur['class'] = c
         if b in valid:
             cur['break'] = b
+        if e in valid:                                 # نغمة نهاية الدوام لهذا البرنامج (بلا رنين = لا ترنّ)
+            cur['end'] = e
         if request.form.get('rep_seen'):              # عدد مرات تكرار النغمة في كل رنّة (1 إلى 5)
             cfg.setdefault('repeats', {})[g['key']] = {
                 'class': central.clamp_repeat(request.form.get(f'rep_class__{g["key"]}')),
-                'break': central.clamp_repeat(request.form.get(f'rep_break__{g["key"]}'))}
+                'break': central.clamp_repeat(request.form.get(f'rep_break__{g["key"]}')),
+                'end': central.clamp_repeat(request.form.get(f'rep_end__{g["key"]}'))}
     central.save_config(cfg)
     db.session.commit()
     flash(_msg('حُفظت إعدادات الجرس المركزي، ويصل التحديث إلى أجهزة الجرس خلال 15 ثانية',
@@ -175,7 +172,9 @@ def player_delete(pid):
 @login_required
 def test():
     tone = request.form.get('tone')
-    if tone not in central.all_tone_keys():
+    if tone in central.all_tone_keys():
+        tone = central.rep_key(tone, request.form.get('repeat'))        # التجربة تُرنّ بالتكرار المختار نفسه
+    if central.split_key(tone)[0] not in central.all_tone_keys():
         flash(_msg('اختر نغمة', 'Choose a tone'), 'error')
     elif request.form.get('devsel') and not request.form.getlist('players'):
         flash(_msg('اختر جهازاً واحداً على الأقل', 'Choose at least one device'), 'error')
