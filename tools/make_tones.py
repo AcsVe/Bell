@@ -46,16 +46,6 @@ def chime(freq, dur=1.8, decay=2.2):
     return out
 
 
-def echo(samples, delay=0.34, fb=0.45, taps=4):
-    """A clear, spacious echo: the tone repeated a few times, each quieter (the «effect» of a big hall)."""
-    step = int(RATE * delay)
-    out = [0.0] * (len(samples) + step * taps + 1)
-    for k in range(taps + 1):
-        amp, off = fb ** k, step * k
-        for i, v in enumerate(samples):
-            out[off + i] += v * amp
-    return out
-
 
 def marimba(freq, dur=0.6):
     n = int(RATE * dur)
@@ -176,14 +166,14 @@ def write(name, samples):
 
 
 def main():
-    # ── announcement chimes (airports, big stations): clear tone with an echo effect ──
+    # ── announcement chimes (airports, big stations): clean notes that ring out and fade, no echo, no clapper ──
     C = lambda n, d=1.8, dc=2.2: chime(NOTE[n], d, dc)
-    write('air-1', echo(overlap([(0, C('G5')), (0.55, C('E5')), (1.1, C('C5', 2.2))])))
-    write('air-2', echo(overlap([(0, C('E5', 2.0)), (0.85, C('C5', 2.6, 1.8))]), 0.4, 0.5))
-    write('air-3', echo(overlap([(0, C('C5')), (0.7, C('G5', 2.2))])))
-    write('air-4', echo(overlap([(0, C('C5')), (0.5, C('E5')), (1.0, C('G5', 2.4))])))
-    write('air-5', echo(overlap([(0, C('G5', 1.2, 3)), (0.4, C('G5', 1.2, 3)), (0.9, C('C6', 2.2, 2.4))]), 0.3, 0.5))
-    write('air-6', echo(overlap([(i * 0.42, C(n, 2.2, 1.9)) for i, n in enumerate(('C5', 'E5', 'G5', 'C6'))]), 0.38, 0.5, 5))
+    write('air-1', overlap([(0, C('G5')), (0.55, C('E5')), (1.1, C('C5', 2.2))]))
+    write('air-2', overlap([(0, C('E5', 2.0)), (0.85, C('C5', 2.6, 1.8))]))
+    write('air-3', overlap([(0, C('C5')), (0.7, C('G5', 2.2))]))
+    write('air-4', overlap([(0, C('C5')), (0.5, C('E5')), (1.0, C('G5', 2.4))]))
+    write('air-5', overlap([(0, C('G5', 1.2, 3)), (0.4, C('G5', 1.2, 3)), (0.9, C('C6', 2.2, 2.4))]))
+    write('air-6', overlap([(i * 0.42, C(n, 2.2, 1.9)) for i, n in enumerate(('C5', 'E5', 'G5', 'C6'))]))
     write('class-7', mix_seq([marimba(NOTE['G5'], 0.45), marimba(NOTE['E5'], 0.45), marimba(NOTE['C5'], 1.0)]))
     # ── break start ──
     write('break-1', mix_seq([marimba(NOTE[n], 0.22) for n in ('C5', 'D5', 'E5', 'F5', 'G5', 'A5')] + [marimba(NOTE['G5'], 0.9)]))

@@ -26,7 +26,7 @@ CENTRAL_TONES = {
     'air-3': ('محطة قطار: نغمتان صاعدتان', 'Train station: two rising chimes'),
     'air-4': ('مطار: ثلاث نغمات صاعدة', 'Airport: three rising chimes'),
     'air-5': ('إعلان: نغمة تنبيه', 'Announcement: attention chime'),
-    'air-6': ('محطة كبرى: أربع نغمات بصدى', 'Grand station: four chimes with echo'),
+    'air-6': ('محطة كبرى: أربع نغمات', 'Grand station: four chimes'),
     'class-7': ('ماريمبا هابطة', 'Falling marimba'),
     'break-1': ('لحن الاستراحة', 'Break melody'),
     'break-2': ('زقزقة', 'Chirps'),
