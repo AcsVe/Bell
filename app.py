@@ -219,6 +219,18 @@ def create_app(test_config=None):
         resp.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
         return resp
 
+    @app.route('/media/tone/<base>/<int:n>.wav')
+    def media_tone(base, n):
+        """A tone played n times in a row, built on demand (open like /media/: the devices fetch it without a session)."""
+        import central
+        key = 'media:' + base[6:] if base.startswith('media-') else base
+        built = central.repeated_audio(key, n) if 1 < n <= central.MAX_REPEAT else None
+        if not built:
+            abort(404)
+        resp = Response(built[0], mimetype=built[1])
+        resp.headers['Cache-Control'] = 'public, max-age=86400'
+        return resp
+
     @app.route('/healthz')
     def healthz():
         return 'ok'

@@ -55,7 +55,7 @@ def test_end_ring_follows_each_programs_last_period_and_the_day(env):
     r = admin.post('/admin/central/save', data={'end_seen': '1', 'end_on': '1', 'end_tone': 'class-2'})
     assert r.status_code == 302
     with app.app_context():
-        assert central.config()['end_ring'] == {'enabled': True, 'tone': 'class-2'}
+        assert central.config()['end_ring'] == {'enabled': True, 'tone': 'class-2', 'repeat': 1}
         week = central.week_rings()
         for wd in (SUN, TUE):
             ends = _last_end(app, wd)

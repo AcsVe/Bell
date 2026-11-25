@@ -187,17 +187,14 @@ def main():
     write('class-3', overlap([(0, bell(NOTE['C5'], 1.8)), (0.45, bell(NOTE['E5'], 1.8)), (0.9, bell(NOTE['G5'], 2.4))]))
     write('class-4', overlap([(0, bell(NOTE['E5'], 1.6, 1.6)), (0.6, bell(NOTE['G#5'], 1.6, 1.6)), (1.2, bell(NOTE['F#5'], 1.6, 1.6)),
                               (1.8, bell(NOTE['B4'], 2.8, 1.2))]))
-    write('class-5', mix_seq([beep(1320, 0.28), silence(0.12), beep(1320, 0.28), silence(0.5), beep(1320, 0.28), silence(0.12), beep(1320, 0.28)]))
     write('class-6', overlap([(0, bell(NOTE['A5'], 1.3, 2.5)), (0.55, bell(NOTE['A5'], 1.3, 2.5)), (1.1, bell(NOTE['A5'], 2.2, 2.0))]))
     write('class-7', mix_seq([marimba(NOTE['G5'], 0.45), marimba(NOTE['E5'], 0.45), marimba(NOTE['C5'], 1.0)]))
-    write('class-8', electric(6.0, 880, 22))
     # ── break start ──
     write('break-1', mix_seq([marimba(NOTE[n], 0.22) for n in ('C5', 'D5', 'E5', 'F5', 'G5', 'A5')] + [marimba(NOTE['G5'], 0.9)]))
     write('break-2', mix_seq([chirp(2200, 3600, 0.09), silence(0.05), chirp(2200, 3600, 0.09), silence(0.25)] * 3))
     write('break-3', overlap([(0, bell(NOTE['C6'], 1.5)), (0.45, bell(NOTE['A5'], 1.5)), (0.9, bell(NOTE['F5'], 1.5)), (1.35, bell(NOTE['C5'], 2.4))]))
     write('break-4', mix_seq([marimba(NOTE[n], 0.2) for n in ('C5', 'E5', 'G5', 'C6', 'G5', 'E5')] + [marimba(NOTE['C5'], 0.9)]))
     write('break-5', mix_seq([wood(), silence(0.1), wood(), silence(0.1), wood(0.12, 700), silence(0.3)] * 3))
-    write('break-6', mix_seq([electric(1.8, 1100, 26), silence(0.5), electric(1.8, 1100, 26)]))
     # ── children (kindergarten / primary) — soft and playful, no electric ringing ──
     N = NOTE
     write('kids-1', overlap([(i * 0.3, musicbox(N[n], 1.2)) for i, n in
