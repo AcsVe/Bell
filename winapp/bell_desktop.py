@@ -257,7 +257,7 @@ def selftest():
     assert 'غير صالح'.encode() in r.data, 'an invalid key was not refused'
     sched = c.get('/api/central/schedule', headers={'X-Bell-Key': key})
     assert sched.status_code == 200, 'the ringing device cannot read the schedule'
-    for path in ('static/css/admin.css', 'static/sounds/central/class-1.wav', 'static/firmware/manifest.json'):
+    for path in ('static/css/admin.css', 'static/sounds/central/air-1.wav', 'static/firmware/manifest.json'):
         assert os.path.exists(os.path.join(app_dir(), path)), 'missing file: ' + path
     assert bp.machine_fingerprint(), 'no computer fingerprint'
     bp.check_license('PERMANENT:x', 'SELFTEST00000000', bp.amman_now().date())
