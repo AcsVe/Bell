@@ -85,7 +85,7 @@
     <div class="shrink" style="min-width:220px"><label>{{ L('النغمة', 'Tone') }}</label>
       <div class="row" style="flex-wrap:nowrap;gap:6px"><select name="tone" data-tone-select>{% for k, name, url in lib %}<option value="{{ k }}" {{ 'selected' if c and c.tone == k }}>{{ name }}</option>{% endfor %}</select>
       <button type="button" class="ghost sm shrink" data-play title="{{ L('استماع', 'Listen') }}">▶</button></div></div>
-    <div class="shrink" style="min-width:120px"><label>{{ L('التكرار', 'Repeat') }}</label>{{ rep_select('repeat', c.repeat if c else 1) }}</div>
+    <div class="shrink" style="min-width:120px"><label>{{ L('التكرار', 'Repeat') }}</label>{{ rep_select('repeat', c.get('repeat', 1) if c else 1) }}</div>
   </div>
   <div class="row" style="gap:4px 14px;flex-wrap:wrap;margin-top:6px">
     <b class="shrink small">{{ L('الأيام:', 'Days:') }}</b>
