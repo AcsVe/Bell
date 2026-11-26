@@ -617,3 +617,20 @@ def test_central_page_survives_an_unreadable_computer_name(admin, app, monkeypat
         AppSetting.set('central_st:p1', '{"seen": "not a date"}')
         assert central.status('p1').get('seen') is None
     assert admin.get('/admin/central').status_code == 200
+
+
+def test_custom_ring_saved_before_the_repeat_option_still_renders(admin, app):
+    """رنّة مخصصة قديمة بلا حقل repeat أسقطت صفحة الجرس المركزي (UndefinedError) في نسخة سطح المكتب."""
+    import central
+    from models import db
+    _seed(admin, app)
+    with app.app_context():
+        central.save_custom_rings([{'id': 'old1', 'name': 'طابور الصباح', 't': '07:30', 'days': [0, 1], 'tone': 'kids-1',
+                                   'enabled': True, 'devices': None}])               # كما كانت تُحفظ قبل التكرار
+        db.session.commit()
+        assert central.custom_rings()[0]['repeat'] == 1
+    r = admin.get('/admin/central')
+    assert r.status_code == 200 and 'طابور الصباح' in r.get_data(as_text=True)
+    with app.app_context():
+        wk = central.week_rings()
+        assert any(rg['tone'] == 'kids-1' for day in wk.values() for slot in day for rg in slot['rings'])

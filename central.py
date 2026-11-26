@@ -295,7 +295,8 @@ def custom_rings():
         out = json.loads(AppSetting.get('central_custom') or '[]')
     except ValueError:
         out = []
-    out = [dict(c, tone=RETIRED_TONES.get(c.get('tone'), c.get('tone'))) for c in out if isinstance(c, dict) and c.get('t')]
+    out = [dict(c, tone=RETIRED_TONES.get(c.get('tone'), c.get('tone')), repeat=clamp_repeat(c.get('repeat', 1)))
+           for c in out if isinstance(c, dict) and c.get('t')]      # رنّة محفوظة قبل خيار التكرار تأخذ «مرة واحدة»
     return sorted(out, key=lambda c: (c['t'], c.get('name', '')))
 
 
