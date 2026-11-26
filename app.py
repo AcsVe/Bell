@@ -111,6 +111,25 @@ def create_app(test_config=None):
         from blueprints.desktop import desktop_bp
         app.register_blueprint(desktop_bp)
 
+        @app.errorhandler(Exception)
+        def _desktop_error(e):
+            """نسخة سطح المكتب: صفحة الخطأ تعرض سبب العطل (للدعم) بدل «Internal Server Error» الغامضة، ويُسجَّل في logs/server.log."""
+            from werkzeug.exceptions import HTTPException
+            if isinstance(e, HTTPException):
+                return e
+            import html
+            import traceback
+            app.logger.exception('page failed: %s', request.path)
+            tb = html.escape(traceback.format_exc()[-3500:])
+            body = ('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+                    '<body style="font-family:Tahoma,Arial,sans-serif;max-width:760px;margin:30px auto;padding:0 16px">'
+                    '<h2>حدث خطأ في هذه الصفحة · Something went wrong on this page</h2>'
+                    '<p>أرسل لقطة لهذه الصفحة إلى الدعم الفني. · Please send a screenshot of this page to support.</p>'
+                    f'<p dir="ltr"><b>{html.escape(request.path)}</b></p>'
+                    f'<pre dir="ltr" style="background:#f4f4f4;padding:12px;overflow:auto;white-space:pre-wrap;font-size:13px">{tb}</pre>'
+                    '<p><a href="/admin/">← العودة · Back</a></p></body>')
+            return Response(body, 500, mimetype='text/html')
+
     # حماية مصدر الصفحات: HTML مشفّر + منع الزر الأيمن وF12 وعرض المصدر — انظر page_shield.py
     from page_shield import install as _shield
     _shield(app)

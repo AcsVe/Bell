@@ -598,3 +598,22 @@ def test_repeat_setting_reaches_the_schedule(admin, app):
         assert body['tones']['kids-1@x5']['url'] == '/media/tone/kids-1/5.wav'
         # every ring's tone has a download address the device can fetch
         assert all(r['tone'] in body['tones'] for day in body['days'].values() for slot in day for r in slot['rings'])
+
+
+def test_central_page_survives_an_unreadable_computer_name(admin, app, monkeypatch):
+    """حاسوب باسم عربي أو غير مقروء يُسقط socket.gethostbyname_ex بـ UnicodeError: الصفحة لا تتعطل (كانت 500 في نسخة سطح المكتب)."""
+    import socket
+    import central
+
+    def boom(*a, **k):
+        raise UnicodeError('bad host name')
+    monkeypatch.setattr(socket, 'gethostbyname_ex', boom)
+    monkeypatch.setattr(socket, 'gethostname', lambda: 'حاسوب-المكتب')
+    assert central.lan_urls() is not None
+    r = admin.get('/admin/central')
+    assert r.status_code == 200
+    with app.app_context():                                              # حالة جهاز بقيمة وقت تالفة لا تُسقط الصفحة أيضاً
+        from models import AppSetting
+        AppSetting.set('central_st:p1', '{"seen": "not a date"}')
+        assert central.status('p1').get('seen') is None
+    assert admin.get('/admin/central').status_code == 200
