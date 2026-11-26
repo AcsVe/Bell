@@ -626,10 +626,15 @@ def status(pid=None):
         st = json.loads(AppSetting.get(f'central_st:{pid}') or '{}')
     except ValueError:
         st = {}
+    if not isinstance(st, dict):
+        st = {}
     if st.get('seen'):
-        age = (datetime.utcnow() - datetime.strptime(st['seen'], '%Y-%m-%dT%H:%M:%SZ')).total_seconds()
-        st['age_s'] = int(age)
-        st['online'] = age <= ONLINE_SECONDS
+        try:
+            age = (datetime.utcnow() - datetime.strptime(st['seen'], '%Y-%m-%dT%H:%M:%SZ')).total_seconds()
+            st['age_s'] = int(age)
+            st['online'] = age <= ONLINE_SECONDS
+        except (TypeError, ValueError):
+            st.pop('seen', None)
     return st
 
 
@@ -651,11 +656,11 @@ def lan_urls():
         s.connect(('10.255.255.255', 1))          # no packet is sent; picks the LAN interface
         ips.add(s.getsockname()[0])
         s.close()
-    except OSError:
+    except (OSError, ValueError):
         pass
     try:
         ips.update(socket.gethostbyname_ex(socket.gethostname())[2])
-    except OSError:
+    except (OSError, ValueError, UnicodeError):          # اسم الحاسوب العربي أو غير المعروف قد يُسقط الفحص: لا يُعطّل الصفحة
         pass
     good = sorted(ip for ip in ips if not ip.startswith(('127.', '169.254.', '0.')))
     return [f'http://{ip}:{port}' for ip in good][:4]
